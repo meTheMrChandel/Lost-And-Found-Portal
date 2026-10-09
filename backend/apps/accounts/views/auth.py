@@ -9,8 +9,14 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 
 from apps.accounts.models import User
-from apps.accounts.serializers.auth import RequestOTPSerializer, VerifyOTPSerializer
+from apps.accounts.serializers.auth import (
+    RequestOTPSerializer,
+    VerifyOTPSerializer,
+    RegisterSerializer,
+    PasswordResetConfirmSerializer,
+)
 from apps.accounts.utils import create_otp, send_otp_email, verify_otp
+
 
 
 class RequestOTPView(APIView):
