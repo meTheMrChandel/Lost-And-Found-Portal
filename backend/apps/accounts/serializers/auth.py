@@ -82,3 +82,35 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
+
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Enriches JWT access token payload with essential user profile fields:
+    - role: 'admin' if is_staff else 'user'
+    - full_name, email, registration_number
+    """
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["email"] = user.email
+        token["full_name"] = user.full_name
+        token["registration_number"] = user.registration_number
+        token["role"] = "admin" if user.is_staff else "user"
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data["user"] = {
+            "id": str(self.user.id),
+            "email": self.user.email,
+            "full_name": self.user.full_name,
+            "registration_number": self.user.registration_number,
+            "role": "admin" if self.user.is_staff else "user",
+            "is_staff": self.user.is_staff,
+        }
+        return data
+
+
