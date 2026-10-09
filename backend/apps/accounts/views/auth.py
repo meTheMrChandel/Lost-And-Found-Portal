@@ -77,3 +77,33 @@ class VerifyOTPView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class RegisterView(APIView):
+    """
+    POST /api/v1/auth/register/
+    Create a new student account after email verification.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(request=RegisterSerializer, responses={201: dict})
+    def post(self, request):
+        from apps.accounts.serializers.auth import RegisterSerializer
+        serializer = RegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        return Response(
+            {
+                "success": True,
+                "message": "Account created successfully. You can now log in.",
+                "data": {
+                    "id": str(user.id),
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "registration_number": user.registration_number,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
