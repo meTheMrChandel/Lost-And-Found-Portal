@@ -1,60 +1,107 @@
 # Lost & Found Portal — IIT Ropar
 
-A campus-wide Lost & Found portal for IIT Ropar students.  
-Repo layout: `backend/` (Django + DRF) | `frontend/` (Next.js) | `android/` (Kotlin, later).
+A campus-wide Lost & Found web and mobile platform for Indian Institute of Technology Ropar (CS509 PG Software Lab).
 
-## Stack
+---
 
-| Layer | Tech |
+## 🏗️ Technology Stack
+
+| Component | Technology |
 |---|---|
-| Web frontend | Next.js 14 (App Router) |
-| REST API | Django 5 + Django REST Framework |
-| Database | PostgreSQL 16 (MySQL schema also ready) |
-| Cache / Queue | Redis 7 + Celery |
-| Auth | SimpleJWT (Bearer for Android, httpOnly cookie for web) |
-| Storage | S3 / Cloudinary (presigned uploads) |
-| Real-time | Django Channels + WebSocket |
-| Android | Kotlin + Jetpack Compose (Week 5) |
+| **Web Frontend** | Next.js 16 (App Router, React 19, TypeScript, Tailwind CSS) |
+| **Backend REST API** | Django 5.2 + Django REST Framework (DRF) |
+| **Database** | SQLite (Local Dev) / PostgreSQL 16 (Docker & Production) |
+| **Cache & Message Broker** | Redis 7 + Celery 5.4 |
+| **Authentication** | SimpleJWT (httpOnly cookies for Web, Bearer tokens for Android) |
+| **Realtime Chat** | Django Channels 4 + WebSockets |
+| **API Specification** | OpenAPI 3.0 via `drf-spectacular` (Swagger UI & ReDoc) |
+| **Mobile App (Week 5)** | Kotlin + Jetpack Compose MVP |
 
-## Quick Start (Docker)
+---
 
-```bash
-cp .env.example .env          # fill in secrets
-docker compose up --build
-```
+## 📋 Phase 0: Setup, Foundations & Schema (Completed)
 
-API: http://localhost:8000/api/v1/  
-Frontend: http://localhost:3000  
-Admin: http://localhost:8000/admin/
+Phase 0 establishes the repository layout, containerized microservices, comprehensive database schema, validation constraints, and seed data.
 
-## Development
+### 1. Key Accomplishments
+- **Repository Structure:** Clean separation into `backend/`, `frontend/`, and top-level infrastructure configs.
+- **Docker Compose Setup:** Multi-container orchestration defined for `db` (Postgres 16), `redis`, `backend`, `celery`, `celery-beat`, and `frontend`.
+- **Database Schema & Models (19 Tables):**
+  - **`accounts`**: Custom `User` model (UUID primary key, mandatory `@iitrpr.ac.in` email validation, format-checked `registration_number`), `OTP` table with SHA-256 hash storage, and `DeviceToken` for push notifications.
+  - **`posts`**: `Category` model, `SiteSettings` (singleton), `Post` model supporting `LOST` and `FOUND` workflows with hidden verification proof fields and composite feed indexing, `PostImage` attachments, and `AbuseReport`.
+  - **`matching`**: `Match` lifecycle state engine (`suggested` → `confirmed` → `proof_pending` → `verified` → `handed_over` → `closed`), proof Q&A store, one-time handover token hashing, and immutable `MatchAuditLog`.
+  - **`items`**: `RegisteredItem` supporting zero-knowledge QR sticker generation (using non-identifying UUID URLs).
+  - **`chat`**: Admin-mediated `Conversation`, `Message` with delivery receipts, and `BlockedUser`.
+  - **`notifications`**: In-app notifications with delivery and read tracking.
+  - **`adminpanel`**: `PostAuditLog` and `AdminInvite` token workflows.
+- **Database Seeding (`seed_data`):**
+  - Seeded 11 campus categories: `bicycle`, `phone`, `laptop`, `earbuds`, `keys`, `id_card`, `bottle`, `umbrella`, `wallet` (sensitive), `cash` (sensitive), `other`.
+  - Seeded default `SiteSettings` (`match_threshold = 0.75`, `post_expiry_days = 30`, `otp_expiry_seconds = 300`).
+  - Pre-configured administrator accounts for local development.
+- **Standardized API Error Envelope:** DRF exception handler standardizing all errors to `{ "success": false, "code": "...", "message": "...", "errors": {} }`.
+- **CI/CD Automation:** GitHub Actions pipeline configured for testing, linting (`black`, `flake8`), and building frontend.
 
-```bash
-# Backend
+---
+
+## 🧪 Phase 0 Test Gate Verification
+
+Phase 0 verified the following criteria before moving forward:
+1. **Django System Check:** Passed with 0 errors (`python manage.py check`).
+2. **Database Migrations:** Clean execution on fresh databases across all 7 apps.
+3. **Automated Unit Tests (`pytest apps/posts/tests.py`):**
+   - ✅ `test_seed_categories_exist` (All 11 default categories exist)
+   - ✅ `test_site_settings_singleton` (Singleton configuration enforced)
+   - ✅ `test_valid_iitrpr_email_allowed` (Accepts `@iitrpr.ac.in` domain)
+   - ✅ `test_invalid_email_domain_rejected` (Rejects non-campus domains like `@gmail.com` on regular signups)
+   - ✅ `test_invalid_registration_number_rejected` (Enforces format like `2024CSM1001`)
+   - ✅ `test_negative_reward_rejected` (Validates non-negative rewards on lost items)
+4. **Frontend Build Verification:** Next.js application compiles cleanly with zero TypeScript errors (`npm run build`).
+
+---
+
+## 🚀 Running the Project
+
+### Backend
+```powershell
 cd backend
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements/dev.txt
+# Run migrations (if starting fresh)
 python manage.py migrate
-python manage.py seed_data
-python manage.py runserver
 
-# Frontend
+# Load initial categories & settings
+python manage.py seed_data
+
+# Start backend server
+python manage.py runserver
+```
+- API Base: `http://127.0.0.1:8000/api/v1/`
+- Admin Panel: `http://127.0.0.1:8000/admin/`
+- Swagger UI Documentation: `http://127.0.0.1:8000/api/v1/docs/`
+- ReDoc: `http://127.0.0.1:8000/api/v1/redoc/`
+
+### Frontend
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
+- Web Application: `http://localhost:3000/`
 
-## Implementation Phases
+---
 
-| Week | Phases | Goal |
-|---|---|---|
-| 1 | 0–2 | Setup, Auth, Roles |
-| 2 | 3–4 | Lost reports, Admin portal |
-| 3 | 5 + Matching | Feed, Found reports, Match queue |
-| 4 | 6–7 | Verify, Handover, QR |
-| 5 | 8–9 | Chat, Notifications, Android MVP |
-| 6 | 10–11 | Hardening, Deploy, Beta |
+## 🗺️ Roadmap & Phase Timeline
 
-## Team
-
-2-person project for CS509 PG Software Lab, MTech CSE — IIT Ropar.
+| Phase | Milestone | Status |
+|---|---|:---:|
+| **Phase 0** | Setup, Docker, Schema, Seeds, CI, and Foundation Tests | **Completed** |
+| **Phase 1** | Authentication & Registration (OTP, JWT, Profile creation) | *Next* |
+| **Phase 2** | Roles & Permissions (Admin vs Student boundaries) | Planned |
+| **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | Planned |
+| **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | Planned |
+| **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | Planned |
+| **Matching**| Celery Automated Matching Engine (Similarity scoring) | Planned |
+| **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | Planned |
+| **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | Planned |
+| **Phase 8** | WebSocket Chat & Push Notifications | Planned |
+| **Phase 9** | Android MVP (Kotlin + Jetpack Compose) | Planned |
+| **Phase 10**| Hardening, Rate Limiting & Load Testing | Planned |
+| **Phase 11**| Staging & Production Campus Deployment | Planned |
