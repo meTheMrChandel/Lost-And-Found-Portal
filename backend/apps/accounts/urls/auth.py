@@ -1,2 +1,11 @@
-﻿from django.urls import path
-urlpatterns = []
+"""
+accounts/urls/auth.py — Authentication endpoints.
+"""
+
+from django.urls import path
+from apps.accounts.views.auth import RequestOTPView, VerifyOTPView
+
+urlpatterns = [
+    path("request-otp/", RequestOTPView.as_view(), name="request-otp"),
+    path("verify-otp/", VerifyOTPView.as_view(), name="verify-otp"),
+]
