@@ -107,3 +107,67 @@ class RegisterView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
+
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from apps.accounts.serializers.auth import CustomTokenObtainPairSerializer
+
+
+class LoginView(TokenObtainPairView):
+    """
+    POST /api/v1/auth/login/
+    Returns JWT access & refresh tokens.
+    For web clients, sets secure httpOnly cookies.
+    """
+    serializer_class = CustomTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            access_token = response.data.get("access")
+            refresh_token = response.data.get("refresh")
+
+            # Set httpOnly cookies for Web clients
+            response.set_cookie(
+                key="access_token",
+                value=access_token,
+                httponly=True,
+                samesite="Lax",
+                max_age=15 * 60,
+            )
+            response.set_cookie(
+                key="refresh_token",
+                value=refresh_token,
+                httponly=True,
+                samesite="Lax",
+                max_age=7 * 24 * 60 * 60,
+            )
+        return response
+
+
+class LogoutView(APIView):
+    """
+    POST /api/v1/auth/logout/
+    Blacklists the refresh token and clears web auth cookies.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh") or request.COOKIES.get("refresh_token")
+            if refresh_token:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+        except Exception:
+            pass  # token already invalid or expired
+
+        response = Response(
+            {"success": True, "message": "Successfully logged out."},
+            status=status.HTTP_200_OK,
+        )
+        response.delete_cookie("access_token")
+        response.delete_cookie("refresh_token")
+        return response
+
+
