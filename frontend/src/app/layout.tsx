@@ -19,6 +19,8 @@ export const metadata: Metadata = {
   description: "Official Campus Lost and Found Portal for students and staff of IIT Ropar",
 };
 
+import { AuthProvider } from "@/context/AuthContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,8 +29,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${playfair.variable} ${inter.variable} antialiased`}>
       <body className="min-h-screen bg-[#FAF7F2] text-[#1C1C1E]">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
 }
+
