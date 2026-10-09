@@ -39,3 +39,46 @@ class VerifyOTPSerializer(serializers.Serializer):
         if not value.isdigit():
             raise serializers.ValidationError("OTP code must contain only 6 digits.")
         return value
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    """
+    Serializer to complete student registration.
+    Requires email, password, full_name, registration_number, department, program_year.
+    """
+    password = serializers.CharField(write_only=True, min_length=8)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "email",
+            "password",
+            "registration_number",
+            "full_name",
+            "department",
+            "program_year",
+            "hostel",
+            "phone",
+        ]
+        read_only_fields = ["id"]
+
+    def validate_email(self, value):
+        email = value.lower().strip()
+        validate_iitrpr_email(email)
+        if User.objects.filter(email=email).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return email
+
+    def validate_registration_number(self, value):
+        return value.upper().strip()
+
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        user = User.objects.create_user(
+            password=password,
+            is_email_verified=True,
+            **validated_data
+        )
+        return user
+
