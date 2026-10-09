@@ -71,3 +71,41 @@ def send_otp_email(email: str, code: str, purpose: str) -> None:
         recipient_list=[email],
         fail_silently=False,
     )
+
+
+def verify_otp(email: str, code: str, purpose: str) -> tuple[bool, str]:
+    """
+    Verify submitted OTP code against stored SHA-256 hash.
+    Enforces expiry and a max 3 attempt lockout.
+    Returns (success: bool, error_message: str).
+    """
+    max_attempts = getattr(settings, "OTP_MAX_ATTEMPTS", 3)
+
+    try:
+        otp = OTP.objects.filter(
+            email=email.lower(),
+            purpose=purpose,
+            is_used=False,
+        ).latest("created_at")
+    except OTP.DoesNotExist:
+        return False, "No active OTP found. Please request a new one."
+
+    if otp.is_expired():
+        return False, "OTP has expired. Please request a new one."
+
+    if otp.is_locked(max_attempts):
+        return False, "Too many wrong attempts. This OTP is locked. Please request a new one."
+
+    if otp.otp_hash != hash_otp(code):
+        otp.attempts += 1
+        otp.save(update_fields=["attempts"])
+        remaining = max_attempts - otp.attempts
+        if remaining <= 0:
+            return False, "Too many wrong attempts. This OTP is locked. Please request a new one."
+        return False, f"Incorrect OTP. {remaining} attempt(s) remaining."
+
+    # Mark OTP as successfully used
+    otp.is_used = True
+    otp.save(update_fields=["is_used"])
+    return True, ""
+
