@@ -1,12 +1,18 @@
+"use client";
+
 import CampusHeroSlider from "@/components/CampusHeroSlider";
+import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
 
 export default function Home() {
+  const { user, logout } = useAuth();
+
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#FAF7F2] text-[#1C1C1E]">
       {/* Navigation Bar */}
       <header className="border-b border-[#EFEAE0] bg-[#FAF7F2]/90 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#047857] flex items-center justify-center text-white font-bold text-xl shadow-sm">
               LF
             </div>
@@ -18,24 +24,44 @@ export default function Home() {
                 IIT ROPAR CAMPUS
               </span>
             </div>
-          </div>
+          </Link>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            <a
-              href="/login"
-              className="px-5 py-2.5 rounded-full text-sm font-medium text-[#1C1C1E] hover:bg-[#EFEAE0] transition-colors"
-            >
-              Log in
-            </a>
-            <a
-              href="/register"
-              className="px-5 py-2.5 rounded-full text-sm font-medium text-white bg-[#047857] hover:bg-[#10B981] shadow-sm transition-all"
-            >
-              Sign up
-            </a>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/profile"
+                  className="px-4 py-2 rounded-full text-xs font-semibold text-[#1C1C1E] bg-[#EFEAE0] hover:bg-[#E2DDD2] transition-colors"
+                >
+                  {user.full_name || user.email}
+                </Link>
+                <button
+                  onClick={logout}
+                  className="px-4 py-2 rounded-full text-xs font-semibold text-[#D94F3B] hover:bg-[#D94F3B]/10 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="px-5 py-2.5 rounded-full text-sm font-medium text-[#1C1C1E] hover:bg-[#EFEAE0] transition-colors"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-5 py-2.5 rounded-full text-sm font-medium text-white bg-[#047857] hover:bg-[#10B981] shadow-sm transition-all"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
+
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-12">
