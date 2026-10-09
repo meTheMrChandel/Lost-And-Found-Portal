@@ -171,3 +171,44 @@ class LogoutView(APIView):
         return response
 
 
+class PasswordResetConfirmView(APIView):
+    """
+    POST /api/v1/auth/password-reset-confirm/
+    Verifies OTP and resets user password.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(request=PasswordResetConfirmSerializer, responses={200: dict})
+    def post(self, request):
+        from apps.accounts.serializers.auth import PasswordResetConfirmSerializer
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+        new_password = serializer.validated_data["new_password"]
+
+        is_valid, err_msg = verify_otp(email=email, code=code, purpose=OTP.Purpose.PASSWORD_RESET)
+        if not is_valid:
+            return Response(
+                {"success": False, "code": "invalid_otp", "message": err_msg},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.filter(email=email).first()
+        if not user:
+            return Response(
+                {"success": False, "message": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response(
+            {"success": True, "message": "Password updated successfully. You may now log in."},
+            status=status.HTTP_200_OK,
+        )
+
+
+

@@ -114,3 +114,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """Serializer to reset password using an OTP code."""
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6, min_length=6)
+    new_password = serializers.CharField(min_length=8, write_only=True)
+
+    def validate_email(self, value):
+        return value.lower().strip()
+
+
+

@@ -10,6 +10,7 @@ from apps.accounts.views.auth import (
     LoginView,
     LogoutView,
     TokenRefreshView,
+    PasswordResetConfirmView,
 )
 
 urlpatterns = [
@@ -19,6 +20,8 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("refresh/", TokenRefreshView.as_view(), name="token-refresh"),
     path("logout/", LogoutView.as_view(), name="logout"),
+    path("password-reset-confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
 ]
+
 
 
