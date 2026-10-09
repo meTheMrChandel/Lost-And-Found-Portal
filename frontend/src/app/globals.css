@@ -1,26 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Warm cream background & charcoal text */
+  --background: #FAF7F2;
+  --foreground: #1C1C1E;
+
+  /* Brand Palette */
+  --color-emerald-primary: #047857;
+  --color-emerald-accent: #10B981;
+  --color-charcoal: #1C1C1E;
+  --color-warm-cream: #FAF7F2;
+  --color-sand: #EFEAE0;
+  --color-coral: #D94F3B;
+  --color-amber: #F5B73B;
+  --color-grey-secondary: #6B7280;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-brand-emerald: var(--color-emerald-primary);
+  --color-brand-emerald-light: var(--color-emerald-accent);
+  --color-brand-charcoal: var(--color-charcoal);
+  --color-brand-cream: var(--color-warm-cream);
+  --color-brand-sand: var(--color-sand);
+  --color-brand-coral: var(--color-coral);
+  --color-brand-amber: var(--color-amber);
+  --color-brand-muted: var(--color-grey-secondary);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-serif: var(--font-playfair), Cambria, Georgia, serif;
+  --font-sans: var(--font-inter), Calibri, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
 }
