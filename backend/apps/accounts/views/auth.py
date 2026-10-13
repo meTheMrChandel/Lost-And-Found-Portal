@@ -40,13 +40,14 @@ class RequestOTPView(APIView):
         code = create_otp(email=email, purpose=purpose, user=user)
         send_otp_email(email=email, code=code, purpose=purpose)
 
-        return Response(
-            {
-                "success": True,
-                "message": f"Verification code sent to {email}. Valid for 5 minutes.",
-            },
-            status=status.HTTP_200_OK,
-        )
+        resp_data = {
+            "success": True,
+            "message": f"Verification code sent to {email}. Valid for 5 minutes.",
+        }
+        if getattr(settings, "DEBUG", False):
+            resp_data["debug_otp"] = code
+
+        return Response(resp_data, status=status.HTTP_200_OK)
 
 
 class VerifyOTPView(APIView):
