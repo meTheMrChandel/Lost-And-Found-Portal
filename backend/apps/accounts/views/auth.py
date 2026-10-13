@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
+from django.conf import settings
 
 from apps.accounts.models import User
 from apps.accounts.serializers.auth import (
