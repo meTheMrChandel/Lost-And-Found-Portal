@@ -29,6 +29,14 @@ export default function Home() {
           <div className="flex items-center gap-3 sm:gap-4">
             {user ? (
               <div className="flex items-center gap-3">
+                {(user.is_staff || user.role === "admin") && (
+                  <Link
+                    href="/admin"
+                    className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-white bg-[#047857] hover:bg-[#10B981] shadow-sm transition-all"
+                  >
+                    Admin Portal
+                  </Link>
+                )}
                 <Link
                   href="/profile"
                   className="px-4 py-2 rounded-full text-xs font-semibold text-[#1C1C1E] bg-[#EFEAE0] hover:bg-[#E2DDD2] transition-colors"
