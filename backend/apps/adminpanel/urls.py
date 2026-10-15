@@ -6,6 +6,7 @@ from django.urls import path
 from apps.adminpanel.views.invites import AcceptAdminInviteView, AdminInviteListCreateView
 from apps.adminpanel.views.users import AdminUserListView, AdminUserModerationView
 from apps.adminpanel.views.audit import PostAuditLogListView
+from apps.adminpanel.views.settings import AdminSiteSettingsView
 
 urlpatterns = [
     path("invites/", AdminInviteListCreateView.as_view(), name="admin-invites-list-create"),
@@ -13,4 +14,5 @@ urlpatterns = [
     path("users/", AdminUserListView.as_view(), name="admin-users-list"),
     path("users/<uuid:user_id>/moderate/", AdminUserModerationView.as_view(), name="admin-users-moderate"),
     path("audit-logs/", PostAuditLogListView.as_view(), name="admin-audit-logs-list"),
+    path("settings/", AdminSiteSettingsView.as_view(), name="admin-site-settings"),
 ]
