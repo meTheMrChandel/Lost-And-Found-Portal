@@ -23,6 +23,7 @@ urlpatterns = [
     path("api/v1/chat/", include("apps.chat.urls")),
     path("api/v1/notifications/", include("apps.notifications.urls")),
     path("api/v1/admin/", include("apps.adminpanel.urls")),
+    path("api/v1/adminpanel/", include("apps.adminpanel.urls")),
 
     # OpenAPI schema + docs
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
