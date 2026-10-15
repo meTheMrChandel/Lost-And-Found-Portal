@@ -33,16 +33,12 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await apiClient<{ success: boolean; message: string; debug_otp?: string }>("/auth/request-otp/", {
+      const res = await apiClient<{ success: boolean; message: string }>("/auth/request-otp/", {
         method: "POST",
         data: { email, purpose: "registration" },
       });
-      if (res.debug_otp) {
-        setSuccessMsg(`${res.message} [Dev Mode OTP: ${res.debug_otp}]`);
-        setOtpCode(res.debug_otp);
-      } else {
-        setSuccessMsg(res.message);
-      }
+      setSuccessMsg(res.message);
+      setOtpCode("");
       setStep(2);
     } catch (err: any) {
       setError(err.message || "Failed to send OTP.");
