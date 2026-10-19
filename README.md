@@ -88,14 +88,33 @@ npm run dev
 
 ---
 
+## 📋 Phase 1: Authentication & Registration (Completed)
+
+- **OTP Verification & Rate Limiting:** Live SMTP delivery for `@iitrpr.ac.in` email OTP requests with brute-force lockout.
+- **JWT & Session Security:** SimpleJWT authentication flow supporting login, logout, password resets, and user profile updates.
+- **Frontend Flow:** Next.js authentication screens (`/login`, `/register`, `/forgot-password`, `/profile`) with campus theme and responsive slider.
+
+---
+
+## 📋 Phase 2: Roles, Permissions & Admin Panel (Completed)
+
+- **Role Boundaries & Permissions:** Custom DRF permissions (`IsCampusAdmin`, `IsStudentUser`, `IsNotBanned`, `IsOwnerOrAdmin`).
+- **Staff Authority & Invites:** Tokenized admin invite creation (`/api/v1/adminpanel/invites/`) and invitation acceptance (`/api/v1/adminpanel/invites/accept/`) with staff credential elevation.
+- **User Moderation:** Student query directory (`/api/v1/adminpanel/users/`) and account suspension/reinstate workflows with reason tracking.
+- **Audit Logs:** Immutable audit log history tracking status changes, admin interventions, and post moderation notes.
+- **Site Configuration:** Dynamic operational settings (`/api/v1/adminpanel/settings/`) for match threshold, post expiration days, and OTP lifetimes.
+- **Frontend Admin Portal:** Complete `/admin` section with Overview, Invites, User Moderation, Audit Logs, and Settings tabs protected by `AdminGuard`.
+
+---
+
 ## 🗺️ Roadmap & Phase Timeline
 
 | Phase | Milestone | Status |
 |---|---|:---:|
 | **Phase 0** | Setup, Docker, Schema, Seeds, CI, and Foundation Tests | **Completed** |
-| **Phase 1** | Authentication & Registration (OTP, JWT, Profile creation) | *Next* |
-| **Phase 2** | Roles & Permissions (Admin vs Student boundaries) | Planned |
-| **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | Planned |
+| **Phase 1** | Authentication & Registration (OTP, JWT, Profile creation) | **Completed** |
+| **Phase 2** | Roles & Permissions (Admin vs Student boundaries, Admin Portal) | **Completed** |
+| **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | **In Progress** |
 | **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | Planned |
 | **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | Planned |
 | **Matching**| Celery Automated Matching Engine (Similarity scoring) | Planned |
@@ -105,3 +124,4 @@ npm run dev
 | **Phase 9** | Android MVP (Kotlin + Jetpack Compose) | Planned |
 | **Phase 10**| Hardening, Rate Limiting & Load Testing | Planned |
 | **Phase 11**| Staging & Production Campus Deployment | Planned |
+
