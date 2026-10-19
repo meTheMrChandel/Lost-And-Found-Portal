@@ -28,7 +28,19 @@ export default function Home() {
 
           <div className="flex items-center gap-3 sm:gap-4">
             {user ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Link
+                  href="/report/lost"
+                  className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#D94F3B] hover:opacity-95 shadow-sm transition-all"
+                >
+                  + Report Lost
+                </Link>
+                <Link
+                  href="/my-reports"
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold text-[#1C1C1E] bg-[#EFEAE0] hover:bg-[#E2DDD2] transition-colors"
+                >
+                  My Reports
+                </Link>
                 {(user.is_staff || user.role === "admin") && (
                   <Link
                     href="/admin"
@@ -39,19 +51,25 @@ export default function Home() {
                 )}
                 <Link
                   href="/profile"
-                  className="px-4 py-2 rounded-full text-xs font-semibold text-[#1C1C1E] bg-[#EFEAE0] hover:bg-[#E2DDD2] transition-colors"
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold text-[#1C1C1E] bg-[#FAF7F2] border border-[#E2DDD2] hover:bg-[#EFEAE0] transition-colors"
                 >
                   {user.full_name || user.email}
                 </Link>
                 <button
                   onClick={logout}
-                  className="px-4 py-2 rounded-full text-xs font-semibold text-[#D94F3B] hover:bg-[#D94F3B]/10 transition-colors"
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold text-[#D94F3B] hover:bg-[#D94F3B]/10 transition-colors"
                 >
                   Logout
                 </button>
               </div>
             ) : (
               <>
+                <Link
+                  href="/report/lost"
+                  className="px-4 py-2 rounded-full text-xs font-bold text-white bg-[#D94F3B] hover:opacity-95 shadow-sm transition-all"
+                >
+                  + Report Lost
+                </Link>
                 <Link
                   href="/login"
                   className="px-5 py-2.5 rounded-full text-sm font-medium text-[#1C1C1E] hover:bg-[#EFEAE0] transition-colors"
@@ -76,6 +94,32 @@ export default function Home() {
         {/* Modern IIT Ropar Campus Image Slider */}
         <CampusHeroSlider />
 
+        {/* Quick Action Banner */}
+        <div className="p-6 rounded-3xl bg-gradient-to-r from-[#047857]/10 via-[#FAF7F2] to-[#FAF7F2] border border-[#047857]/20 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h3 className="font-serif text-xl font-bold text-[#1C1C1E]">
+              Lost something on campus?
+            </h3>
+            <p className="text-xs text-[#6B7280]">
+              Submit a report with confidential proof of ownership to initiate admin review and automated matching.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Link
+              href="/report/lost"
+              className="px-5 py-2.5 rounded-full bg-[#D94F3B] hover:opacity-95 text-white text-xs font-bold shadow-sm transition-all"
+            >
+              Report Lost Item →
+            </Link>
+            <Link
+              href="/my-reports"
+              className="px-5 py-2.5 rounded-full bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-[#1C1C1E] text-xs font-bold transition-all shadow-sm"
+            >
+              View My Reports
+            </Link>
+          </div>
+        </div>
+
         {/* Live Preview Cards Grid using Design System */}
         <div>
           <div className="flex items-center justify-between mb-6">
@@ -93,6 +137,7 @@ export default function Home() {
             >
               View all posts →
             </a>
+
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
