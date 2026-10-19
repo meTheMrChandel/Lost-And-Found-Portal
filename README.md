@@ -107,6 +107,18 @@ npm run dev
 
 ---
 
+## 📋 Phase 3: Lost Item Reporting — User 1 Flow (Completed)
+
+- **Post Creation & File Uploads:** Authenticated endpoints for reporting missing belongings (`/api/v1/posts/lost/`) with multi-image attachments (up to 5 images, max 5MB, format-checked).
+- **Confidential Ownership Proof:** Dedicated `hidden_proof` field for private verification details (lockscreen wallpaper, serial numbers, hidden scratches), strictly restricted to the author and campus admins.
+- **My Reports Dashboard:** Student tickets tracking endpoint (`/api/v1/posts/lost/my-reports/`) with status progression, admin notes, and ticket withdrawal.
+- **Frontend Reporting Suite:**
+  - `/report/lost`: Form with category picker, campus location shortcuts, drag-and-drop photo uploader, confidential proof section, and promised reward.
+  - `/my-reports`: Status-filtered dashboard (All, Pending, Approved, Info Requested, Returned, Rejected) with detail modal.
+- **Automated Tests:** 8 comprehensive integration test cases validating category listings, image constraints, post lifecycle, privacy of hidden proof, and permission boundaries. (23/23 tests passing).
+
+---
+
 ## 🗺️ Roadmap & Phase Timeline
 
 | Phase | Milestone | Status |
@@ -114,8 +126,8 @@ npm run dev
 | **Phase 0** | Setup, Docker, Schema, Seeds, CI, and Foundation Tests | **Completed** |
 | **Phase 1** | Authentication & Registration (OTP, JWT, Profile creation) | **Completed** |
 | **Phase 2** | Roles & Permissions (Admin vs Student boundaries, Admin Portal) | **Completed** |
-| **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | **In Progress** |
-| **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | Planned |
+| **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | **Completed** |
+| **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | *Next* |
 | **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | Planned |
 | **Matching**| Celery Automated Matching Engine (Similarity scoring) | Planned |
 | **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | Planned |
@@ -124,4 +136,5 @@ npm run dev
 | **Phase 9** | Android MVP (Kotlin + Jetpack Compose) | Planned |
 | **Phase 10**| Hardening, Rate Limiting & Load Testing | Planned |
 | **Phase 11**| Staging & Production Campus Deployment | Planned |
+
 
