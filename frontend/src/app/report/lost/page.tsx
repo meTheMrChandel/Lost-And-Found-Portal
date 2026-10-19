@@ -29,9 +29,8 @@ export default function ReportLostItemPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [lastSeenPlace, setLastSeenPlace] = useState("");
-  const [lastSeenTime, setLastSeenTime] = useState(
-    new Date().toISOString().slice(0, 16)
-  );
+  const [lastSeenTime, setLastSeenTime] = useState("");
+  const [maxDate, setMaxDate] = useState("");
   const [hiddenProof, setHiddenProof] = useState("");
   const [rewardAmount, setRewardAmount] = useState<number | string>(0);
   const [images, setImages] = useState<File[]>([]);
@@ -41,7 +40,12 @@ export default function ReportLostItemPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const nowStr = new Date().toISOString().slice(0, 16);
+    setLastSeenTime(nowStr);
+    setMaxDate(nowStr);
+
     // Fetch categories
+
     apiClient("/posts/categories/")
       .then((res) => {
         if (res?.data) {
@@ -330,11 +334,12 @@ export default function ReportLostItemPage() {
               <input
                 type="datetime-local"
                 required
-                max={new Date().toISOString().slice(0, 16)}
+                max={maxDate}
                 value={lastSeenTime}
                 onChange={(e) => setLastSeenTime(e.target.value)}
                 className="px-4 py-2.5 rounded-2xl bg-[#FAF7F2] border border-[#E2DDD2] text-xs font-mono focus:ring-2 focus:ring-[#047857] outline-none"
               />
+
             </div>
           </div>
 
