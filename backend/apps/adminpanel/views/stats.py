@@ -35,7 +35,7 @@ class AdminStatisticsView(APIView):
         total_users = User.objects.count()
         total_students = User.objects.filter(is_staff=False, is_superuser=False).count()
         banned_users = User.objects.filter(is_banned=True).count()
-        new_users_week = User.objects.filter(created_at__gte=last_7_days).count()
+        new_users_week = User.objects.filter(date_joined__gte=last_7_days).count()
 
         # Post metrics
         total_posts = Post.objects.count()
