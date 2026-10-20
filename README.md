@@ -119,6 +119,20 @@ npm run dev
 
 ---
 
+## 📋 Phase 4: Admin Portal & Case Queue (Completed)
+
+- **Case Queue & Filtering:** Centralized administrative case queue (`/api/v1/adminpanel/posts/`) with filtering by status, category, post type, SLA overdue detection (>24h pending), and text search.
+- **Interactive Review & Moderation:** Endpoint (`/api/v1/adminpanel/posts/<id>/review/`) supporting actions: `APPROVE` (publish to feed), `REJECT` (with mandatory reason), `INFO_REQUESTED` (request clarifications from student), `CHANGE_CATEGORY`, and `HIDE`.
+- **Abuse & Flagged Content Review:** Listing and resolving user-submitted abuse reports (`/api/v1/adminpanel/abuse-reports/`).
+- **Platform Analytics:** Real-time metrics endpoint (`/api/v1/adminpanel/statistics/`) calculating pending review counts, SLA breaches, category breakdown, community health, and recent audit activity.
+- **Admin Frontend Suite:**
+  - `/admin/cases`: Comprehensive Case Queue with status tabs, filter toolbar, photo zoom, student identity cards, confidential proof inspection, and moderation decision controls.
+  - `/admin/abuse-reports`: Student flagged item moderation panel with resolution workflow.
+  - `/admin`: Upgraded overview dashboard displaying real-time counters, SLA overdue alerts, category distribution, and recent audit activity.
+- **Automated Tests:** 9 test cases added covering case queue querying, confidential proof visibility, approval and rejection transitions, audit log persistence, student permission barriers, statistics calculation, and abuse resolution (32/32 tests passing across repository).
+
+---
+
 ## 🗺️ Roadmap & Phase Timeline
 
 | Phase | Milestone | Status |
@@ -127,8 +141,8 @@ npm run dev
 | **Phase 1** | Authentication & Registration (OTP, JWT, Profile creation) | **Completed** |
 | **Phase 2** | Roles & Permissions (Admin vs Student boundaries, Admin Portal) | **Completed** |
 | **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | **Completed** |
-| **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | *Next* |
-| **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | Planned |
+| **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | **Completed** |
+| **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | *Next* |
 | **Matching**| Celery Automated Matching Engine (Similarity scoring) | Planned |
 | **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | Planned |
 | **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | Planned |
