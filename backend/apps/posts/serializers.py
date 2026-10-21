@@ -7,7 +7,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework import serializers
 
-from apps.posts.models import Category, Post, PostImage
+from apps.posts.models import Category, Post, PostImage, AbuseReport
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -187,4 +187,101 @@ class LostPostUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Cannot modify post while in '{instance.get_status_display()}' status."
             )
+        return attrs
+
+
+class FoundPostCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for submitting a Found Item report (User 2 flow).
+    Supports custody location selection and optional private admin disclosure.
+    """
+
+    category = serializers.SlugRelatedField(
+        slug_field="slug",
+        queryset=Category.objects.all(),
+    )
+    custody_location = serializers.ChoiceField(
+        choices=Post.CustodyLocation.choices,
+        default=Post.CustodyLocation.WITH_FINDER,
+    )
+    inform_admin_privately = serializers.BooleanField(
+        default=False,
+        help_text="If true, item is visible only to campus administrators.",
+    )
+
+    class Meta:
+        model = Post
+        fields = [
+            "id",
+            "title",
+            "category",
+            "description",
+            "last_seen_place",
+            "last_seen_time",
+            "custody_location",
+            "inform_admin_privately",
+            "status",
+            "created_at",
+        ]
+        read_only_fields = ["id", "status", "created_at"]
+
+    def validate_last_seen_time(self, value):
+        now_with_buffer = timezone.now() + timedelta(minutes=5)
+        if value > now_with_buffer:
+            raise serializers.ValidationError("Found date and time cannot be in the future.")
+        return value
+
+
+class PublicFeedPostSerializer(serializers.ModelSerializer):
+    """
+    Public feed serializer.
+    Guarantees strict privacy:
+      - Sensitive items (wallet/cash) excluded
+      - Private admin items excluded
+      - Hidden proofs completely omitted
+      - Only displays approved posts
+    """
+
+    category = serializers.SlugRelatedField(slug_field="slug", read_only=True)
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    images = PostImageSerializer(many=True, read_only=True)
+    author_name = serializers.CharField(source="author.full_name", read_only=True)
+    author_registration_number = serializers.CharField(
+        source="author.registration_number", read_only=True
+    )
+
+    class Meta:
+        model = Post
+        fields = [
+            "id",
+            "title",
+            "post_type",
+            "category",
+            "category_name",
+            "description",
+            "last_seen_place",
+            "last_seen_time",
+            "reward_amount",
+            "custody_location",
+            "images",
+            "author_name",
+            "author_registration_number",
+            "created_at",
+            "expires_at",
+        ]
+
+
+class AbuseReportCreateSerializer(serializers.ModelSerializer):
+    """Serializer for students submitting abuse/fraud reports on a post."""
+
+    class Meta:
+        model = AbuseReport
+        fields = ["reason", "description"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        post = self.context.get("post")
+        if request and post:
+            if AbuseReport.objects.filter(post=post, reporter=request.user).exists():
+                raise serializers.ValidationError("You have already reported this post for review.")
         return attrs
