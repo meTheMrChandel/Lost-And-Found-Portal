@@ -297,3 +297,212 @@ class TestPhase3LostItemReporting:
         res = client.post("/api/v1/posts/lost/", data=payload, format="json")
         assert res.status_code == 403
 
+
+@pytest.mark.django_db
+class TestPhase5FeedAndFoundReports:
+    """Test suite for Phase 5: Public Feed, Found Item Reports, and Abuse Reporting."""
+
+    @pytest.fixture
+    def student_user(self):
+        return User.objects.create_user(
+            email="finder.student@iitrpr.ac.in",
+            registration_number="2024CSM1020",
+            password="testpassword123",
+            full_name="Finder Student",
+        )
+
+    @pytest.fixture
+    def other_student(self):
+        return User.objects.create_user(
+            email="other.student@iitrpr.ac.in",
+            registration_number="2024CSM1021",
+            password="testpassword123",
+            full_name="Other Student",
+        )
+
+    def test_found_post_creation_success(self, client, student_user):
+        """Student can submit a found item report with custody location."""
+        client.force_authenticate(user=student_user)
+        payload = {
+            "title": "Found Water Bottle",
+            "category": "bottle",
+            "description": "Milton black insulated bottle with IIT sticker",
+            "last_seen_place": "LHC 101 front row",
+            "last_seen_time": "2026-10-20T12:00:00Z",
+            "custody_location": "finder",
+            "inform_admin_privately": False,
+        }
+        res = client.post("/api/v1/posts/found/", data=payload, format="json")
+        assert res.status_code == 201
+        data = res.json()["data"]
+        assert data["title"] == "Found Water Bottle"
+        assert data["post_type"] == "FOUND"
+        assert data["status"] == "PENDING"
+        assert Post.objects.filter(id=data["id"], custody_location="finder").exists()
+
+    def test_found_post_with_private_admin_disclosure(self, client, student_user):
+        """Student can flag a found item to inform admin privately."""
+        client.force_authenticate(user=student_user)
+        payload = {
+            "title": "Found Expensive Earbuds",
+            "category": "earbuds",
+            "description": "Found near main gate",
+            "last_seen_place": "Main Gate Security",
+            "last_seen_time": "2026-10-20T12:00:00Z",
+            "custody_location": "security_office",
+            "inform_admin_privately": True,
+        }
+        res = client.post("/api/v1/posts/found/", data=payload, format="json")
+        assert res.status_code == 201
+        post = Post.objects.get(id=res.json()["data"]["id"])
+        assert post.inform_admin_privately is True
+        assert post.is_public is False
+
+    def test_feed_only_shows_approved_posts(self, client, student_user):
+        """Public feed only includes approved posts."""
+        cat = Category.objects.get(slug="umbrella")
+        pending_post = Post.objects.create(
+            author=student_user,
+            post_type=Post.PostType.FOUND,
+            category=cat,
+            title="Pending Umbrella",
+            description="Blue umbrella",
+            last_seen_place="Cafeteria",
+            last_seen_time="2026-10-20T10:00:00Z",
+            status=Post.Status.PENDING,
+        )
+        approved_post = Post.objects.create(
+            author=student_user,
+            post_type=Post.PostType.FOUND,
+            category=cat,
+            title="Approved Umbrella",
+            description="Blue umbrella",
+            last_seen_place="Cafeteria",
+            last_seen_time="2026-10-20T10:00:00Z",
+            status=Post.Status.APPROVED,
+        )
+
+        res = client.get("/api/v1/posts/feed/")
+        assert res.status_code == 200
+        feed_ids = [p["id"] for p in res.json()["data"]]
+        assert str(approved_post.id) in feed_ids
+        assert str(pending_post.id) not in feed_ids
+
+    def test_feed_excludes_sensitive_categories(self, client, student_user):
+        """Sensitive categories (wallet, cash) never appear in the public feed."""
+        wallet_cat = Category.objects.get(slug="wallet")
+        assert wallet_cat.is_sensitive is True
+
+        sensitive_post = Post.objects.create(
+            author=student_user,
+            post_type=Post.PostType.FOUND,
+            category=wallet_cat,
+            title="Found Brown Leather Wallet",
+            description="Found wallet containing cards",
+            last_seen_place="Library",
+            last_seen_time="2026-10-20T10:00:00Z",
+            status=Post.Status.APPROVED,
+        )
+
+        res = client.get("/api/v1/posts/feed/")
+        assert res.status_code == 200
+        feed_ids = [p["id"] for p in res.json()["data"]]
+        assert str(sensitive_post.id) not in feed_ids
+
+    def test_feed_filtering_and_search(self, client, student_user):
+        """Public feed filters by category, post_type, and search keyword."""
+        cat_keys = Category.objects.get(slug="keys")
+        cat_phone = Category.objects.get(slug="phone")
+
+        p_keys = Post.objects.create(
+            author=student_user,
+            post_type=Post.PostType.LOST,
+            category=cat_keys,
+            title="Lost Hostel Room 102 Key",
+            description="Silver key with blue ring",
+            last_seen_place="Satluj Hostel",
+            last_seen_time="2026-10-20T09:00:00Z",
+            status=Post.Status.APPROVED,
+        )
+        p_phone = Post.objects.create(
+            author=student_user,
+            post_type=Post.PostType.FOUND,
+            category=cat_phone,
+            title="Found Samsung Galaxy S23",
+            description="Green phone with clear cover",
+            last_seen_place="Lecture Hall 2",
+            last_seen_time="2026-10-20T09:00:00Z",
+            status=Post.Status.APPROVED,
+        )
+
+        # Filter by category
+        res_keys = client.get("/api/v1/posts/feed/?category=keys")
+        assert res_keys.status_code == 200
+        keys_ids = [p["id"] for p in res_keys.json()["data"]]
+        assert str(p_keys.id) in keys_ids
+        assert str(p_phone.id) not in keys_ids
+
+        # Filter by post_type
+        res_found = client.get("/api/v1/posts/feed/?post_type=FOUND")
+        assert res_found.status_code == 200
+        found_ids = [p["id"] for p in res_found.json()["data"]]
+        assert str(p_phone.id) in found_ids
+        assert str(p_keys.id) not in found_ids
+
+        # Search query
+        res_search = client.get("/api/v1/posts/feed/?search=Samsung")
+        assert res_search.status_code == 200
+        search_ids = [p["id"] for p in res_search.json()["data"]]
+        assert str(p_phone.id) in search_ids
+        assert str(p_keys.id) not in search_ids
+
+    def test_student_can_report_abuse(self, client, student_user, other_student):
+        """Student can report abuse on a post; duplicate reporting is prevented."""
+        cat = Category.objects.get(slug="bottle")
+        post = Post.objects.create(
+            author=student_user,
+            post_type=Post.PostType.FOUND,
+            category=cat,
+            title="Test Bottle",
+            description="Test",
+            last_seen_place="Campus",
+            last_seen_time="2026-10-20T10:00:00Z",
+            status=Post.Status.APPROVED,
+        )
+
+        client.force_authenticate(user=other_student)
+        payload = {"reason": "spam", "description": "Obvious test post"}
+        res = client.post(f"/api/v1/posts/{post.id}/report-abuse/", data=payload, format="json")
+        assert res.status_code == 201
+
+        # Duplicate attempt fails
+        res_dup = client.post(f"/api/v1/posts/{post.id}/report-abuse/", data=payload, format="json")
+        assert res_dup.status_code == 400
+
+    def test_author_can_renew_post(self, client, student_user, other_student):
+        """Author can renew active post; unauthorized student is blocked."""
+        cat = Category.objects.get(slug="bicycle")
+        post = Post.objects.create(
+            author=student_user,
+            post_type=Post.PostType.LOST,
+            category=cat,
+            title="My Bicycle",
+            description="Bicycle description",
+            last_seen_place="Brahmaputra",
+            last_seen_time="2026-10-20T10:00:00Z",
+            status=Post.Status.APPROVED,
+        )
+
+        # Other student cannot renew
+        client.force_authenticate(user=other_student)
+        res_fail = client.post(f"/api/v1/posts/{post.id}/renew/")
+        assert res_fail.status_code == 403
+
+        # Author can renew
+        client.force_authenticate(user=student_user)
+        res_success = client.post(f"/api/v1/posts/{post.id}/renew/")
+        assert res_success.status_code == 200
+        post.refresh_from_db()
+        assert post.renewed_at is not None
+
+
