@@ -36,6 +36,8 @@ export interface Post {
   last_seen_time: string;
   hidden_proof?: string;
   reward_amount: string | number;
+  custody_location?: string;
+  inform_admin_privately?: boolean;
   status: PostStatus;
   admin_remarks?: string;
   images: PostImage[];
