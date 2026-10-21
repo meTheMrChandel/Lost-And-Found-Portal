@@ -133,6 +133,20 @@ npm run dev
 
 ---
 
+## 📋 Phase 5: Public Feed & Found Reports — User 2 Flow (Completed)
+
+- **Found Item Reporting:** Authenticated submission endpoint (`/api/v1/posts/found/`) with custody assignment (`finder`, `admin_office`, `security_office`), private admin disclosure option, and multi-photo attachments.
+- **Public Campus Feed:** Secure public feed (`/api/v1/posts/feed/` & `/api/v1/posts/`) filtering strictly approved, unexpired posts while automatically concealing sensitive items (wallets, cash) and private admin records.
+- **Abuse & Flagging Flow:** Public reporting endpoint (`/api/v1/posts/<id>/report-abuse/`) preventing duplicate flagging by the same user.
+- **Post Lifecycle Renewal:** Endpoint (`/api/v1/posts/<id>/renew/`) enabling owners to extend their post visibility by 30 days.
+- **Frontend Directory Suite:**
+  - `/feed`: Campus Belongings Directory with type toggle (All, Lost, Found), category horizontal scroller, text search, sorting (Newest, Oldest, Highest Reward), and item detail modal with abuse reporting.
+  - `/report/found`: "I Found Something" multi-section form with custody options, private admin disclosure, and photo upload.
+  - Homepage navigation bar and quick action banner updated with links to Feed and Found reporting.
+- **Automated Tests:** 7 comprehensive integration test cases validating found post creation, private admin disclosure, sensitive category suppression, feed filtering, abuse reporting, and post renewal. (39/39 tests passing across repository).
+
+---
+
 ## 🗺️ Roadmap & Phase Timeline
 
 | Phase | Milestone | Status |
@@ -142,8 +156,8 @@ npm run dev
 | **Phase 2** | Roles & Permissions (Admin vs Student boundaries, Admin Portal) | **Completed** |
 | **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | **Completed** |
 | **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | **Completed** |
-| **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | *Next* |
-| **Matching**| Celery Automated Matching Engine (Similarity scoring) | Planned |
+| **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | **Completed** |
+| **Matching**| Celery Automated Matching Engine (Similarity scoring) | *Next* |
 | **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | Planned |
 | **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | Planned |
 | **Phase 8** | WebSocket Chat & Push Notifications | Planned |
