@@ -2,8 +2,11 @@
 posts/views.py — API views for Category listing, Lost Post reporting, and My Reports.
 """
 
+from datetime import timedelta
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -11,13 +14,16 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from apps.accounts.permissions import IsNotBanned, IsOwnerOrAdmin
-from apps.posts.models import Category, Post, PostImage
+from apps.posts.models import Category, Post, PostImage, AbuseReport, SiteSettings
 from apps.posts.serializers import (
     CategorySerializer,
     LostPostCreateSerializer,
     LostPostDetailSerializer,
     LostPostListSerializer,
     LostPostUpdateSerializer,
+    FoundPostCreateSerializer,
+    PublicFeedPostSerializer,
+    AbuseReportCreateSerializer,
 )
 
 MAX_IMAGES_ALLOWED = 5
@@ -244,3 +250,226 @@ class LostPostDetailView(APIView):
             {"success": True, "message": "Report has been withdrawn and removed."},
             status=status.HTTP_200_OK,
         )
+
+
+class FoundPostCreateView(APIView):
+    """
+    POST /api/v1/posts/found/
+    Submit a found item report (User 2 flow).
+    Supports custody location selection and private disclosure option.
+    """
+
+    permission_classes = [IsAuthenticated, IsNotBanned]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @extend_schema(
+        request=FoundPostCreateSerializer,
+        responses={201: LostPostDetailSerializer},
+    )
+    def post(self, request):
+        serializer = FoundPostCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        images = request.FILES.getlist("images")
+        if len(images) > MAX_IMAGES_ALLOWED:
+            raise ValidationError(f"Maximum of {MAX_IMAGES_ALLOWED} photos can be attached.")
+
+        for f in images:
+            if f.size > MAX_IMAGE_SIZE_BYTES:
+                raise ValidationError(f"Image '{f.name}' exceeds the 5MB size limit.")
+            if f.content_type not in ALLOWED_CONTENT_TYPES:
+                raise ValidationError(
+                    f"File '{f.name}' is not an accepted image format (JPG, PNG, WEBP)."
+                )
+
+        post = serializer.save(
+            author=request.user,
+            post_type=Post.PostType.FOUND,
+            status=Post.Status.PENDING,
+        )
+
+        if images:
+            _process_uploaded_images(post, images)
+
+        response_serializer = LostPostDetailSerializer(post, context={"request": request})
+        return Response(
+            {
+                "success": True,
+                "message": "Found item reported successfully. Campus administrators will verify custody.",
+                "data": response_serializer.data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PublicFeedView(APIView):
+    """
+    GET /api/v1/posts/feed/ & GET /api/v1/posts/
+    Public campus feed of verified and approved items.
+    Enforces strict privacy: excludes sensitive categories, private admin items, and expired posts.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="category", description="Filter by category slug", required=False, type=str),
+            OpenApiParameter(name="post_type", description="Filter by post type (LOST/FOUND)", required=False, type=str),
+            OpenApiParameter(name="search", description="Search in title, description, and location", required=False, type=str),
+            OpenApiParameter(name="ordering", description="Ordering field (-created_at, created_at, reward_amount, -reward_amount)", required=False, type=str),
+        ],
+        responses={200: PublicFeedPostSerializer(many=True)},
+    )
+    def get(self, request):
+        now = timezone.now()
+        posts = (
+            Post.objects.filter(
+                status=Post.Status.APPROVED,
+                category__is_sensitive=False,
+                inform_admin_privately=False,
+                expires_at__gt=now,
+            )
+            .select_related("category", "author")
+            .prefetch_related("images")
+        )
+
+        # Filters
+        category_param = request.query_params.get("category")
+        if category_param:
+            posts = posts.filter(category_id=category_param)
+
+        post_type_param = request.query_params.get("post_type")
+        if post_type_param and post_type_param.upper() in ["LOST", "FOUND"]:
+            posts = posts.filter(post_type=post_type_param.upper())
+
+        search_param = request.query_params.get("search")
+        if search_param:
+            q = search_param.strip()
+            posts = posts.filter(
+                Q(title__icontains=q)
+                | Q(description__icontains=q)
+                | Q(last_seen_place__icontains=q)
+            )
+
+        ordering = request.query_params.get("ordering", "-created_at")
+        allowed_orderings = ["-created_at", "created_at", "-reward_amount", "reward_amount"]
+        if ordering in allowed_orderings:
+            posts = posts.order_by(ordering)
+        else:
+            posts = posts.order_by("-created_at")
+
+        serializer = PublicFeedPostSerializer(posts, many=True)
+        return Response({"success": True, "data": serializer.data}, status=status.HTTP_200_OK)
+
+
+class PostPublicDetailView(APIView):
+    """
+    GET /api/v1/posts/<id>/
+    Retrieve post details for the public view.
+    Enforces privacy: non-approved or sensitive posts accessible only by author or staff.
+    Confidential hidden_proof is stripped for non-authors.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(responses={200: LostPostDetailSerializer})
+    def get(self, request, pk):
+        try:
+            post = (
+                Post.objects.select_related("category", "author")
+                .prefetch_related("images")
+                .get(pk=pk)
+            )
+        except Post.DoesNotExist:
+            raise NotFound("Post not found.")
+
+        # Privacy gate
+        user = request.user if request.user.is_authenticated else None
+        is_owner = user and user == post.author
+        is_staff = user and (user.is_staff or user.is_superuser)
+
+        if not (is_owner or is_staff):
+            if post.status != Post.Status.APPROVED or post.category.is_sensitive or post.inform_admin_privately:
+                raise PermissionDenied("You do not have permission to view this post.")
+
+        serializer = LostPostDetailSerializer(post, context={"request": request})
+        return Response({"success": True, "data": serializer.data}, status=status.HTTP_200_OK)
+
+
+class PostReportAbuseView(APIView):
+    """
+    POST /api/v1/posts/<id>/report-abuse/
+    Students report fraudulent, spam, or inappropriate posts.
+    """
+
+    permission_classes = [IsAuthenticated, IsNotBanned]
+
+    @extend_schema(
+        request=AbuseReportCreateSerializer,
+        responses={201: dict},
+    )
+    def post(self, request, pk):
+        try:
+            post = Post.objects.get(pk=pk)
+        except Post.DoesNotExist:
+            raise NotFound("Post not found.")
+
+        serializer = AbuseReportCreateSerializer(
+            data=request.data,
+            context={"request": request, "post": post},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        AbuseReport.objects.create(
+            post=post,
+            reporter=request.user,
+            reason=serializer.validated_data["reason"],
+            description=serializer.validated_data.get("description", ""),
+        )
+
+        return Response(
+            {
+                "success": True,
+                "message": "Thank you for reporting. Campus administrators will investigate this post.",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PostRenewView(APIView):
+    """
+    POST /api/v1/posts/<id>/renew/
+    Author extends active listing by post_expiry_days (default 30 days).
+    """
+
+    permission_classes = [IsAuthenticated, IsNotBanned]
+
+    def post(self, request, pk):
+        try:
+            post = Post.objects.get(pk=pk)
+        except Post.DoesNotExist:
+            raise NotFound("Post not found.")
+
+        if post.author != request.user and not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied("Only the post author can renew this listing.")
+
+        site_settings = SiteSettings.get()
+        expiry_days = site_settings.post_expiry_days or 30
+
+        post.expires_at = timezone.now() + timedelta(days=expiry_days)
+        post.renewed_at = timezone.now()
+        post.save()
+
+        return Response(
+            {
+                "success": True,
+                "message": f"Post renewed for {expiry_days} additional days.",
+                "data": {
+                    "id": post.id,
+                    "expires_at": post.expires_at,
+                    "renewed_at": post.renewed_at,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
