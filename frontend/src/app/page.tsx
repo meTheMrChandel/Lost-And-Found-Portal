@@ -27,13 +27,26 @@ export default function Home() {
           </Link>
 
           <div className="flex items-center gap-3 sm:gap-4">
+            <Link
+              href="/feed"
+              className="text-xs font-semibold text-[#1C1C1E] hover:text-[#047857] transition-colors hidden md:block"
+            >
+              Public Feed
+            </Link>
+
             {user ? (
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link
                   href="/report/lost"
-                  className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-[#D94F3B] hover:opacity-95 shadow-sm transition-all"
+                  className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-[#D94F3B] hover:opacity-95 shadow-sm transition-all"
                 >
-                  + Report Lost
+                  + Lost
+                </Link>
+                <Link
+                  href="/report/found"
+                  className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-[#047857] hover:bg-[#10B981] shadow-sm transition-all"
+                >
+                  + Found
                 </Link>
                 <Link
                   href="/my-reports"
@@ -44,7 +57,7 @@ export default function Home() {
                 {(user.is_staff || user.role === "admin") && (
                   <Link
                     href="/admin"
-                    className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-white bg-[#047857] hover:bg-[#10B981] shadow-sm transition-all"
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-[#1C1C1E] hover:bg-black shadow-sm transition-all"
                   >
                     Admin Portal
                   </Link>
@@ -66,19 +79,25 @@ export default function Home() {
               <>
                 <Link
                   href="/report/lost"
-                  className="px-4 py-2 rounded-full text-xs font-bold text-white bg-[#D94F3B] hover:opacity-95 shadow-sm transition-all"
+                  className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-[#D94F3B] hover:opacity-95 shadow-sm transition-all"
                 >
-                  + Report Lost
+                  + Lost
+                </Link>
+                <Link
+                  href="/report/found"
+                  className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-[#047857] hover:bg-[#10B981] shadow-sm transition-all"
+                >
+                  + Found
                 </Link>
                 <Link
                   href="/login"
-                  className="px-5 py-2.5 rounded-full text-sm font-medium text-[#1C1C1E] hover:bg-[#EFEAE0] transition-colors"
+                  className="px-4 py-2 rounded-full text-xs font-medium text-[#1C1C1E] hover:bg-[#EFEAE0] transition-colors"
                 >
                   Log in
                 </Link>
                 <Link
                   href="/register"
-                  className="px-5 py-2.5 rounded-full text-sm font-medium text-white bg-[#047857] hover:bg-[#10B981] shadow-sm transition-all"
+                  className="px-4 py-2 rounded-full text-xs font-medium text-white bg-[#047857] hover:bg-[#10B981] shadow-sm transition-all"
                 >
                   Sign up
                 </Link>
@@ -104,18 +123,24 @@ export default function Home() {
               Submit a report with confidential proof of ownership to initiate admin review and automated matching.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2.5">
             <Link
               href="/report/lost"
-              className="px-5 py-2.5 rounded-full bg-[#D94F3B] hover:opacity-95 text-white text-xs font-bold shadow-sm transition-all"
+              className="px-4 py-2 rounded-full bg-[#D94F3B] hover:opacity-95 text-white text-xs font-bold shadow-sm transition-all"
             >
-              Report Lost Item →
+              Report Lost Item
             </Link>
             <Link
-              href="/my-reports"
-              className="px-5 py-2.5 rounded-full bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-[#1C1C1E] text-xs font-bold transition-all shadow-sm"
+              href="/report/found"
+              className="px-4 py-2 rounded-full bg-[#047857] hover:bg-[#10B981] text-white text-xs font-bold shadow-sm transition-all"
             >
-              View My Reports
+              Report Found Item
+            </Link>
+            <Link
+              href="/feed"
+              className="px-4 py-2 rounded-full bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-[#1C1C1E] text-xs font-bold transition-all shadow-sm"
+            >
+              View Feed →
             </Link>
           </div>
         </div>
