@@ -12,10 +12,10 @@ A campus-wide Lost & Found web and mobile platform for Indian Institute of Techn
 | **Backend REST API** | Django 5.2 + Django REST Framework (DRF) |
 | **Database** | SQLite (Local Dev) / PostgreSQL 16 (Docker & Production) |
 | **Cache & Message Broker** | Redis 7 + Celery 5.4 |
-| **Authentication** | SimpleJWT (httpOnly cookies for Web, Bearer tokens for Android) |
+| **Authentication** | SimpleJWT (httpOnly cookies for Web, Bearer tokens for Mobile iOS/Android) |
 | **Realtime Chat** | Django Channels 4 + WebSockets |
 | **API Specification** | OpenAPI 3.0 via `drf-spectacular` (Swagger UI & ReDoc) |
-| **Mobile App (Week 5)** | Kotlin + Jetpack Compose MVP |
+| **Mobile App (Phase 9)** | React Native + Expo (Cross-Platform iOS & Android) |
 
 ---
 
@@ -187,7 +187,7 @@ npm run dev
 | **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | *Next* |
 | **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | Planned |
 | **Phase 8** | WebSocket Chat & Push Notifications | Planned |
-| **Phase 9** | Android MVP (Kotlin + Jetpack Compose) | Planned |
+| **Phase 9** | Cross-Platform Mobile App (React Native + Expo for iOS & Android) | Planned |
 | **Phase 10**| Hardening, Rate Limiting & Load Testing | Planned |
 | **Phase 11**| Staging & Production Campus Deployment | Planned |
 
