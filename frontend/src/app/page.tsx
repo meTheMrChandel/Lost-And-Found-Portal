@@ -5,9 +5,11 @@ import NotificationBell from "@/components/NotificationBell";
 import RecentActivity from "@/components/RecentActivity";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import { useState } from "react";
 
 export default function Home() {
   const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#FAF7F2] text-[#1C1C1E]">
@@ -28,16 +30,32 @@ export default function Home() {
             </div>
           </Link>
 
-          <div className="flex items-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="home-nav"
+            className="lg:hidden w-10 h-10 rounded-xl flex items-center justify-center text-xl text-[#1C1C1E] hover:bg-[#EFEAE0] transition-colors"
+          >
+            {menuOpen ? "✕" : "☰"}
+          </button>
+
+          <nav
+            id="home-nav"
+            className={`${
+              menuOpen ? "flex" : "hidden"
+            } lg:flex absolute lg:static top-full inset-x-0 flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-4 p-6 lg:p-0 bg-[#FAF7F2] lg:bg-transparent border-b lg:border-0 border-[#EFEAE0] text-center`}
+          >
             <Link
               href="/feed"
-              className="text-xs font-semibold text-[#1C1C1E] hover:text-[#047857] transition-colors hidden md:block"
+              className="text-xs font-semibold text-[#1C1C1E] hover:text-[#047857] transition-colors"
             >
               Public Feed
             </Link>
 
             {user ? (
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2 lg:gap-3">
                 <Link
                   href="/report/lost"
                   className="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-[#D94F3B] hover:opacity-95 shadow-sm transition-all"
@@ -118,7 +136,7 @@ export default function Home() {
                 </Link>
               </>
             )}
-          </div>
+          </nav>
         </div>
       </header>
 
