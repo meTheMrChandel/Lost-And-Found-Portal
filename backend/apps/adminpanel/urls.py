@@ -18,10 +18,14 @@ from apps.adminpanel.views.abuse import (
 )
 from apps.adminpanel.views.stats import AdminStatisticsView
 from apps.matching.views import (
+    AdminGenerateHandoverCodeView,
     AdminMatchActionView,
+    AdminMatchCloseView,
     AdminMatchDetailView,
     AdminMatchListView,
+    AdminMatchProofRecordView,
     AdminRunMatchingView,
+    AdminVerifyHandoverCodeView,
 )
 
 urlpatterns = [
@@ -41,6 +45,10 @@ urlpatterns = [
     path("matches/run/", AdminRunMatchingView.as_view(), name="admin-panel-matches-run"),
     path("matches/<uuid:pk>/", AdminMatchDetailView.as_view(), name="admin-panel-match-detail"),
     path("matches/<uuid:pk>/action/", AdminMatchActionView.as_view(), name="admin-panel-match-action"),
+    path("matches/<uuid:pk>/proof/", AdminMatchProofRecordView.as_view(), name="admin-panel-match-proof"),
+    path("matches/<uuid:pk>/handover-code/generate/", AdminGenerateHandoverCodeView.as_view(), name="admin-panel-match-handover-generate"),
+    path("matches/<uuid:pk>/handover-code/verify/", AdminVerifyHandoverCodeView.as_view(), name="admin-panel-match-handover-verify"),
+    path("matches/<uuid:pk>/close/", AdminMatchCloseView.as_view(), name="admin-panel-match-close"),
 
     # Abuse Reports (Phase 4)
     path("abuse-reports/", AdminAbuseReportListView.as_view(), name="admin-abuse-reports-list"),

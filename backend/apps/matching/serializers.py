@@ -142,7 +142,42 @@ class MatchDetailSerializer(serializers.ModelSerializer):
 
 class MatchActionSerializer(serializers.Serializer):
     action = serializers.ChoiceField(
-        choices=["CONFIRM", "DISMISS"],
+        choices=["CONFIRM", "DISMISS", "PROOF_PENDING", "VERIFIED"],
         required=True,
+    )
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ProofQuestionItemSerializer(serializers.Serializer):
+    question = serializers.CharField(required=True)
+    answer = serializers.CharField(required=True)
+    is_correct = serializers.BooleanField(required=False, default=True)
+
+
+class MatchProofRecordSerializer(serializers.Serializer):
+    questions = ProofQuestionItemSerializer(many=True, required=True)
+    decision = serializers.ChoiceField(
+        choices=["VERIFIED", "KEEP_PENDING", "REJECT"],
+        required=False,
+        default="VERIFIED",
+    )
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class MatchMeetingModeSerializer(serializers.Serializer):
+    meeting_mode = serializers.ChoiceField(
+        choices=[Match.MeetingMode.DIRECT, Match.MeetingMode.OFFICE],
+        required=True,
+    )
+
+
+class MatchHandoverVerifySerializer(serializers.Serializer):
+    code = serializers.CharField(min_length=4, max_length=20, required=True)
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class MatchCloseSerializer(serializers.Serializer):
+    reward_amount_settled = serializers.DecimalField(
+        max_digits=8, decimal_places=2, min_value=0, required=False, default=0.0
     )
     notes = serializers.CharField(required=False, allow_blank=True, default="")
