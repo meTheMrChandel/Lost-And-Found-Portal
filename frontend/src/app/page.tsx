@@ -2,6 +2,7 @@
 
 import CampusHeroSlider from "@/components/CampusHeroSlider";
 import NotificationBell from "@/components/NotificationBell";
+import RecentActivity from "@/components/RecentActivity";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 
@@ -159,7 +160,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Live Preview Cards Grid using Design System */}
+        {/* Latest approved posts from the public feed */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -170,84 +171,15 @@ export default function Home() {
                 Live updates of reported lost and found belongings across hostels and departments.
               </p>
             </div>
-            <a
+            <Link
               href="/feed"
               className="hidden sm:inline-flex text-sm font-medium text-[#047857] hover:underline"
             >
               View all posts →
-            </a>
-
+            </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Card 1: Sample LOST card */}
-            <div className="p-6 rounded-2xl bg-[#EFEAE0]/80 border border-[#EFEAE0] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white bg-[#D94F3B]">
-                    LOST
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold text-[#1C1C1E] bg-[#F5B73B]">
-                    ₹500 Reward
-                  </span>
-                </div>
-                <h4 className="font-serif text-xl font-bold text-[#1C1C1E] mb-2">
-                  Blue Campus ID & Hostel Keys
-                </h4>
-                <p className="text-sm text-[#6B7280] mb-4">
-                  Lost near Satluj Hostel common room or path to cafeteria.
-                </p>
-              </div>
-              <div className="text-xs text-[#6B7280] pt-4 border-t border-[#E2DDD2] flex justify-between">
-                <span>Satluj Hostel</span>
-                <span>2 hours ago</span>
-              </div>
-            </div>
-
-            {/* Card 2: Sample FOUND card */}
-            <div className="p-6 rounded-2xl bg-[#EFEAE0]/80 border border-[#EFEAE0] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white bg-[#047857]">
-                    FOUND
-                  </span>
-                  <span className="text-xs text-[#6B7280]">
-                    Admin Office Custody
-                  </span>
-                </div>
-                <h4 className="font-serif text-xl font-bold text-[#1C1C1E] mb-2">
-                  Wireless Earbuds Case
-                </h4>
-                <p className="text-sm text-[#6B7280] mb-4">
-                  Found on bench outside Central Library entrance.
-                </p>
-              </div>
-              <div className="text-xs text-[#6B7280] pt-4 border-t border-[#E2DDD2] flex justify-between">
-                <span>Central Library</span>
-                <span>Today, 11:30 AM</span>
-              </div>
-            </div>
-
-            {/* Card 3: QR Valuable Tag Feature */}
-            <div className="p-6 rounded-2xl bg-[#EFEAE0]/80 border border-[#EFEAE0] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-[#1C1C1E] bg-[#FAF7F2]">
-                    SECURITY FEATURE
-                  </span>
-                </div>
-                <h4 className="font-serif text-xl font-bold text-[#1C1C1E] mb-2">
-                  Zero-Knowledge QR Stickers
-                </h4>
-                <p className="text-sm text-[#6B7280] mb-4">
-                  Generate stickers for your cycle, laptop, or bottle. Scanners only see item name, keeping personal data private.
-                </p>
-              </div>
-              <div className="text-xs text-[#047857] font-semibold pt-4 border-t border-[#E2DDD2]">
-                Admin-supervised handovers
-              </div>
-            </div>
-          </div>
+          <RecentActivity />
         </div>
       </main>
 
