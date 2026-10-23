@@ -1,6 +1,7 @@
 "use client";
 
 import AdminGuard from "@/components/AdminGuard";
+import NotificationBell from "@/components/NotificationBell";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -41,6 +42,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
 
             <div className="flex items-center gap-3">
+              <Link
+                href="/chat"
+                className="text-xs font-semibold text-[#047857] hover:underline"
+              >
+                💬 Chat
+              </Link>
+              <NotificationBell />
               <Link
                 href="/"
                 className="text-xs font-semibold text-[#6B7280] hover:text-[#1C1C1E] transition-colors"

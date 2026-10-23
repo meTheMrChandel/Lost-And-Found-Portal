@@ -1,6 +1,7 @@
 "use client";
 
 import CampusHeroSlider from "@/components/CampusHeroSlider";
+import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 
@@ -58,8 +59,15 @@ export default function Home() {
                   href="/items"
                   className="px-3 py-1.5 rounded-full text-xs font-semibold text-[#047857] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
                 >
-                  🏷️ My Valuables (QR)
+                  🏷️ Valuables
                 </Link>
+                <Link
+                  href="/chat"
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 transition-colors"
+                >
+                  💬 Chat
+                </Link>
+                <NotificationBell />
                 {(user.is_staff || user.role === "admin") && (
                   <Link
                     href="/admin"
