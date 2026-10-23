@@ -36,8 +36,14 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
   }
 
   if (!response.ok) {
-    const errorMsg = result?.message || (result?.errors ? Object.values(result.errors).flat().join(" ") : `Request failed (${response.status})`);
-    throw new Error(errorMsg);
+    let errorMsg = result?.message;
+    if (result?.errors && typeof result.errors === "object" && Object.keys(result.errors).length > 0) {
+      const fieldErrors = Object.values(result.errors).flat().join(" ");
+      if (fieldErrors) {
+        errorMsg = fieldErrors;
+      }
+    }
+    throw new Error(errorMsg || `Request failed (${response.status})`);
   }
 
   return result;
