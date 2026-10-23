@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to the Lost &amp; Found Portal | IIT Ropar</title>
+  <link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/b/bc/Spiraliitropar.jpg" type="image/jpeg">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ocean: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              200: '#99f6e4',
+              300: '#5eead4',
+              400: '#2dd4bf',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a',
+            },
+            marine: {
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+            }
+          },
+          fontFamily: {
+            serif: ['Playfair Display', 'Georgia', 'serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap" rel="stylesheet">
+  <style>
+    .ocean-gradient {
+      background: linear-gradient(135deg, #0284c7 0%, #0891b2 40%, #0d9488 100%);
+    }
+    .ocean-glass {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .card-hover:hover {
+      transform: translateY(-4px);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  </style>
+</head>
+<body class="bg-[#F6FAF9] text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-ocean-200 selection:text-ocean-900">
+
+  <!-- Header / Navigation Bar -->
+  <header class="ocean-glass sticky top-0 z-50 border-b border-ocean-100/80 shadow-xs">
+    <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+      <!-- Brand Logo -->
+      <a href="/" class="flex items-center gap-3 group">
+        <div class="w-11 h-11 rounded-2xl ocean-gradient flex items-center justify-center text-white font-bold text-xl shadow-md group-hover:scale-105 transition-transform">
+          LF
+        </div>
+        <div>
+          <span class="font-serif text-2xl font-bold tracking-tight text-slate-900 block leading-tight">
+            Lost &amp; Found
+          </span>
+          <span class="text-[11px] font-semibold text-ocean-700 tracking-wider uppercase block font-sans">
+            Indian Institute of Technology Ropar
+          </span>
+        </div>
+      </a>
+
+      <!-- Quick Nav Buttons -->
+      <div class="flex items-center gap-3">
+        <a href="{{ frontend_url }}/feed" class="hidden sm:inline-flex px-4 py-2 text-xs font-semibold text-slate-700 hover:text-ocean-700 hover:bg-ocean-50 rounded-full transition-colors">
+          Public Feed
+        </a>
+        <a href="{{ frontend_url }}/items" class="hidden md:inline-flex px-4 py-2 text-xs font-semibold text-ocean-700 bg-ocean-50/70 border border-ocean-200/60 hover:bg-ocean-100 rounded-full transition-colors">
+          🏷️ Registered Valuables
+        </a>
+        <a href="/api/v1/docs/" class="hidden lg:inline-flex px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">
+          ⚡ API Docs
+        </a>
+        <a href="{{ frontend_url }}" class="px-5 py-2.5 ocean-gradient text-white text-xs font-bold rounded-full shadow-sm hover:shadow-md hover:opacity-95 transition-all">
+          Open Web Portal →
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="relative overflow-hidden pt-12 pb-20 lg:pt-16 lg:pb-28">
+    <!-- Ocean Ambient Glows -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-ocean-100/60 via-cyan-50/30 to-transparent blur-3xl pointer-events-none -z-10"></div>
+    <div class="absolute -top-24 right-0 w-96 h-96 bg-cyan-200/40 rounded-full blur-3xl pointer-events-none -z-10"></div>
+
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+
+        <!-- Left Column: Welcome Message -->
+        <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+          <!-- Campus Badge -->
+          <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-ocean-50 border border-ocean-200/80 text-ocean-800 text-xs font-semibold shadow-2xs">
+            <span class="w-2 h-2 rounded-full bg-ocean-500 animate-pulse"></span>
+            Official Campus Asset Recovery Portal
+          </div>
+
+          <!-- Main Heading -->
+          <h1 class="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 leading-[1.15]">
+            Welcome to the <br class="hidden sm:inline">
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-ocean-700 via-cyan-600 to-marine-600">
+              Lost &amp; Found Portal
+            </span> <br>
+            of IIT Ropar
+          </h1>
+
+          <!-- Grammatically Checked Description -->
+          <p class="text-base sm:text-lg text-slate-600 max-w-2xl leading-relaxed font-normal">
+            A secure, automated platform connecting students, faculty, and campus administrators across IIT Ropar. Report misplaced items, search found belongings, and securely claim property using our smart matching engine and QR sticker verification.
+          </p>
+
+          <!-- Primary Call to Actions -->
+          <div class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
+            <a href="{{ frontend_url }}/report/lost" class="px-6 py-3.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+              <span>+ Report Lost Item</span>
+            </a>
+            <a href="{{ frontend_url }}/report/found" class="px-6 py-3.5 ocean-gradient text-white text-sm font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2">
+              <span>+ Report Found Item</span>
+            </a>
+            <a href="{{ frontend_url }}/feed" class="px-5 py-3.5 bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 text-sm font-semibold rounded-2xl shadow-xs transition-colors">
+              🔍 Explore Feed
+            </a>
+          </div>
+
+          <!-- Trust & Status Indicators -->
+          <div class="pt-6 border-t border-slate-200/70 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs text-slate-500">
+            <div class="flex items-center gap-2">
+              <span class="text-ocean-600 font-bold">✓</span>
+              <span>IIT Ropar Email Verified (<code class="text-ocean-800 bg-ocean-50 px-1.5 py-0.5 rounded">@iitrpr.ac.in</code>)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-ocean-600 font-bold">✓</span>
+              <span>Zero-Knowledge QR Valuables</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-ocean-600 font-bold">✓</span>
+              <span>Admin Mediated Claims</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Visual Showcase with IIT Ropar Campus & Students -->
+        <div class="lg:col-span-5 relative">
+          <div class="relative mx-auto max-w-md lg:max-w-none">
+            <!-- Main Campus Card -->
+            <div class="bg-white rounded-3xl p-3 shadow-xl border border-ocean-100 card-hover overflow-hidden">
+              <div class="relative h-60 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-100">
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/b/bc/Spiraliitropar.jpg"
+                  alt="IIT Ropar Spiral Architecture"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                  onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80';"
+                />
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-transparent"></div>
+                <div class="absolute bottom-3 left-4 right-4 text-white">
+                  <span class="text-[10px] uppercase font-bold tracking-widest text-cyan-300 block">Main Campus</span>
+                  <p class="font-serif text-lg font-bold">IIT Ropar Main Academic Complex</p>
+                </div>
+              </div>
+
+              <!-- Student Life Mini Row -->
+              <div class="grid grid-cols-2 gap-2 mt-3">
+                <div class="relative h-28 rounded-xl overflow-hidden bg-slate-100">
+                  <img
+                    src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=600&q=80"
+                    alt="IIT Ropar Campus Students"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  <div class="absolute inset-0 bg-slate-900/30"></div>
+                  <span class="absolute bottom-2 left-2 text-[10px] font-bold text-white drop-shadow">Campus Life</span>
+                </div>
+                <div class="relative h-28 rounded-xl overflow-hidden bg-slate-100">
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/c/c5/Maingateiitropar.jpg"
+                    alt="IIT Ropar Main Gate"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                    onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=600&q=80';"
+                  />
+                  <div class="absolute inset-0 bg-slate-900/30"></div>
+                  <span class="absolute bottom-2 left-2 text-[10px] font-bold text-white drop-shadow">Entrance Gate</span>
+                </div>
+              </div>
+
+              <!-- Live Portal Status Pill -->
+              <div class="mt-3 p-3 bg-ocean-50/80 rounded-2xl border border-ocean-100 flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span class="font-semibold text-ocean-950">Backend API Services</span>
+                </div>
+                <span class="text-ocean-700 font-mono font-bold text-[11px]">HTTP 200 OK</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Access Navigation Grid -->
+  <section class="py-12 bg-white/70 border-y border-ocean-100/80">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="text-center max-w-xl mx-auto mb-10">
+        <h2 class="font-serif text-2xl sm:text-3xl font-bold text-slate-900">
+          Everything You Need in One Portal
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-500 mt-2">
+          Designed specifically for IIT Ropar students, hostel residents, faculty, and administrative security staff.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <!-- Card 1: Next.js Frontend Portal -->
+        <a href="{{ frontend_url }}" class="group bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs hover:border-ocean-300 hover:shadow-xl transition-all card-hover flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-ocean-100 text-ocean-700 flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition-transform">
+              🌐
+            </div>
+            <h3 class="font-serif text-lg font-bold text-slate-900 group-hover:text-ocean-700 transition-colors">
+              Web Portal (Next.js)
+            </h3>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+              Access the high-performance Next.js web application with live feeds, case filtering, and student dashboards.
+            </p>
+          </div>
+          <span class="text-xs font-bold text-ocean-700 mt-4 inline-flex items-center gap-1">
+            Launch Portal →
+          </span>
+        </a>
+
+        <!-- Card 2: Registered Valuables QR -->
+        <a href="{{ frontend_url }}/items" class="group bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs hover:border-ocean-300 hover:shadow-xl transition-all card-hover flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-cyan-100 text-cyan-700 flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition-transform">
+              🏷️
+            </div>
+            <h3 class="font-serif text-lg font-bold text-slate-900 group-hover:text-ocean-700 transition-colors">
+              Valuables QR Stickers
+            </h3>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+              Register bicycles, laptops, and headphones. Print privacy-preserving QR stickers for zero-knowledge identification.
+            </p>
+          </div>
+          <span class="text-xs font-bold text-ocean-700 mt-4 inline-flex items-center gap-1">
+            Manage Gear →
+          </span>
+        </a>
+
+        <!-- Card 3: Real-Time Chat -->
+        <a href="{{ frontend_url }}/chat" class="group bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs hover:border-ocean-300 hover:shadow-xl transition-all card-hover flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition-transform">
+              💬
+            </div>
+            <h3 class="font-serif text-lg font-bold text-slate-900 group-hover:text-ocean-700 transition-colors">
+              Campus Chat &amp; Handover
+            </h3>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+              Coordinate safe handovers with admin-mediated chats, single-use handover codes, and offline message sync.
+            </p>
+          </div>
+          <span class="text-xs font-bold text-ocean-700 mt-4 inline-flex items-center gap-1">
+            Open Chat →
+          </span>
+        </a>
+
+        <!-- Card 4: REST API Documentation -->
+        <a href="/api/v1/docs/" class="group bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs hover:border-ocean-300 hover:shadow-xl transition-all card-hover flex flex-col justify-between">
+          <div>
+            <div class="w-12 h-12 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center text-xl mb-4 group-hover:scale-110 transition-transform">
+              ⚡
+            </div>
+            <h3 class="font-serif text-lg font-bold text-slate-900 group-hover:text-ocean-700 transition-colors">
+              API Documentation
+            </h3>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+              Explore interactive Swagger/OpenAPI specifications for authentication, matching, and notification services.
+            </p>
+          </div>
+          <span class="text-xs font-bold text-sky-700 mt-4 inline-flex items-center gap-1">
+            Explore Swagger →
+          </span>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works Section -->
+  <section class="py-16">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center max-w-xl mx-auto mb-12">
+        <span class="text-xs uppercase font-bold tracking-widest text-ocean-700 block mb-1">Simple &amp; Confidential</span>
+        <h2 class="font-serif text-3xl font-bold text-slate-900">How Asset Recovery Works</h2>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        <div class="bg-white p-6 rounded-3xl border border-ocean-100 shadow-xs">
+          <div class="w-10 h-10 rounded-full bg-ocean-50 text-ocean-700 font-bold flex items-center justify-center mb-4 text-sm">
+            01
+          </div>
+          <h4 class="font-serif font-bold text-base text-slate-900 mb-2">1. Submit a Report</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Report lost or found items with location tags, photo attachments, and private hidden proof only verified by campus moderators.
+          </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-3xl border border-ocean-100 shadow-xs">
+          <div class="w-10 h-10 rounded-full bg-ocean-50 text-ocean-700 font-bold flex items-center justify-center mb-4 text-sm">
+            02
+          </div>
+          <h4 class="font-serif font-bold text-base text-slate-900 mb-2">2. Automated Match</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Our algorithmic engine continuously calculates multi-criteria similarity scores across category, time window, and location keywords.
+          </p>
+        </div>
+
+        <div class="bg-white p-6 rounded-3xl border border-ocean-100 shadow-xs">
+          <div class="w-10 h-10 rounded-full bg-ocean-50 text-ocean-700 font-bold flex items-center justify-center mb-4 text-sm">
+            03
+          </div>
+          <h4 class="font-serif font-bold text-base text-slate-900 mb-2">3. Safe Handover</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Claim items securely via single-use cryptographically generated handover codes in the security office or through direct meeting.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="mt-auto bg-slate-900 text-slate-400 py-10 border-t border-slate-800 text-xs">
+    <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl bg-ocean-600 flex items-center justify-center text-white font-bold text-sm">
+          LF
+        </div>
+        <div>
+          <span class="font-serif font-bold text-white text-sm block">Lost &amp; Found Portal</span>
+          <span class="text-[11px] text-slate-400">Indian Institute of Technology Ropar, Rupnagar, Punjab - 140001</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-6">
+        <a href="{{ frontend_url }}" class="hover:text-white transition-colors">Portal Home</a>
+        <a href="{{ frontend_url }}/feed" class="hover:text-white transition-colors">Public Feed</a>
+        <a href="/admin/" class="hover:text-white transition-colors">Staff Login</a>
+        <a href="/api/v1/docs/" class="hover:text-white transition-colors">Swagger API</a>
+      </div>
+
+      <p class="text-[11px] text-slate-400">
+        &copy; 2026 IIT Ropar • CS509 PG Software Lab Project
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>

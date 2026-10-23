@@ -9,8 +9,12 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from config.views import landing_page_view
 
 urlpatterns = [
+    # Root landing page (http://127.0.0.1:8000/)
+    path("", landing_page_view, name="landing-page"),
+
     # Django admin
     path("admin/", admin.site.urls),
 
