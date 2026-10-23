@@ -219,6 +219,28 @@ npm run dev
 
 ---
 
+## 📋 Phase 8: Real-Time Chat & Notifications (Completed)
+
+- **Admin-Mediated & Direct Messaging (`/api/v1/chat/`):**
+  - Conversation channels for case coordination (`owner_admin`, `finder_admin`, `direct`).
+  - Strict anti-harassment gate: direct owner ↔ finder chat requires explicit campus administrator approval (`/api/v1/chat/conversations/<id>/approve-direct/`) before messaging is unlocked.
+  - Full bidirectional safety controls: user blocking (`/api/v1/chat/block/`) prevents messages in both REST and WebSocket channels.
+  - Real-time read receipts (`/api/v1/chat/conversations/<id>/read/`) updating sender checkmarks and unread counts.
+- **Offline Synchronization (`?since=` Cursor):**
+  - Instant incremental message synchronization for users returning from offline states or backgrounded apps via `/api/v1/chat/conversations/<id>/messages/?since=<timestamp>`.
+- **WebSocket Real-Time Broadcasts (`Django Channels`):**
+  - WebSocket routing at `ws/chat/<conversation_id>/` with JWT authentication and group broadcasts.
+- **Campus Notifications Hub (`/api/v1/notifications/`):**
+  - Unified notifications system for match alerts, handover updates, case resolutions, and chat messages.
+  - Real-time unread badge counter (`/api/v1/notifications/unread-count/`).
+  - Mark single (`/api/v1/notifications/<id>/read/`) or bulk (`/api/v1/notifications/mark-all-read/`) read actions.
+- **Frontend Chat & Notification Suite:**
+  - `NotificationBell.tsx`: Interactive navigation dropdown with real-time unread count badge, notification list, and time ago formatting.
+  - `/chat`: Campus messaging center with active thread sidebar, live message stream, admin approval workflow, user block toggle, and WebSocket connectivity.
+- **Automated Tests:** 7 comprehensive integration test cases covering mediated messaging, admin approval enforcement, offline cursor sync, user block barrier, unread counts, and notification lifecycle (67/67 tests passing across repository).
+
+---
+
 ## 🗺️ Roadmap & Phase Timeline
 
 | Phase | Milestone | Status |
@@ -229,11 +251,10 @@ npm run dev
 | **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | **Completed** |
 | **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | **Completed** |
 | **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | **Completed** |
-| **Matching**| Celery Automated Matching Engine (Similarity scoring) | **Completed** |
 | **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | **Completed** |
 | **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | **Completed** |
-| **Phase 8** | WebSocket Chat & Push Notifications | *Next* |
-| **Phase 9** | Cross-Platform Mobile App (React Native + Expo for iOS & Android) | Planned |
+| **Phase 8** | Real-Time Chat & Notifications (Django Channels & Badges) | **Completed** |
+| **Phase 9** | Cross-Platform Mobile App (React Native + Expo for iOS & Android) | *Next* |
 | **Phase 10**| Hardening, Rate Limiting & Load Testing | Planned |
 | **Phase 11**| Staging & Production Campus Deployment | Planned |
 
