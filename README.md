@@ -192,7 +192,30 @@ npm run dev
   - Modal Q&A form with question addition, answer logging, and correct/incorrect indicators.
   - One-time code generator and in-person meeting verification terminal.
   - Case closure & reward settlement modal.
-- **Automated Tests:** 6 integration test cases verifying proof pending rules, verified transitions, meeting mode permissions, single-use code expiry, admin-only barriers, and the complete `lost -> match -> verify -> handover -> closed` lifecycle (54/54 tests passing across repository).
+- **Automated Tests:** 6 integration test cases verifying proof pending rules, verified transitions, meeting mode permissions, single-use code expiry, admin-only barriers, and the complete `lost -> match -> verify -> handover -> closed` lifecycle.
+
+---
+
+## 📋 Phase 7: QR System & Valuables Registration (Completed)
+
+- **Valuables Registration (`/api/v1/items/`):**
+  - Authenticated students can register valuable campus gear (bicycles, laptops, phones, headphones).
+  - Generates a non-identifying random UUID link (`qr_uuid`).
+  - Private serial number / frame number stored securely for ownership verification only.
+  - Active/Deactivated toggle with timestamp tracking (`/api/v1/items/<id>/toggle-active/`).
+- **Printable QR Sticker Generator (`/api/v1/items/<id>/sticker/`):**
+  - High-resolution SVG / JSON QR sticker generation encoding `/scan/<qr_uuid>`.
+  - Branded printable design with IIT Ropar lost and found identity and direct print dialog.
+- **Zero-Knowledge Public Scan Endpoint (`/api/v1/items/scan/<qr_uuid>/`):**
+  - Strict privacy shield: returns only whitelisted fields (`item_name`, `category`, `owner_name`, `qr_uuid`, `is_active`).
+  - Personal student contact details (phone number, email address, registration number) and serial numbers are strictly concealed.
+  - Deactivated stickers display a neutral, non-identifying notification.
+- **Admin Valuables Directory (`/api/v1/items/admin/`):**
+  - Searchable by item name, serial number, owner name, or student registration number.
+- **Frontend Suites:**
+  - `/items`: "My Registered Valuables" student dashboard with registration modal, active toggles, and sticker preview/print view.
+  - `/scan/[uuid]`: Mobile-first zero-knowledge public scan landing page with "I Found This Belonging" direct action link.
+- **Automated Tests:** 6 integration test cases verifying unique UUID generation, zero-knowledge privacy enforcement, deactivated neutral notices, owner-only toggles, SVG sticker generation, and admin search (60/60 tests passing across repository).
 
 ---
 
@@ -208,8 +231,8 @@ npm run dev
 | **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | **Completed** |
 | **Matching**| Celery Automated Matching Engine (Similarity scoring) | **Completed** |
 | **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | **Completed** |
-| **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | *Next* |
-| **Phase 8** | WebSocket Chat & Push Notifications | Planned |
+| **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | **Completed** |
+| **Phase 8** | WebSocket Chat & Push Notifications | *Next* |
 | **Phase 9** | Cross-Platform Mobile App (React Native + Expo for iOS & Android) | Planned |
 | **Phase 10**| Hardening, Rate Limiting & Load Testing | Planned |
 | **Phase 11**| Staging & Production Campus Deployment | Planned |
