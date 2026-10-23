@@ -17,6 +17,12 @@ from apps.adminpanel.views.abuse import (
     AdminAbuseReportResolveView,
 )
 from apps.adminpanel.views.stats import AdminStatisticsView
+from apps.matching.views import (
+    AdminMatchActionView,
+    AdminMatchDetailView,
+    AdminMatchListView,
+    AdminRunMatchingView,
+)
 
 urlpatterns = [
     # Invites & User Moderation
@@ -29,6 +35,12 @@ urlpatterns = [
     path("posts/", AdminPostQueueView.as_view(), name="admin-posts-queue"),
     path("posts/<uuid:pk>/", AdminPostDetailView.as_view(), name="admin-post-detail"),
     path("posts/<uuid:pk>/review/", AdminPostReviewView.as_view(), name="admin-post-review"),
+
+    # Match Queue & Control
+    path("matches/", AdminMatchListView.as_view(), name="admin-panel-matches-list"),
+    path("matches/run/", AdminRunMatchingView.as_view(), name="admin-panel-matches-run"),
+    path("matches/<uuid:pk>/", AdminMatchDetailView.as_view(), name="admin-panel-match-detail"),
+    path("matches/<uuid:pk>/action/", AdminMatchActionView.as_view(), name="admin-panel-match-action"),
 
     # Abuse Reports (Phase 4)
     path("abuse-reports/", AdminAbuseReportListView.as_view(), name="admin-abuse-reports-list"),

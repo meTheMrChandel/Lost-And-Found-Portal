@@ -147,6 +147,32 @@ npm run dev
 
 ---
 
+## 📋 Matching Engine: Automated Similarity Scoring & Queue (Completed)
+
+- **Algorithmic Similarity Scoring (`services.py`):**
+  - **Category Match (weight 0.35):** Strict identical category matching with lenient fallback for generic items.
+  - **Date Proximity Window (weight 0.20):** Scoring decay based on absolute day delta between lost and found dates.
+  - **Location Keyword Overlap (weight 0.20):** Tokenization, stopword suppression, and Jaccard / Overlap coefficient scoring on campus locations.
+  - **Title & Description Text Similarity (weight 0.25):** Token intersection combined with sequence matching across item titles and details.
+- **Automated Pipeline & Celery Task (`tasks.py`):**
+  - Celery shared task `run_matching_engine` comparing active `LOST` and `FOUND` posts.
+  - Pairs scoring $\ge 0.75$ (`SiteSettings.match_threshold`) automatically generate `Suggested` matches.
+  - Idempotent execution preventing duplicate pairs on re-runs.
+  - Management CLI command `python manage.py run_matching`.
+- **Admin Match Queue & Review Actions:**
+  - `GET /api/v1/matching/`: Centralized match queue with status, search, and min-score filters.
+  - `POST /api/v1/matching/<id>/action/`: Admin actions to `CONFIRM` or `DISMISS` suggestions with audit logging.
+  - `POST /api/v1/matching/run/`: On-demand manual trigger for administrators.
+  - `GET /api/v1/matching/my-matches/`: Student endpoint to view confirmed matches for their posts.
+- **Frontend Admin Suite (`/admin/matches`):**
+  - Side-by-side comparison cards displaying Lost Item and Found Item side-by-side.
+  - Match confidence percentage badge with color-coded likelihood indicators.
+  - Immediate "Run Matching Engine Now" button with real-time feedback.
+  - Modal workflows to confirm or dismiss match suggestions.
+- **Automated Tests:** 9 test cases covering algorithmic scoring, celery task execution, idempotency, same-author exclusion, admin review actions, student authorization barriers, and CLI commands (48/48 tests passing across repository).
+
+---
+
 ## 🗺️ Roadmap & Phase Timeline
 
 | Phase | Milestone | Status |
@@ -157,8 +183,8 @@ npm run dev
 | **Phase 3** | Lost Item Reporting (User 1 flow with hidden proof & rewards) | **Completed** |
 | **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | **Completed** |
 | **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | **Completed** |
-| **Matching**| Celery Automated Matching Engine (Similarity scoring) | *Next* |
-| **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | Planned |
+| **Matching**| Celery Automated Matching Engine (Similarity scoring) | **Completed** |
+| **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | *Next* |
 | **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | Planned |
 | **Phase 8** | WebSocket Chat & Push Notifications | Planned |
 | **Phase 9** | Android MVP (Kotlin + Jetpack Compose) | Planned |

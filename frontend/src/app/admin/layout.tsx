@@ -10,6 +10,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navLinks = [
     { href: "/admin", label: "Overview", exact: true },
     { href: "/admin/cases", label: "Case Queue" },
+    { href: "/admin/matches", label: "Match Queue" },
     { href: "/admin/abuse-reports", label: "Abuse Reports" },
     { href: "/admin/users", label: "User Moderation" },
     { href: "/admin/invites", label: "Admin Invites" },
