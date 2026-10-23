@@ -54,6 +54,12 @@ export default function Home() {
                 >
                   My Reports
                 </Link>
+                <Link
+                  href="/items"
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold text-[#047857] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                >
+                  🏷️ My Valuables (QR)
+                </Link>
                 {(user.is_staff || user.role === "admin") && (
                   <Link
                     href="/admin"
