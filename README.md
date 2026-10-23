@@ -169,7 +169,30 @@ npm run dev
   - Match confidence percentage badge with color-coded likelihood indicators.
   - Immediate "Run Matching Engine Now" button with real-time feedback.
   - Modal workflows to confirm or dismiss match suggestions.
-- **Automated Tests:** 9 test cases covering algorithmic scoring, celery task execution, idempotency, same-author exclusion, admin review actions, student authorization barriers, and CLI commands (48/48 tests passing across repository).
+- **Automated Tests:** 9 test cases covering algorithmic scoring, celery task execution, idempotency, same-author exclusion, admin review actions, student authorization barriers, and CLI commands.
+
+---
+
+## 📋 Phase 6: Verification & Handover (Completed)
+
+- **Admin Hidden-Proof Q&A (`/api/v1/matching/<id>/proof/`):**
+  - Interactive Q&A record for claimant verification (color, scratches, wallpaper, serial number).
+  - Validation engine: incorrect answers keep state at `proof_pending`; full verified answers transition to `verified`.
+  - Immutable audit logging (`PROOF_VERIFIED`, `PROOF_PENDING`, `PROOF_REJECTED`).
+- **Meeting Mode Logistics (`/api/v1/matching/<id>/meeting-mode/`):**
+  - Choice between `direct` (direct student meeting) and `office` (via Admin / Campus Security Office).
+  - Configurable by involved parties or campus administrators.
+- **Single-Use Handover Verification Code:**
+  - `POST /api/v1/matching/<id>/handover-code/generate/`: Cryptographically secure 6-character token generated for owner presentation; only its SHA-256 hash is persisted.
+  - `POST /api/v1/matching/<id>/handover-code/verify/`: Admin verifies code in constant time; immediately marks the code used (expires single-use token) and advances match to `handed_over`.
+- **Reward Settlement & Post Closure (`/api/v1/matching/<id>/close/`):**
+  - Records settled honor-based reward and credits finder.
+  - Automatically transitions both `LOST` and `FOUND` posts to `RETURNED`.
+- **Frontend Match & Verification Hub (`/admin/matches`):**
+  - Modal Q&A form with question addition, answer logging, and correct/incorrect indicators.
+  - One-time code generator and in-person meeting verification terminal.
+  - Case closure & reward settlement modal.
+- **Automated Tests:** 6 integration test cases verifying proof pending rules, verified transitions, meeting mode permissions, single-use code expiry, admin-only barriers, and the complete `lost -> match -> verify -> handover -> closed` lifecycle (54/54 tests passing across repository).
 
 ---
 
@@ -184,8 +207,8 @@ npm run dev
 | **Phase 4** | Admin Portal (Case queue, audit logs, approval/rejection) | **Completed** |
 | **Phase 5** | Public Feed & Found Reports (User 2 flow, custody assignment) | **Completed** |
 | **Matching**| Celery Automated Matching Engine (Similarity scoring) | **Completed** |
-| **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | *Next* |
-| **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | Planned |
+| **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | **Completed** |
+| **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | *Next* |
 | **Phase 8** | WebSocket Chat & Push Notifications | Planned |
 | **Phase 9** | Cross-Platform Mobile App (React Native + Expo for iOS & Android) | Planned |
 | **Phase 10**| Hardening, Rate Limiting & Load Testing | Planned |
