@@ -136,11 +136,16 @@ class RegisteredItemQRStickerView(APIView):
         if request.query_params.get("format") == "json":
             return Response(
                 {
+                    "success": True,
                     "item_id": str(item.id),
                     "name": item.name,
                     "category": item.category.name,
                     "scan_url": scan_url,
                     "svg": svg_content,
+                    "data": {
+                        "svg": svg_content,
+                        "scan_url": scan_url,
+                    },
                 },
                 status=status.HTTP_200_OK,
             )

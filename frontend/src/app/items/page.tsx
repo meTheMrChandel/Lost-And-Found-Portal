@@ -63,9 +63,11 @@ export default function MyValuablesPage() {
 
   const fetchCategories = async () => {
     try {
-      const res = await apiClient("/posts/categories/");
-      if (res?.data) {
-        setCategories(res.data);
+      const res = await apiClient<any>("/posts/categories/");
+      const list = res?.data || (Array.isArray(res) ? res : res?.results || []);
+      if (Array.isArray(list) && list.length > 0) {
+        setCategories(list);
+        setCategoryInput((prev) => (prev ? prev : list[0].slug));
       }
     } catch (err) {
       console.error("Failed to load categories", err);
@@ -85,12 +87,12 @@ export default function MyValuablesPage() {
     try {
       await apiClient("/items/", {
         method: "POST",
-        body: JSON.stringify({
+        data: {
           name: nameInput.trim(),
-          category: categoryInput,
+          category: categoryInput || "bicycle",
           description: descInput.trim(),
           serial_number: serialInput.trim(),
-        }),
+        },
       });
 
       setSuccessMsg("Valuable item registered successfully! You can now print your QR sticker.");
@@ -108,7 +110,7 @@ export default function MyValuablesPage() {
 
   const handleToggleActive = async (item: RegisteredItem) => {
     try {
-      const res = await apiClient(`/items/${item.id}/toggle-active/`, { method: "POST" });
+      const res = await apiClient<any>(`/items/${item.id}/toggle-active/`, { method: "POST" });
       setSuccessMsg(res?.message || "QR sticker status updated.");
       await fetchItems();
     } catch (err: any) {
@@ -133,9 +135,10 @@ export default function MyValuablesPage() {
     setStickerItem(item);
     setLoadingSticker(true);
     try {
-      const res = await apiClient(`/items/${item.id}/sticker/?format=json`);
-      if (res?.data?.svg) {
-        setStickerSvg(res.data.svg);
+      const res = await apiClient<any>(`/items/${item.id}/sticker/?format=json`);
+      const svg = res?.svg || res?.data?.svg || (typeof res === "string" ? res : "");
+      if (svg) {
+        setStickerSvg(svg);
       }
     } catch (err: any) {
       setError(err.message || "Failed to generate QR sticker.");

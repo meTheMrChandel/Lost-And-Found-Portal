@@ -5,20 +5,36 @@ interface RequestOptions extends RequestInit {
 }
 
 export async function apiClient<T = any>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-  const { data, headers, ...customConfig } = options;
+  const { data, headers, body, ...customConfig } = options;
   
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
 
-  const defaultHeaders: HeadersInit = {
-    "Content-Type": "application/json",
+  const isFormData =
+    (typeof FormData !== "undefined" && body instanceof FormData) ||
+    (typeof FormData !== "undefined" && data instanceof FormData);
+
+  const defaultHeaders: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...headers,
   };
+
+  if (!isFormData) {
+    defaultHeaders["Content-Type"] = "application/json";
+  }
+
+  let requestBody: any = undefined;
+  if (data !== undefined) {
+    requestBody = isFormData ? data : typeof data === "string" ? data : JSON.stringify(data);
+  } else if (body !== undefined) {
+    requestBody = body;
+  }
 
   const config: RequestInit = {
     ...customConfig,
-    headers: defaultHeaders,
-    body: data ? JSON.stringify(data) : undefined,
+    headers: {
+      ...defaultHeaders,
+      ...headers,
+    },
+    body: requestBody,
   };
 
   const response = await fetch(`${API_BASE}${endpoint}`, config);
