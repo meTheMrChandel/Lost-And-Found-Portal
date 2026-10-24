@@ -89,7 +89,7 @@ export const QRScanScreen: React.FC = () => {
             barcodeScannerSettings={{
               barcodeTypes: ["qr"],
             }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
 
           {/* Scanner Overlay Frame */}
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.4)",

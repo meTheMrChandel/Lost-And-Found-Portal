@@ -33,11 +33,12 @@ staticfiles/
 .env.*
 !.env.example
 
-# ─── Node / Next.js ─────────────────────────────────────────────────────────
+# ─── Node / Next.js / React Native ──────────────────────────────────────────
 node_modules/
 .next/
 out/
 .cache/
+.expo/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

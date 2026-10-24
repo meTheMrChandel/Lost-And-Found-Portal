@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from "react-native";
 import { itemsApi, RegisteredValuable } from "../../api/items";
 import { postsApi, Category } from "../../api/posts";

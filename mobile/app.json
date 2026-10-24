@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FAF7F2"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ac.in.iitrpr.lostandfound",
@@ -42,6 +37,14 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow Lost & Found to access your photos to attach item images."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FAF7F2"
         }
       ]
     ]
