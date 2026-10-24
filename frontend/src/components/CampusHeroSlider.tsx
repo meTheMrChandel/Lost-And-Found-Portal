@@ -62,7 +62,7 @@ export default function CampusHeroSlider() {
             IIT Ropar Campus Portal
           </div>
           <h2 className="font-serif text-3xl sm:text-5xl font-bold leading-tight drop-shadow-md text-white mb-3">
-            Lost something on campus? We'll help you find it.
+            Lost something on campus? We&apos;ll help you find it.
           </h2>
           <p className="font-sans text-sm sm:text-base text-gray-200 drop-shadow mb-6 max-w-xl">
             Real-time feed, admin-verified handovers, and privacy-first QR tags connecting 3,000+ students and faculty across Rupnagar campus.

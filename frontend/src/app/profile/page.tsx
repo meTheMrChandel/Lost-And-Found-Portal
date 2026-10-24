@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
@@ -208,12 +209,12 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex justify-between items-center mt-4">
-              <a
+              <Link
                 href="/"
                 className="text-xs text-[#6B7280] hover:text-[#1C1C1E] font-medium"
               >
                 ← Back to Home
-              </a>
+              </Link>
               <button
                 type="submit"
                 disabled={saving}

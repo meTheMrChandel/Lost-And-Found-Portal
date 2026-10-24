@@ -199,7 +199,7 @@ export default function AdminUsersPage() {
                 <p className="text-xs text-[#6B7280] mb-4">
                   Account is currently suspended. Ban reason:{" "}
                   <span className="italic text-[#D94F3B]">
-                    "{selectedUser.ban_reason || "None specified"}"
+                    &ldquo;{selectedUser.ban_reason || "None specified"}&rdquo;
                   </span>
                 </p>
                 <div className="flex justify-end gap-2">

@@ -524,7 +524,7 @@ export default function AdminCaseQueuePage() {
                           {log.action}
                         </span>
                         <span className="text-[#6B7280]">by {log.admin_email}</span>
-                        {log.notes && <div className="text-[#1C1C1E] mt-0.5">"{log.notes}"</div>}
+                        {log.notes && <div className="text-[#1C1C1E] mt-0.5">&ldquo;{log.notes}&rdquo;</div>}
                       </div>
                       <span className="text-[10px] text-[#6B7280] font-mono">
                         {new Date(log.created_at).toLocaleTimeString("en-IN", {
