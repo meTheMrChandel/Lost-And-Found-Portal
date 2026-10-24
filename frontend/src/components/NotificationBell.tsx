@@ -14,29 +14,35 @@ interface NotificationItem {
   created_at: string;
 }
 
+type NotificationListResponse =
+  | NotificationItem[]
+  | { results?: NotificationItem[]; data?: NotificationItem[] };
+
 export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
+  // Reference time for "x ago" labels; refreshed whenever the list is fetched
+  const [now, setNow] = useState<number>(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const fetchUnreadCount = async () => {
-    try {
-      const res = await apiClient<{ unread_count: number }>("/notifications/unread-count/");
-      setUnreadCount(res.unread_count || 0);
-    } catch {
-      // ignore unauthenticated or network errors silently
-    }
+  const fetchUnreadCount = () => {
+    apiClient<{ unread_count: number }>("/notifications/unread-count/")
+      .then((res) => setUnreadCount(res.unread_count || 0))
+      .catch(() => {
+        // ignore unauthenticated or network errors silently
+      });
   };
 
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const res = await apiClient<any>("/notifications/");
+      const res = await apiClient<NotificationListResponse>("/notifications/");
       // Handle both DRF paginated { results: [...] } and direct array
-      const items = res?.results || (Array.isArray(res) ? res : res?.data || []);
+      const items = Array.isArray(res) ? res : res?.results || res?.data || [];
       setNotifications(items);
+      setNow(Date.now());
     } catch (err) {
       console.error("Failed to fetch notifications", err);
     } finally {
@@ -49,12 +55,6 @@ export default function NotificationBell() {
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-    }
-  }, [isOpen]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -89,8 +89,15 @@ export default function NotificationBell() {
     }
   };
 
+  const toggleOpen = () => {
+    if (!isOpen) {
+      fetchNotifications();
+    }
+    setIsOpen(!isOpen);
+  };
+
   const formatTimeAgo = (dateStr: string) => {
-    const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    const diff = Math.floor((now - new Date(dateStr).getTime()) / 1000);
     if (diff < 60) return "Just now";
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -100,7 +107,7 @@ export default function NotificationBell() {
   return (
     <div className="relative inline-block" ref={dropdownRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         className="relative p-2 rounded-full text-[#1C1C1E] hover:bg-[#EFEAE0] transition-colors focus:outline-none"
         aria-label="Notifications"
         title="Campus Notifications"
