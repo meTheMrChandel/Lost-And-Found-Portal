@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Callable, Dict
 
 from .constants import ALLOWED_CATEGORIES, MAX_ITEM_NAME_LENGTH
-from .errors import ItemNotFoundError, ValidationError
+from .errors import ItemNotFoundError, NotOwnerError, ValidationError
 from .models import Item, Owner
 from .tokens import new_item_token, normalize_token
 
@@ -42,4 +42,20 @@ class ItemRegistry:
         item = self._items.get(normalize_token(token))
         if item is None:
             raise ItemNotFoundError(token)
+        return item
+
+    def _owned(self, token: str, owner_id: str) -> Item:
+        item = self.get(token)
+        if item.owner.owner_id != owner_id:
+            raise NotOwnerError("only the owner can change this item")
+        return item
+
+    def deactivate_qr(self, token: str, owner_id: str) -> Item:
+        item = self._owned(token, owner_id)
+        item.qr_active = False
+        return item
+
+    def activate_qr(self, token: str, owner_id: str) -> Item:
+        item = self._owned(token, owner_id)
+        item.qr_active = True
         return item
