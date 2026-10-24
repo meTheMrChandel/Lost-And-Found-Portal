@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Welcome to the Lost &amp; Found Portal | IIT Ropar</title>
-  <link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/b/bc/Spiraliitropar.jpg" type="image/jpeg">
+  <!-- Favicon using IIT Ropar Spiral landmark -->
+  <link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/5/51/Spiraliitropar.jpg" type="image/jpeg">
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -46,12 +47,12 @@
       background: linear-gradient(135deg, #0284c7 0%, #0891b2 40%, #0d9488 100%);
     }
     .ocean-glass {
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
     }
     .card-hover:hover {
-      transform: translateY(-4px);
+      transform: translateY(-5px);
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
   </style>
@@ -59,7 +60,7 @@
 <body class="bg-[#F6FAF9] text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-ocean-200 selection:text-ocean-900">
 
   <!-- Header / Navigation Bar -->
-  <header class="ocean-glass sticky top-0 z-50 border-b border-ocean-100/80 shadow-xs">
+  <header class="ocean-glass sticky top-0 z-50 border-b border-ocean-100/90 shadow-2xs">
     <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
       <!-- Brand Logo -->
       <a href="/" class="flex items-center gap-3 group">
@@ -81,7 +82,7 @@
         <a href="{{ frontend_url }}/feed" class="hidden sm:inline-flex px-4 py-2 text-xs font-semibold text-slate-700 hover:text-ocean-700 hover:bg-ocean-50 rounded-full transition-colors">
           Public Feed
         </a>
-        <a href="{{ frontend_url }}/items" class="hidden md:inline-flex px-4 py-2 text-xs font-semibold text-ocean-700 bg-ocean-50/70 border border-ocean-200/60 hover:bg-ocean-100 rounded-full transition-colors">
+        <a href="{{ frontend_url }}/items" class="hidden md:inline-flex px-4 py-2 text-xs font-semibold text-ocean-700 bg-ocean-50/80 border border-ocean-200/70 hover:bg-ocean-100 rounded-full transition-colors">
           🏷️ Registered Valuables
         </a>
         <a href="/api/v1/docs/" class="hidden lg:inline-flex px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">
@@ -95,7 +96,7 @@
   </header>
 
   <!-- Hero Section -->
-  <section class="relative overflow-hidden pt-12 pb-20 lg:pt-16 lg:pb-28">
+  <section class="relative overflow-hidden pt-10 pb-16 lg:pt-14 lg:pb-24">
     <!-- Ocean Ambient Glows -->
     <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-ocean-100/60 via-cyan-50/30 to-transparent blur-3xl pointer-events-none -z-10"></div>
     <div class="absolute -top-24 right-0 w-96 h-96 bg-cyan-200/40 rounded-full blur-3xl pointer-events-none -z-10"></div>
@@ -133,7 +134,7 @@
             <a href="{{ frontend_url }}/report/found" class="px-6 py-3.5 ocean-gradient text-white text-sm font-bold rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2">
               <span>+ Report Found Item</span>
             </a>
-            <a href="{{ frontend_url }}/feed" class="px-5 py-3.5 bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 text-sm font-semibold rounded-2xl shadow-xs transition-colors">
+            <a href="{{ frontend_url }}/feed" class="px-5 py-3.5 bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 text-sm font-semibold rounded-2xl shadow-2xs transition-colors">
               🔍 Explore Feed
             </a>
           </div>
@@ -142,7 +143,7 @@
           <div class="pt-6 border-t border-slate-200/70 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs text-slate-500">
             <div class="flex items-center gap-2">
               <span class="text-ocean-600 font-bold">✓</span>
-              <span>IIT Ropar Email Verified (<code class="text-ocean-800 bg-ocean-50 px-1.5 py-0.5 rounded">@iitrpr.ac.in</code>)</span>
+              <span>IIT Ropar Email Verified (<code class="text-ocean-800 bg-ocean-50 px-1.5 py-0.5 rounded font-mono">@iitrpr.ac.in</code>)</span>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-ocean-600 font-bold">✓</span>
@@ -155,48 +156,50 @@
           </div>
         </div>
 
-        <!-- Right Column: Visual Showcase with IIT Ropar Campus & Students -->
+        <!-- Right Column: Visual Showcase with Actual IIT Ropar Campus Images -->
         <div class="lg:col-span-5 relative">
           <div class="relative mx-auto max-w-md lg:max-w-none">
-            <!-- Main Campus Card -->
+            <!-- Main Campus Card: Spiral Monument -->
             <div class="bg-white rounded-3xl p-3 shadow-xl border border-ocean-100 card-hover overflow-hidden">
-              <div class="relative h-60 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-100">
+              <div class="relative h-64 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-100">
                 <img
-                  src="https://upload.wikimedia.org/wikipedia/commons/b/bc/Spiraliitropar.jpg"
-                  alt="IIT Ropar Spiral Architecture"
-                  class="w-full h-full object-cover"
+                  src="https://upload.wikimedia.org/wikipedia/commons/5/51/Spiraliitropar.jpg"
+                  alt="IIT Ropar Iconic Spiral Architecture Landmark"
+                  class="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                   loading="lazy"
-                  onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=800&q=80';"
+                  referrerpolicy="no-referrer"
                 />
-                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-transparent"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
                 <div class="absolute bottom-3 left-4 right-4 text-white">
-                  <span class="text-[10px] uppercase font-bold tracking-widest text-cyan-300 block">Main Campus</span>
-                  <p class="font-serif text-lg font-bold">IIT Ropar Main Academic Complex</p>
+                  <span class="text-[10px] uppercase font-bold tracking-widest text-cyan-300 block">Iconic Architecture</span>
+                  <p class="font-serif text-lg font-bold">IIT Ropar Spiral Landmark &amp; Academic Hub</p>
+                  <p class="text-[11px] text-slate-300 font-sans">Permanent Campus, Rupnagar, Punjab</p>
                 </div>
               </div>
 
-              <!-- Student Life Mini Row -->
+              <!-- Student Life & Entrance Mini Row -->
               <div class="grid grid-cols-2 gap-2 mt-3">
-                <div class="relative h-28 rounded-xl overflow-hidden bg-slate-100">
+                <div class="relative h-28 rounded-xl overflow-hidden bg-slate-100 group">
                   <img
                     src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=600&q=80"
-                    alt="IIT Ropar Campus Students"
-                    class="w-full h-full object-cover"
+                    alt="Campus Students Collaborating"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     loading="lazy"
+                    referrerpolicy="no-referrer"
                   />
-                  <div class="absolute inset-0 bg-slate-900/30"></div>
-                  <span class="absolute bottom-2 left-2 text-[10px] font-bold text-white drop-shadow">Campus Life</span>
+                  <div class="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-transparent"></div>
+                  <span class="absolute bottom-2 left-2 text-[10px] font-bold text-white drop-shadow">Student Community</span>
                 </div>
-                <div class="relative h-28 rounded-xl overflow-hidden bg-slate-100">
+                <div class="relative h-28 rounded-xl overflow-hidden bg-slate-100 group">
                   <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/c/c5/Maingateiitropar.jpg"
+                    src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Maingateiitropar.jpg"
                     alt="IIT Ropar Main Gate"
-                    class="w-full h-full object-cover"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     loading="lazy"
-                    onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=600&q=80';"
+                    referrerpolicy="no-referrer"
                   />
-                  <div class="absolute inset-0 bg-slate-900/30"></div>
-                  <span class="absolute bottom-2 left-2 text-[10px] font-bold text-white drop-shadow">Entrance Gate</span>
+                  <div class="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-transparent"></div>
+                  <span class="absolute bottom-2 left-2 text-[10px] font-bold text-white drop-shadow">Main Campus Gate</span>
                 </div>
               </div>
 
@@ -216,8 +219,128 @@
     </div>
   </section>
 
+  <!-- Photo Gallery Section: Real IIT Ropar Campus & Student Life -->
+  <section class="py-16 bg-gradient-to-b from-white via-cyan-50/20 to-white border-t border-ocean-100/70">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="text-center max-w-2xl mx-auto mb-12">
+        <span class="text-xs uppercase font-bold tracking-widest text-ocean-700 block mb-1">Campus Life &amp; Environment</span>
+        <h2 class="font-serif text-3xl sm:text-4xl font-bold text-slate-900">
+          Our Vibrant IIT Ropar Campus
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-500 mt-2">
+          Spread across 525 picturesque acres along the Sutlej River in Rupnagar, Punjab.
+        </p>
+      </div>
+
+      <!-- 4-Card Visual Grid with Actual Photos -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <!-- Photo 1: Main Academic Complex -->
+        <div class="bg-white rounded-3xl overflow-hidden border border-ocean-100 shadow-xs card-hover flex flex-col">
+          <div class="relative h-48 w-full bg-slate-100 overflow-hidden">
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/4/46/IIT_Ropar_-_Main_Building_of_the_Transit_Campus.JPG"
+              alt="IIT Ropar Academic Building"
+              class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+            />
+            <span class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/90 text-ocean-800 shadow-xs">
+              Academic Block
+            </span>
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between">
+            <div>
+              <h4 class="font-serif font-bold text-sm text-slate-900 mb-1">Department Complex</h4>
+              <p class="text-xs text-slate-500 leading-relaxed">
+                Modern lecture halls, computing facilities, and departmental laboratories.
+              </p>
+            </div>
+            <span class="text-[10px] text-ocean-600 font-medium mt-3 block">Photo: Wikimedia Commons</span>
+          </div>
+        </div>
+
+        <!-- Photo 2: Main Gate Entrance -->
+        <div class="bg-white rounded-3xl overflow-hidden border border-ocean-100 shadow-xs card-hover flex flex-col">
+          <div class="relative h-48 w-full bg-slate-100 overflow-hidden">
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/5/5c/Maingateiitropar.jpg"
+              alt="IIT Ropar Main Gate"
+              class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+            />
+            <span class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/90 text-ocean-800 shadow-xs">
+              Entrance
+            </span>
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between">
+            <div>
+              <h4 class="font-serif font-bold text-sm text-slate-900 mb-1">Main Entrance Gate</h4>
+              <p class="text-xs text-slate-500 leading-relaxed">
+                The grand gateway leading into the permanent campus off the Nangal Road.
+              </p>
+            </div>
+            <span class="text-[10px] text-ocean-600 font-medium mt-3 block">Photo: Wikimedia Commons</span>
+          </div>
+        </div>
+
+        <!-- Photo 3: Student Study & Collaboration -->
+        <div class="bg-white rounded-3xl overflow-hidden border border-ocean-100 shadow-xs card-hover flex flex-col">
+          <div class="relative h-48 w-full bg-slate-100 overflow-hidden">
+            <img
+              src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80"
+              alt="Students Working Together"
+              class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+            />
+            <span class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/90 text-ocean-800 shadow-xs">
+              Student Life
+            </span>
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between">
+            <div>
+              <h4 class="font-serif font-bold text-sm text-slate-900 mb-1">Collaborative Study</h4>
+              <p class="text-xs text-slate-500 leading-relaxed">
+                Students working together in team project hubs, student lounges, and hostels.
+              </p>
+            </div>
+            <span class="text-[10px] text-ocean-600 font-medium mt-3 block">Photo: Campus Community</span>
+          </div>
+        </div>
+
+        <!-- Photo 4: Central Library & Reading Room -->
+        <div class="bg-white rounded-3xl overflow-hidden border border-ocean-100 shadow-xs card-hover flex flex-col">
+          <div class="relative h-48 w-full bg-slate-100 overflow-hidden">
+            <img
+              src="https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=800&q=80"
+              alt="Students Reading in Library"
+              class="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+            />
+            <span class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/90 text-ocean-800 shadow-xs">
+              Library
+            </span>
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between">
+            <div>
+              <h4 class="font-serif font-bold text-sm text-slate-900 mb-1">Library &amp; Study Areas</h4>
+              <p class="text-xs text-slate-500 leading-relaxed">
+                Quiet research and reference spaces with high-speed campus Wi-Fi connectivity.
+              </p>
+            </div>
+            <span class="text-[10px] text-ocean-600 font-medium mt-3 block">Photo: Campus Community</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
   <!-- Quick Access Navigation Grid -->
-  <section class="py-12 bg-white/70 border-y border-ocean-100/80">
+  <section class="py-14 bg-white/70 border-y border-ocean-100/80">
     <div class="max-w-7xl mx-auto px-6">
       <div class="text-center max-w-xl mx-auto mb-10">
         <h2 class="font-serif text-2xl sm:text-3xl font-bold text-slate-900">
