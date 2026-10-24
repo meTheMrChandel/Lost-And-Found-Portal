@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Lost & Found IIT Ropar",
+    "slug": "lost-and-found-iitrpr",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF7F2"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ac.in.iitrpr.lostandfound",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Lost & Found needs camera access to scan QR stickers on campus belongings and take photos of items.",
+        "NSPhotoLibraryUsageDescription": "Lost & Found needs photo library access to attach pictures of lost or found belongings."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#047857"
+      },
+      "package": "ac.in.iitrpr.lostandfound",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Lost & Found to scan QR stickers on campus items."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Lost & Found to access your photos to attach item images."
+        }
+      ]
+    ]
+  }
+}
