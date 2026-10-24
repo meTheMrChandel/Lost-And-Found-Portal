@@ -86,3 +86,33 @@ class TestPhase1AuthenticationAPI:
         assert res.status_code == 200
         assert res.data["data"]["email"] == test_user.email
         assert res.data["data"]["registration_number"] == test_user.registration_number
+
+    def test_mobile_bearer_token_authorization_and_refresh(self, client, test_user):
+        """Mobile clients authenticate with Bearer tokens and refresh tokens when expired."""
+        from rest_framework_simplejwt.tokens import RefreshToken
+        refresh = RefreshToken.for_user(test_user)
+        access_token = str(refresh.access_token)
+
+        # 1. Access protected profile using Mobile Bearer Header
+        res = client.get(
+            "/api/v1/users/me/",
+            HTTP_AUTHORIZATION=f"Bearer {access_token}"
+        )
+        assert res.status_code == 200
+        assert res.data["data"]["email"] == test_user.email
+
+        # 2. Refresh token endpoint issues a new valid access token
+        refresh_res = client.post(
+            "/api/v1/auth/token/refresh/",
+            {"refresh": str(refresh)}
+        )
+        assert refresh_res.status_code == 200
+        assert "access" in refresh_res.data
+        new_access_token = refresh_res.data["access"]
+
+        # 3. New token successfully accesses API
+        res_refreshed = client.get(
+            "/api/v1/users/me/",
+            HTTP_AUTHORIZATION=f"Bearer {new_access_token}"
+        )
+        assert res_refreshed.status_code == 200
