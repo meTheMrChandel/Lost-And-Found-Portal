@@ -16,9 +16,10 @@ export type MainTabParamList = {
 };
 
 export type RootStackParamList = {
-  Auth: NavigatorScreenParams<AuthStackParamList>;
-  Main: NavigatorScreenParams<MainTabParamList>;
+  Auth: NavigatorScreenParams<AuthStackParamList> | undefined;
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
   ItemDetail: { postId: string };
   Chat: { conversationId: string; title?: string };
   Notifications: undefined;
+  Valuables: undefined;
 };

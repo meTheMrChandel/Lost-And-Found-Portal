@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
+import { useAuth } from "../../context/AuthContext";
 import { postsApi, Category } from "../../api/posts";
 import { Input } from "../../components/Input";
 import { Button } from "../../components/Button";
@@ -21,6 +22,7 @@ import { colors } from "../../theme/colors";
 
 export const ReportLostScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
 
   const [title, setTitle] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -136,6 +138,19 @@ export const ReportLostScreen: React.FC = () => {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {!user && (
+          <View style={styles.authPromptCard}>
+            <Text style={styles.authPromptTitle}>🔒 Sign In Required</Text>
+            <Text style={styles.authPromptSub}>
+              Please sign in with your verified IIT Ropar institute account to report lost belongings and receive matching notifications.
+            </Text>
+            <Button
+              title="Sign In / Register"
+              onPress={() => navigation.navigate("Auth")}
+              style={{ marginTop: 10 }}
+            />
+          </View>
+        )}
         <View style={styles.header}>
           <Text style={styles.title}>Report a Lost Item</Text>
           <Text style={styles.subtitle}>
@@ -255,6 +270,32 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 40,
+  },
+  authPromptCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  authPromptTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  authPromptSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 4,
   },
   header: {
     marginBottom: 16,

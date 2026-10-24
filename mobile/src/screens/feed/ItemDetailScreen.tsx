@@ -13,6 +13,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import { apiClient } from "../../api/client";
 import { postsApi, Post } from "../../api/posts";
+import { useAuth } from "../../context/AuthContext";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { colors } from "../../theme/colors";
@@ -20,6 +21,7 @@ import { colors } from "../../theme/colors";
 type Props = NativeStackScreenProps<RootStackParamList, "ItemDetail">;
 
 export const ItemDetailScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { user } = useAuth();
   const { postId } = route.params;
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -150,7 +152,20 @@ export const ItemDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <Button
               title="💬 Open Campus Chat"
               variant="ocean"
-              onPress={() => navigation.navigate("Chat", { conversationId: post.id, title: post.title })}
+              onPress={() => {
+                if (!user) {
+                  Alert.alert(
+                    "Sign In Required",
+                    "Please sign in with your IIT Ropar institute account to chat with the finder or claim this item.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Sign In", onPress: () => navigation.navigate("Auth") },
+                    ]
+                  );
+                  return;
+                }
+                navigation.navigate("Chat", { conversationId: post.id, title: post.title });
+              }}
               style={styles.actionBtn}
             />
 

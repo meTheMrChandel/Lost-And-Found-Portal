@@ -26,41 +26,58 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Student ID Card */}
-      <View style={styles.idCard}>
-        <View style={styles.idHeader}>
-          <View style={styles.logoBadge}>
+      {!user ? (
+        <View style={styles.guestCard}>
+          <View style={styles.guestLogoBadge}>
             <Text style={styles.logoText}>LF</Text>
           </View>
-          <View>
-            <Text style={styles.instName}>INDIAN INSTITUTE OF TECHNOLOGY ROPAR</Text>
-            <Text style={styles.portalTag}>Verified Campus Member</Text>
+          <Text style={styles.guestTitle}>IIT Ropar Campus Member</Text>
+          <Text style={styles.guestSubtitle}>
+            Sign in with your institute email to register campus valuables with QR stickers, report belongings, and receive automated matching alerts.
+          </Text>
+          <Button
+            title="Sign In / Register"
+            onPress={() => navigation.navigate("Auth")}
+            style={{ marginTop: 16 }}
+          />
+        </View>
+      ) : (
+        /* Student ID Card */
+        <View style={styles.idCard}>
+          <View style={styles.idHeader}>
+            <View style={styles.logoBadge}>
+              <Text style={styles.logoText}>LF</Text>
+            </View>
+            <View>
+              <Text style={styles.instName}>INDIAN INSTITUTE OF TECHNOLOGY ROPAR</Text>
+              <Text style={styles.portalTag}>Verified Campus Member</Text>
+            </View>
+          </View>
+
+          <View style={styles.avatarRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarChar}>{user?.full_name?.charAt(0) || "U"}</Text>
+            </View>
+            <View style={styles.nameCol}>
+              <Text style={styles.fullName}>{user?.full_name || "Campus Member"}</Text>
+              <Text style={styles.regNo}>{user?.registration_number || "REGISTRATION NUMBER"}</Text>
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.infoGrid}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>INSTITUTE EMAIL</Text>
+              <Text style={styles.infoValue}>{user?.email}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>DEPARTMENT</Text>
+              <Text style={styles.infoValue}>{user?.department || "CSE"}</Text>
+            </View>
           </View>
         </View>
-
-        <View style={styles.avatarRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarChar}>{user?.full_name?.charAt(0) || "U"}</Text>
-          </View>
-          <View style={styles.nameCol}>
-            <Text style={styles.fullName}>{user?.full_name || "Campus Member"}</Text>
-            <Text style={styles.regNo}>{user?.registration_number || "REGISTRATION NUMBER"}</Text>
-          </View>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>INSTITUTE EMAIL</Text>
-            <Text style={styles.infoValue}>{user?.email}</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>DEPARTMENT</Text>
-            <Text style={styles.infoValue}>{user?.department || "CSE"}</Text>
-          </View>
-        </View>
-      </View>
+      )}
 
       {/* Quick Menu Options */}
       <View style={styles.menuSection}>
@@ -117,12 +134,20 @@ export const ProfileScreen: React.FC = () => {
         </Text>
       </View>
 
-      <Button
-        title="Sign Out"
-        variant="lost"
-        onPress={handleLogout}
-        style={styles.logoutBtn}
-      />
+      {user ? (
+        <Button
+          title="Sign Out"
+          variant="lost"
+          onPress={handleLogout}
+          style={styles.logoutBtn}
+        />
+      ) : (
+        <Button
+          title="Sign In with IIT Ropar Email"
+          onPress={() => navigation.navigate("Auth")}
+          style={styles.logoutBtn}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -135,6 +160,42 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 40,
+  },
+  guestCard: {
+    backgroundColor: colors.card,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  guestLogoBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  guestTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: colors.textPrimary,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  guestSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 18,
   },
   idCard: {
     backgroundColor: "#064E3B",

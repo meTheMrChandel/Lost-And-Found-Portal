@@ -28,6 +28,7 @@ export const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
+        initialRouteName="Main"
         screenOptions={{
           headerStyle: {
             backgroundColor: colors.background,
@@ -40,38 +41,38 @@ export const AppNavigator: React.FC = () => {
           headerTintColor: colors.primary,
         }}
       >
-        {!user ? (
-          <Stack.Screen
-            name="Auth"
-            component={AuthNavigator}
-            options={{ headerShown: false }}
-          />
-        ) : (
-          <>
-            <Stack.Screen
-              name="Main"
-              component={BottomTabNavigator}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="ItemDetail"
-              component={ItemDetailScreen}
-              options={{ title: "Belonging Details" }}
-            />
-            <Stack.Screen
-              name="Chat"
-              component={ChatScreen}
-              options={({ route }) => ({
-                title: route.params.title || "Campus Handover Chat",
-              })}
-            />
-            <Stack.Screen
-              name="Notifications"
-              component={NotificationsScreen}
-              options={{ title: "Alerts & Notifications" }}
-            />
-          </>
-        )}
+        <Stack.Screen
+          name="Main"
+          component={BottomTabNavigator}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Auth"
+          component={AuthNavigator}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ItemDetail"
+          component={ItemDetailScreen}
+          options={{ title: "Belonging Details" }}
+        />
+        <Stack.Screen
+          name="Chat"
+          component={ChatScreen}
+          options={({ route }) => ({
+            title: route.params.title || "Campus Handover Chat",
+          })}
+        />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ title: "Alerts & Notifications" }}
+        />
+        <Stack.Screen
+          name="Valuables"
+          component={ValuablesScreen}
+          options={{ title: "My Registered Belongings" }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

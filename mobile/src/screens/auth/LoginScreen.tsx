@@ -40,6 +40,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
     try {
       await login(email.trim().toLowerCase(), password);
+      navigation.navigate("Main" as any);
     } catch (err: any) {
       setError(err.formattedMessage || err.message || "Failed to sign in. Please verify your credentials.");
     } finally {
@@ -115,12 +116,38 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.submitBtn}
           />
 
+          {/* Quick Demo Fill Helper */}
+          <TouchableOpacity
+            style={styles.demoHelper}
+            onPress={() => {
+              setEmail("2026aim1023@iitrpr.ac.in");
+              setError("");
+            }}
+          >
+            <Text style={styles.demoHelperText}>
+              💡 Fill Demo Email (2026aim1023@iitrpr.ac.in)
+            </Text>
+          </TouchableOpacity>
+
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>New to IIT Ropar Lost & Found? </Text>
             <TouchableOpacity onPress={() => navigation.navigate("Register")}>
               <Text style={styles.registerLink}>Register</Text>
             </TouchableOpacity>
           </View>
+
+          <View style={styles.guestDivider}>
+            <View style={styles.line} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.line} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.guestBtn}
+            onPress={() => navigation.navigate("Main" as any)}
+          >
+            <Text style={styles.guestBtnText}>← Continue as Guest (Browse Feed)</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -235,5 +262,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: colors.primary,
+  },
+  demoHelper: {
+    backgroundColor: colors.primaryLight,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  demoHelperText: {
+    fontSize: 11,
+    color: colors.primaryHover,
+    fontWeight: "600",
+  },
+  guestDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 14,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderLight,
+  },
+  orText: {
+    marginHorizontal: 10,
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.textMuted,
+  },
+  guestBtn: {
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 10,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  guestBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textSecondary,
   },
 });
