@@ -241,6 +241,31 @@ npm run dev
 
 ---
 
+## 📋 Phase 9: Cross-Platform Mobile App (Completed)
+
+- **Architecture & Dual-Mode Authentication (`React Native + Expo`):**
+  - Universal mobile codebase running seamlessly on both **iOS** and **Android** devices.
+  - Dual-mode SimpleJWT authentication (`Authorization: Bearer <access_token>`) stored securely in encrypted device storage via `expo-secure-store` with automatic 401 refresh token interceptor.
+  - `@iitrpr.ac.in` domain verification with live email OTP request and verification screens.
+- **Searchable Campus Feed & Details:**
+  - Search input with category horizontal filter scroller and post type toggle tabs (All, Lost, Found).
+  - Belonging detail screen with multi-image banner carousel, promised reward tags, location metadata, and abuse reporting.
+- **Native Lost & Found Reporting:**
+  - Camera and photo library image picker (`expo-image-picker`) supporting up to 5 photos per report.
+  - Confidential `hidden_proof` input section with visual security indicator.
+  - Custody options (Finder custody, Academic Admin office, Main gate security office).
+- **Native QR Valuables Scanner:**
+  - Integrated mobile camera barcode scanner (`expo-camera` / `expo-barcode-scanner`) targeting campus valuable stickers.
+  - Zero-knowledge identity protection: confirms verified ownership without revealing student phone number or registration number.
+- **Real-Time Handover Chat & Alerts:**
+  - Direct & mediated chat stream with `?since=` cursor offline synchronization and read receipts.
+  - Campus notifications center with unread badge counter.
+- **Student Profile & Gear Management:**
+  - Student identity card displaying verified institute credentials.
+  - "My Registered Valuables" list with one-touch active/deactivate toggle and QR sticker preview.
+
+---
+
 ## 🗺️ Roadmap & Phase Timeline
 
 | Phase | Milestone | Status |
@@ -254,8 +279,8 @@ npm run dev
 | **Phase 6** | Verification & Handover (Proof Q&A, One-time QR handover token) | **Completed** |
 | **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | **Completed** |
 | **Phase 8** | Real-Time Chat & Notifications (Django Channels & Badges) | **Completed** |
-| **Phase 9** | Cross-Platform Mobile App (React Native + Expo for iOS & Android) | *Next* |
-| **Phase 10**| Hardening, Rate Limiting & Load Testing | Planned |
+| **Phase 9** | Cross-Platform Mobile App (React Native + Expo for iOS & Android) | **Completed** |
+| **Phase 10**| Hardening, Rate Limiting & Load Testing | *Next* |
 | **Phase 11**| Staging & Production Campus Deployment | Planned |
 
 
