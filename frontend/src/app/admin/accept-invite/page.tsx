@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, Suspense } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import Link from "next/link";
 
 function AcceptInviteContent() {
@@ -38,8 +38,8 @@ function AcceptInviteContent() {
       setTimeout(() => {
         router.push("/login?admin_activated=true");
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || "Failed to accept admin invite.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to accept admin invite."));
     } finally {
       setLoading(false);
     }

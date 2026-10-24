@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { PostAuditLog } from "@/types/auth";
 
 export default function AdminAuditLogsPage() {
@@ -18,8 +18,8 @@ export default function AdminAuditLogsPage() {
       if (res?.data) {
         setLogs(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load audit logs.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load audit logs."));
     } finally {
       setLoading(false);
     }

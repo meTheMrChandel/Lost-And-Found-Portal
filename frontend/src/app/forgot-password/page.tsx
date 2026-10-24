@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import Link from "next/link";
 
 export default function ForgotPasswordPage() {
@@ -27,8 +27,8 @@ export default function ForgotPasswordPage() {
       });
       setMessage(res.message);
       setStep(2);
-    } catch (err: any) {
-      setError(err.message || "Unable to send reset OTP.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to send reset OTP."));
     } finally {
       setLoading(false);
     }
@@ -44,8 +44,8 @@ export default function ForgotPasswordPage() {
         data: { email, code, new_password: newPassword },
       });
       router.push("/login?reset=success");
-    } catch (err: any) {
-      setError(err.message || "Failed to reset password.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to reset password."));
     } finally {
       setLoading(false);
     }

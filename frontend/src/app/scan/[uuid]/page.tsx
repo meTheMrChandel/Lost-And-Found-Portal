@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use, Suspense } from "react";
 import Link from "next/link";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 
 interface ScanData {
   item_name: string;
@@ -31,8 +31,8 @@ function ScanContent({ params }: { params: Promise<{ uuid: string }> }) {
         } else if (res?.is_active === false) {
           setDeactivatedMsg(res.message || "This QR sticker is deactivated.");
         }
-      } catch (err: any) {
-        if (err.status === 404 || err.message?.includes("Invalid QR")) {
+      } catch (err) {
+        if (getErrorMessage(err, "").includes("Invalid QR")) {
           setNotFound(true);
         } else {
           setDeactivatedMsg("Unable to verify QR code at this time.");

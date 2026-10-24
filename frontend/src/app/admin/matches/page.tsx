@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 
 interface CategorySummary {
   id: string;
@@ -113,8 +113,8 @@ export default function AdminMatchesPage() {
       if (res?.data) {
         setMatches(Array.isArray(res.data) ? res.data : res.data.results || []);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load matching queue.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load matching queue."));
     } finally {
       setLoading(false);
     }
@@ -142,8 +142,8 @@ export default function AdminMatchesPage() {
         } new match(es), Updated: ${data.matches_updated || 0}.`
       );
       await fetchMatches();
-    } catch (err: any) {
-      setError(err.message || "Failed to execute matching engine.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to execute matching engine."));
     } finally {
       setRunningEngine(false);
     }
@@ -171,8 +171,8 @@ export default function AdminMatchesPage() {
       setActionType(null);
       setActionNotes("");
       await fetchMatches();
-    } catch (err: any) {
-      setError(err.message || "Failed to process match action.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to process match action."));
     } finally {
       setSubmittingAction(false);
     }
@@ -217,8 +217,8 @@ export default function AdminMatchesPage() {
       setSuccessMsg(`Proof evaluation recorded. Match is now ${proofDecision.toLowerCase().replace("_", " ")}.`);
       setProofModalMatch(null);
       await fetchMatches();
-    } catch (err: any) {
-      setError(err.message || "Failed to submit proof evaluation.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to submit proof evaluation."));
     } finally {
       setSubmittingAction(false);
     }
@@ -233,8 +233,8 @@ export default function AdminMatchesPage() {
       });
       setSuccessMsg(`Meeting mode updated to: ${mode === "office" ? "Admin / Security Office" : "Direct Meet"}`);
       await fetchMatches();
-    } catch (err: any) {
-      setError(err.message || "Failed to set meeting mode.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to set meeting mode."));
     }
   };
 
@@ -249,8 +249,8 @@ export default function AdminMatchesPage() {
         setSuccessMsg(`Handover code generated: ${res.data.code}`);
       }
       await fetchMatches();
-    } catch (err: any) {
-      setError(err.message || "Failed to generate handover code.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to generate handover code."));
     } finally {
       setSubmittingAction(false);
     }
@@ -271,8 +271,8 @@ export default function AdminMatchesPage() {
       setVerifyCodeInput("");
       setGeneratedCode(null);
       await fetchMatches();
-    } catch (err: any) {
-      setError(err.message || "Invalid handover verification code.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Invalid handover verification code."));
     } finally {
       setSubmittingAction(false);
     }
@@ -296,8 +296,8 @@ export default function AdminMatchesPage() {
       setSettledReward("0");
       setCloseNotes("");
       await fetchMatches();
-    } catch (err: any) {
-      setError(err.message || "Failed to close case.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to close case."));
     } finally {
       setSubmittingAction(false);
     }

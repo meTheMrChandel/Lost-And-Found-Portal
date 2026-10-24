@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { User } from "@/types/auth";
 
 export default function AdminUsersPage() {
@@ -24,8 +24,8 @@ export default function AdminUsersPage() {
       if (res?.data) {
         setUsers(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch student accounts.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to fetch student accounts."));
     } finally {
       setLoading(false);
     }
@@ -54,8 +54,8 @@ export default function AdminUsersPage() {
       setSelectedUser(null);
       setBanReason("");
       fetchUsers();
-    } catch (err: any) {
-      setError(err.message || "Moderation action failed.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Moderation action failed."));
     } finally {
       setActionLoading(false);
     }

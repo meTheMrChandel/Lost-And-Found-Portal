@@ -64,3 +64,7 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
 
   return result;
 }
+
+export function getErrorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}

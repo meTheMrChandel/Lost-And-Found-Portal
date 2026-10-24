@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 
 export default function ProfilePage() {
   const { user, loading, logout, setUser } = useAuth();
@@ -48,8 +48,8 @@ export default function ProfilePage() {
       });
       setUser(res.data);
       setMsg("Profile details saved successfully.");
-    } catch (err: any) {
-      setError(err.message || "Failed to update profile.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to update profile."));
     } finally {
       setSaving(false);
     }

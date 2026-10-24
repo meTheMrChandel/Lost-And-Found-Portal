@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 
 interface CategorySummary {
   id: string;
@@ -52,8 +52,8 @@ export default function MyValuablesPage() {
       if (res?.data) {
         setItems(Array.isArray(res.data) ? res.data : res.data.results || []);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load registered valuables.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load registered valuables."));
     } finally {
       setLoading(false);
     }
@@ -99,8 +99,8 @@ export default function MyValuablesPage() {
       setDescInput("");
       setSerialInput("");
       await fetchItems();
-    } catch (err: any) {
-      setError(err.message || "Failed to register item.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to register item."));
     } finally {
       setSubmitting(false);
     }
@@ -111,8 +111,8 @@ export default function MyValuablesPage() {
       const res = await apiClient<any>(`/items/${item.id}/toggle-active/`, { method: "POST" });
       setSuccessMsg(res?.message || "QR sticker status updated.");
       await fetchItems();
-    } catch (err: any) {
-      setError(err.message || "Failed to toggle active state.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to toggle active state."));
     }
   };
 
@@ -124,8 +124,8 @@ export default function MyValuablesPage() {
       await apiClient(`/items/${item.id}/`, { method: "DELETE" });
       setSuccessMsg(`"${item.name}" removed successfully.`);
       await fetchItems();
-    } catch (err: any) {
-      setError(err.message || "Failed to remove item.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to remove item."));
     }
   };
 
@@ -138,8 +138,8 @@ export default function MyValuablesPage() {
       if (svg) {
         setStickerSvg(svg);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to generate QR sticker.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to generate QR sticker."));
     } finally {
       setLoadingSticker(false);
     }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import Link from "next/link";
 
 export default function RegisterPage() {
@@ -40,8 +40,8 @@ export default function RegisterPage() {
       setSuccessMsg(res.message);
       setOtpCode("");
       setStep(2);
-    } catch (err: any) {
-      setError(err.message || "Failed to send OTP.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to send OTP."));
     } finally {
       setLoading(false);
     }
@@ -59,8 +59,8 @@ export default function RegisterPage() {
       });
       setSuccessMsg("OTP Verified! Please complete your student profile.");
       setStep(3);
-    } catch (err: any) {
-      setError(err.message || "Invalid OTP code.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Invalid OTP code."));
     } finally {
       setLoading(false);
     }
@@ -80,8 +80,8 @@ export default function RegisterPage() {
         },
       });
       router.push("/login?registered=true");
-    } catch (err: any) {
-      setError(err.message || "Failed to complete registration.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to complete registration."));
     } finally {
       setLoading(false);
     }

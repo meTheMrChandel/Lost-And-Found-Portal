@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { Category } from "@/types/post";
 
 const CAMPUS_LOCATIONS = [
@@ -128,8 +128,8 @@ function ReportFoundContent() {
       }
 
       router.push("/my-reports?submitted=true");
-    } catch (err: any) {
-      setError(err.message || "An error occurred while submitting.");
+    } catch (err) {
+      setError(getErrorMessage(err, "An error occurred while submitting."));
     } finally {
       setSubmitting(false);
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { Category, Post, PostStatus } from "@/types/post";
 
 export default function AdminCaseQueuePage() {
@@ -54,8 +54,8 @@ export default function AdminCaseQueuePage() {
       if (res?.data) {
         setPosts(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load case queue.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load case queue."));
     } finally {
       setLoading(false);
     }
@@ -78,8 +78,8 @@ export default function AdminCaseQueuePage() {
         setSelectedPost(res.data);
         setNewCategorySlug(res.data.category);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load case details.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load case details."));
     }
   };
 
@@ -117,8 +117,8 @@ export default function AdminCaseQueuePage() {
       setReviewAction(null);
       setReviewRemarks("");
       fetchPosts();
-    } catch (err: any) {
-      setError(err.message || "Review action failed.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Review action failed."));
     } finally {
       setActionLoading(false);
     }

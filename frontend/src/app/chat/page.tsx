@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import NotificationBell from "@/components/NotificationBell";
 
 interface Participant {
@@ -79,7 +79,7 @@ export default function ChatPage() {
       if (items.length > 0 && !activeConv) {
         setActiveConv(items[0]);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to load conversations", err);
     } finally {
       setLoadingConvs(false);
@@ -103,7 +103,7 @@ export default function ChatPage() {
       setConversations((prev) =>
         prev.map((c) => (c.id === convId ? { ...c, unread_count: 0 } : c))
       );
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to fetch messages", err);
     } finally {
       setLoadingMsgs(false);
@@ -227,8 +227,8 @@ export default function ChatPage() {
           setMessages((prev) => [...prev, res.data]);
         }
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to send message.");
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Failed to send message."));
     } finally {
       setSending(false);
     }
@@ -244,8 +244,8 @@ export default function ChatPage() {
         prev.map((c) => (c.id === activeConv.id ? { ...c, is_direct_approved: true } : c))
       );
       setSuccessMsg("Direct chat approved for parties.");
-    } catch (err: any) {
-      setErrorMsg(err.message || "Approval failed.");
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Approval failed."));
     }
   };
 
@@ -258,8 +258,8 @@ export default function ChatPage() {
         data: { blocked_user_id: participantId, reason: "Inappropriate communication" },
       });
       alert(res.message || "Block status updated.");
-    } catch (err: any) {
-      alert(err.message || "Failed to update block status.");
+    } catch (err) {
+      alert(getErrorMessage(err, "Failed to update block status."));
     }
   };
 

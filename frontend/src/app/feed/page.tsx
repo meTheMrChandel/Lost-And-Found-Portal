@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { Category, Post } from "@/types/post";
 import { useAuth } from "@/context/AuthContext";
 
@@ -63,8 +63,8 @@ function FeedContent() {
       if (res?.data) {
         setPosts(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load campus feed.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load campus feed."));
     } finally {
       setLoading(false);
     }
@@ -99,8 +99,8 @@ function FeedContent() {
         setAbuseMsg("");
         setAbuseDesc("");
       }, 2000);
-    } catch (err: any) {
-      setAbuseError(err.message || "Failed to submit abuse report.");
+    } catch (err) {
+      setAbuseError(getErrorMessage(err, "Failed to submit abuse report."));
     } finally {
       setAbuseLoading(false);
     }

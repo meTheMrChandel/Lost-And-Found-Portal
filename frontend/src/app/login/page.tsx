@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import { getErrorMessage } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,8 +23,8 @@ export default function LoginPage() {
     try {
       await login(email, password);
       router.push("/");
-    } catch (err: any) {
-      setError(err.message || "Failed to log in. Please check your credentials.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to log in. Please check your credentials."));
     } finally {
       setSubmitting(false);
     }

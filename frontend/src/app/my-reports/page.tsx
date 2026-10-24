@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { Post, PostStatus } from "@/types/post";
 
 function MyReportsContent() {
@@ -27,8 +27,8 @@ function MyReportsContent() {
       if (res?.data) {
         setReports(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load your reports.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load your reports."));
     } finally {
       setLoading(false);
     }
@@ -48,8 +48,8 @@ function MyReportsContent() {
       setActionMsg("Report withdrawn successfully.");
       setSelectedReport(null);
       fetchReports();
-    } catch (err: any) {
-      setError(err.message || "Failed to withdraw report.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to withdraw report."));
     } finally {
       setActionLoading(false);
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { AbuseReport } from "@/types/post";
 
 export default function AdminAbuseReportsPage() {
@@ -19,8 +19,8 @@ export default function AdminAbuseReportsPage() {
       if (res?.data) {
         setReports(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load abuse reports.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load abuse reports."));
     } finally {
       setLoading(false);
     }
@@ -40,8 +40,8 @@ export default function AdminAbuseReportsPage() {
       });
       setMsg(res.message || "Abuse report marked as resolved.");
       fetchReports();
-    } catch (err: any) {
-      setError(err.message || "Failed to resolve report.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to resolve report."));
     } finally {
       setResolvingId(null);
     }

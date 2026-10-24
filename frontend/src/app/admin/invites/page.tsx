@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { AdminInvite } from "@/types/auth";
 
 export default function AdminInvitesPage() {
@@ -17,8 +17,8 @@ export default function AdminInvitesPage() {
       if (res?.data) {
         setInvites(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load invites list.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load invites list."));
     }
   };
 
@@ -40,8 +40,8 @@ export default function AdminInvitesPage() {
       setSuccess(res.message || "Invitation sent successfully!");
       setEmail("");
       fetchInvites();
-    } catch (err: any) {
-      setError(err.message || "Failed to send invitation.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to send invitation."));
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { apiClient, getErrorMessage } from "@/lib/api";
 import { SiteSettings } from "@/types/auth";
 
 export default function AdminSettingsPage() {
@@ -28,8 +28,8 @@ export default function AdminSettingsPage() {
         setOtpExpirySeconds(res.data.otp_expiry_seconds ?? 300);
         setOtpMaxAttempts(res.data.otp_max_attempts ?? 5);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load site configuration.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to load site configuration."));
     } finally {
       setLoading(false);
     }
@@ -60,8 +60,8 @@ export default function AdminSettingsPage() {
       if (res.data) {
         setSettings(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to update site configuration.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to update site configuration."));
     } finally {
       setSaving(false);
     }
