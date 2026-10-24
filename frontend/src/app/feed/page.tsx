@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
-import { Category, Post, PostType } from "@/types/post";
+import { Category, Post } from "@/types/post";
 import { useAuth } from "@/context/AuthContext";
 
 function FeedContent() {

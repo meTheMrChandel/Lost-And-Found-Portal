@@ -20,7 +20,6 @@ export default function AdminCaseQueuePage() {
 
   // Review modal
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Review inputs
@@ -71,7 +70,6 @@ export default function AdminCaseQueuePage() {
   }, [statusFilter, categoryFilter, typeFilter, slaBreachedOnly]);
 
   const openCaseDetail = async (postId: string) => {
-    setDetailLoading(true);
     setReviewAction(null);
     setReviewRemarks("");
     try {
@@ -82,8 +80,6 @@ export default function AdminCaseQueuePage() {
       }
     } catch (err: any) {
       setError(err.message || "Failed to load case details.");
-    } finally {
-      setDetailLoading(false);
     }
   };
 

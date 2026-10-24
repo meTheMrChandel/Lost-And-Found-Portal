@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (res.success && res.data) {
           setUser(res.data);
         }
-      } catch (err) {
+      } catch {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
       } finally {
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         data: { refresh },
       });
-    } catch (e) {
+    } catch {
       // Ignore logout errors
     } finally {
       localStorage.removeItem("access_token");

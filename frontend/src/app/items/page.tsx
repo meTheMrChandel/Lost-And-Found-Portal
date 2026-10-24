@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
-import { useAuth } from "@/context/AuthContext";
 
 interface CategorySummary {
   id: string;
@@ -26,7 +25,6 @@ interface RegisteredItem {
 }
 
 export default function MyValuablesPage() {
-  const { user } = useAuth();
   const [items, setItems] = useState<RegisteredItem[]>([]);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [loading, setLoading] = useState(true);

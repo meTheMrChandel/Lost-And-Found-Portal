@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { apiClient } from "@/lib/api";
 import { AbuseReport } from "@/types/post";
 
