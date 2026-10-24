@@ -31,10 +31,10 @@ Cross-platform mobile client for the **IIT Ropar Lost & Found Portal** built wit
 
 - **Framework:** React Native + Expo (SDK 52)
 - **Language:** TypeScript
-- **Navigation:** React Navigation v6 (Native Stack & Bottom Tabs)
+- **Navigation:** React Navigation v7 (Native Stack & Bottom Tabs)
 - **Network & State:** Axios with interceptors, Context API
 - **Device Hardware APIs:**
-  - `expo-camera` / `expo-barcode-scanner` (QR scanning)
+  - `expo-camera` (`CameraView` modern QR & barcode scanning)
   - `expo-image-picker` (Camera & Photo Library)
   - `expo-secure-store` (Encrypted keychain / keystore storage)
 - **Styling:** Custom light theme with IIT Ropar emerald (`#047857`) and ocean teal accents (`#0284c7`, `#0d9488`).
