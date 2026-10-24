@@ -59,3 +59,8 @@ class ItemRegistry:
         item = self._owned(token, owner_id)
         item.qr_active = True
         return item
+
+    def set_lost(self, token: str, owner_id: str, lost: bool = True) -> Item:
+        item = self._owned(token, owner_id)
+        item.is_marked_lost = lost
+        return item
