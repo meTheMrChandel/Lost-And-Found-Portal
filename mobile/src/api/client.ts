@@ -1,13 +1,20 @@
 import axios from "axios";
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Default API URL based on platform:
-// - Android Emulator: 10.0.2.2 points to host machine
-// - iOS Simulator / Local: 127.0.0.1 / localhost
+// Automatically detect host IP (e.g. 192.168.x.x) when running via Expo Go on physical device:
+const expoHost = Constants.expoConfig?.hostUri
+  ? Constants.expoConfig.hostUri.split(":")[0]
+  : null;
+
 const DEFAULT_API_BASE =
-  Platform.OS === "android"
+  Platform.OS === "web"
+    ? "http://127.0.0.1:8000/api/v1"
+    : expoHost
+    ? `http://${expoHost}:8000/api/v1`
+    : Platform.OS === "android"
     ? "http://10.0.2.2:8000/api/v1"
     : "http://127.0.0.1:8000/api/v1";
 
