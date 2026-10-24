@@ -64,3 +64,8 @@ class ItemRegistry:
         item = self._owned(token, owner_id)
         item.is_marked_lost = lost
         return item
+
+    def items_for_owner(self, owner_id: str) -> list:
+        """All items of one owner, oldest first."""
+        mine = [i for i in self._items.values() if i.owner.owner_id == owner_id]
+        return sorted(mine, key=lambda i: i.created_at)
