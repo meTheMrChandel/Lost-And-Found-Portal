@@ -845,7 +845,7 @@ export default function AdminMatchesPage() {
               <label className="block text-xs font-semibold text-[#1C1C1E] mb-1">Verification Decision:</label>
               <select
                 value={proofDecision}
-                onChange={(e) => setProofDecision(e.target.value as any)}
+                onChange={(e) => setProofDecision(e.target.value as typeof proofDecision)}
                 className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#EFEAE0] rounded-xl text-xs font-semibold"
               >
                 <option value="VERIFIED">✅ Mark as Verified (Move to Handover)</option>

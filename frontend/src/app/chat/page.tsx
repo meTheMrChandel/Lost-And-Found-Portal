@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { apiClient, getErrorMessage } from "@/lib/api";
+import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
 import NotificationBell from "@/components/NotificationBell";
 
 interface Participant {
@@ -73,8 +73,8 @@ export default function ChatPage() {
   // Fetch list of conversations
   const fetchConversations = useCallback(async () => {
     try {
-      const res = await apiClient<any>("/chat/conversations/");
-      const items: Conversation[] = Array.isArray(res) ? res : res?.data || res?.results || [];
+      const res = await apiClient<ListResponse<Conversation>>("/chat/conversations/");
+      const items = unwrapList(res);
       setConversations(items);
       if (items.length > 0 && !activeConv) {
         setActiveConv(items[0]);
@@ -94,9 +94,8 @@ export default function ChatPage() {
   const fetchMessages = useCallback(async (convId: string) => {
     setLoadingMsgs(true);
     try {
-      const res = await apiClient<any>(`/chat/conversations/${convId}/messages/`);
-      const msgs: Message[] = res?.data || (Array.isArray(res) ? res : []);
-      setMessages(msgs);
+      const res = await apiClient<ListResponse<Message>>(`/chat/conversations/${convId}/messages/`);
+      setMessages(unwrapList(res));
 
       // Mark conversation as read
       await apiClient(`/chat/conversations/${convId}/read/`, { method: "POST" });
@@ -219,12 +218,13 @@ export default function ChatPage() {
         );
       } else {
         // Fallback to REST endpoint
-        const res = await apiClient<any>(`/chat/conversations/${activeConv.id}/messages/`, {
+        const res = await apiClient<{ data?: Message }>(`/chat/conversations/${activeConv.id}/messages/`, {
           method: "POST",
           data: { content: messageContent },
         });
-        if (res.data) {
-          setMessages((prev) => [...prev, res.data]);
+        const sent = res.data;
+        if (sent) {
+          setMessages((prev) => [...prev, sent]);
         }
       }
     } catch (err) {
@@ -253,7 +253,7 @@ export default function ChatPage() {
   const handleToggleBlock = async (participantId: string) => {
     if (!confirm("Are you sure you want to toggle block status for this user?")) return;
     try {
-      const res = await apiClient<any>("/chat/block/", {
+      const res = await apiClient<{ message?: string }>("/chat/block/", {
         method: "POST",
         data: { blocked_user_id: participantId, reason: "Inappropriate communication" },
       });

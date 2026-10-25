@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { apiClient, getErrorMessage } from "@/lib/api";
+import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
 
 interface CategorySummary {
   id: string;
@@ -61,9 +61,9 @@ export default function MyValuablesPage() {
 
   const fetchCategories = async () => {
     try {
-      const res = await apiClient<any>("/posts/categories/");
-      const list = res?.data || (Array.isArray(res) ? res : res?.results || []);
-      if (Array.isArray(list) && list.length > 0) {
+      const res = await apiClient<ListResponse<CategorySummary>>("/posts/categories/");
+      const list = unwrapList(res);
+      if (list.length > 0) {
         setCategories(list);
         setCategoryInput((prev) => (prev ? prev : list[0].slug));
       }
@@ -108,7 +108,9 @@ export default function MyValuablesPage() {
 
   const handleToggleActive = async (item: RegisteredItem) => {
     try {
-      const res = await apiClient<any>(`/items/${item.id}/toggle-active/`, { method: "POST" });
+      const res = await apiClient<{ message?: string }>(`/items/${item.id}/toggle-active/`, {
+        method: "POST",
+      });
       setSuccessMsg(res?.message || "QR sticker status updated.");
       await fetchItems();
     } catch (err) {
@@ -133,8 +135,10 @@ export default function MyValuablesPage() {
     setStickerItem(item);
     setLoadingSticker(true);
     try {
-      const res = await apiClient<any>(`/items/${item.id}/sticker/?format=json`);
-      const svg = res?.svg || res?.data?.svg || (typeof res === "string" ? res : "");
+      const res = await apiClient<{ svg?: string; data?: { svg?: string } } | string>(
+        `/items/${item.id}/sticker/?format=json`
+      );
+      const svg = typeof res === "string" ? res : res?.svg || res?.data?.svg || "";
       if (svg) {
         setStickerSvg(svg);
       }

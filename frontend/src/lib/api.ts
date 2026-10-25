@@ -1,9 +1,24 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 interface RequestOptions extends RequestInit {
-  data?: any;
+  data?: unknown;
 }
 
+interface ApiErrorBody {
+  message?: string;
+  errors?: Record<string, unknown>;
+}
+
+/** List endpoints return a bare array, a DRF paginated page, or the { data } envelope. */
+export type ListResponse<T> = T[] | { data?: T[]; results?: T[] };
+
+export function unwrapList<T>(res: ListResponse<T> | null | undefined): T[] {
+  if (Array.isArray(res)) return res;
+  return res?.data || res?.results || [];
+}
+
+// Untyped call sites rely on this default; new code should pass an explicit T.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function apiClient<T = any>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const { data, headers, body, ...customConfig } = options;
   
@@ -21,9 +36,10 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
     defaultHeaders["Content-Type"] = "application/json";
   }
 
-  let requestBody: any = undefined;
+  let requestBody: BodyInit | null | undefined = undefined;
   if (data !== undefined) {
-    requestBody = isFormData ? data : typeof data === "string" ? data : JSON.stringify(data);
+    requestBody =
+      data instanceof FormData ? data : typeof data === "string" ? data : JSON.stringify(data);
   } else if (body !== undefined) {
     requestBody = body;
   }
@@ -38,7 +54,7 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
   };
 
   const response = await fetch(`${API_BASE}${endpoint}`, config);
-  let result: any = null;
+  let result: ApiErrorBody | null = null;
   const contentType = response.headers.get("content-type") || "";
 
   if (contentType.includes("application/json")) {
@@ -48,7 +64,7 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
     if (!response.ok) {
       throw new Error(`Server returned error (${response.status}): ${response.statusText}`);
     }
-    return text as any;
+    return text as T;
   }
 
   if (!response.ok) {
@@ -62,7 +78,7 @@ export async function apiClient<T = any>(endpoint: string, options: RequestOptio
     throw new Error(errorMsg || `Request failed (${response.status})`);
   }
 
-  return result;
+  return result as T;
 }
 
 export function getErrorMessage(err: unknown, fallback: string): string {

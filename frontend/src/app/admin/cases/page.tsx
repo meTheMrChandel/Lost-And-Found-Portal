@@ -99,7 +99,7 @@ export default function AdminCaseQueuePage() {
     setActionLoading(true);
     setError("");
     try {
-      const payload: Record<string, any> = {
+      const payload: Record<string, string> = {
         action,
         remarks: reviewRemarks.trim(),
       };
