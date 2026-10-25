@@ -10,7 +10,17 @@ from .models import Item
 from .svg import matrix_to_svg
 from .urls import build_scan_url
 
-_STYLE = "body{font-family:sans-serif}.grid{display:grid;gap:8px}"
+_STYLE = (
+    "body{font-family:system-ui,sans-serif;margin:16px}"
+    "h1{font-size:18px}"
+    ".grid{display:grid;gap:0}"
+    ".label{margin:0;padding:10px;border:1px dashed #888;text-align:center;"
+    "break-inside:avoid}"
+    ".label svg{width:100%;height:auto;max-width:180px}"
+    ".label figcaption{display:flex;flex-direction:column;gap:2px;font-size:12px}"
+    ".label small{color:#555}"
+    "@media print{h1{display:none}body{margin:0}}"
+)
 
 
 def render_sheet(
