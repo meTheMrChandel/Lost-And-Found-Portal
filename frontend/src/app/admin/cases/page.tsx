@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { Category, Post, PostStatus } from "@/types/post";
 
 export default function AdminCaseQueuePage() {
-  const [posts, setPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   // Filters
@@ -16,6 +15,7 @@ export default function AdminCaseQueuePage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [slaBreachedOnly, setSlaBreachedOnly] = useState(false);
 
   // Review modal
@@ -27,47 +27,40 @@ export default function AdminCaseQueuePage() {
   const [reviewRemarks, setReviewRemarks] = useState("");
   const [newCategorySlug, setNewCategorySlug] = useState("");
 
-  const fetchCategories = async () => {
-    try {
-      const res = await apiClient("/posts/categories/");
-      if (res?.data) {
-        setCategories(res.data);
-      }
-    } catch (err) {
-      console.error("Failed to load categories", err);
-    }
-  };
+  const queueQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    if (statusFilter && statusFilter !== "ALL") params.append("status", statusFilter);
+    if (categoryFilter) params.append("category", categoryFilter);
+    if (typeFilter) params.append("post_type", typeFilter);
+    if (appliedSearch) params.append("search", appliedSearch);
+    if (slaBreachedOnly) params.append("sla_breached", "true");
+    return params.toString();
+  }, [statusFilter, categoryFilter, typeFilter, appliedSearch, slaBreachedOnly]);
 
-  const fetchPosts = async () => {
-    setLoading(true);
+  const {
+    data: queue,
+    loading,
+    error: loadError,
+    refresh,
+  } = useApiQuery<{ data?: Post[] }>(`/adminpanel/posts/?${queueQuery}`, "Failed to load case queue.");
+  const posts = queue?.data ?? [];
+  const error = actionError || loadError;
+
+  const refreshQueue = () => {
     setError("");
-    try {
-      const params = new URLSearchParams();
-      if (statusFilter && statusFilter !== "ALL") params.append("status", statusFilter);
-      if (categoryFilter) params.append("category", categoryFilter);
-      if (typeFilter) params.append("post_type", typeFilter);
-      if (searchQuery.trim()) params.append("search", searchQuery.trim());
-      if (slaBreachedOnly) params.append("sla_breached", "true");
-
-      const endpoint = `/adminpanel/posts/?${params.toString()}`;
-      const res = await apiClient(endpoint);
-      if (res?.data) {
-        setPosts(res.data);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load case queue."));
-    } finally {
-      setLoading(false);
-    }
+    setAppliedSearch(searchQuery.trim());
+    refresh();
   };
 
   useEffect(() => {
-    fetchCategories();
+    apiClient("/posts/categories/")
+      .then((res) => {
+        if (res?.data) {
+          setCategories(res.data);
+        }
+      })
+      .catch((err) => console.error("Failed to load categories", err));
   }, []);
-
-  useEffect(() => {
-    fetchPosts();
-  }, [statusFilter, categoryFilter, typeFilter, slaBreachedOnly]);
 
   const openCaseDetail = async (postId: string) => {
     setReviewAction(null);
@@ -116,7 +109,7 @@ export default function AdminCaseQueuePage() {
       setSelectedPost(null);
       setReviewAction(null);
       setReviewRemarks("");
-      fetchPosts();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Review action failed."));
     } finally {
@@ -170,7 +163,7 @@ export default function AdminCaseQueuePage() {
           </p>
         </div>
         <button
-          onClick={fetchPosts}
+          onClick={refreshQueue}
           disabled={loading}
           className="self-start md:self-auto px-4 py-2 rounded-xl bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-xs font-semibold shadow-sm transition-all cursor-pointer"
         >
@@ -199,7 +192,7 @@ export default function AdminCaseQueuePage() {
             placeholder="Search by title, location, student name, email, or reg #..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && fetchPosts()}
+            onKeyDown={(e) => e.key === "Enter" && refreshQueue()}
             className="w-full px-4 py-2 rounded-xl bg-[#FAF7F2] border border-[#E2DDD2] text-xs focus:ring-2 focus:ring-[#047857] outline-none"
           />
         </div>
@@ -242,7 +235,7 @@ export default function AdminCaseQueuePage() {
         </button>
 
         <button
-          onClick={fetchPosts}
+          onClick={refreshQueue}
           className="px-4 py-2 rounded-xl bg-[#1C1C1E] hover:bg-black text-white text-xs font-bold transition-all cursor-pointer"
         >
           Filter

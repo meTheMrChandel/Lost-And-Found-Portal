@@ -1,39 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { User } from "@/types/auth";
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [banReason, setBanReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [msg, setMsg] = useState("");
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const endpoint = search
-        ? `/adminpanel/users/?search=${encodeURIComponent(search)}`
-        : "/adminpanel/users/";
-      const res = await apiClient(endpoint);
-      if (res?.data) {
-        setUsers(res.data);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to fetch student accounts."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, [search]);
+  // Search runs on every keystroke; useApiQuery drops responses for stale terms
+  const {
+    data: usersRes,
+    loading,
+    error: loadError,
+    refresh,
+  } = useApiQuery<{ data?: User[] }>(
+    search ? `/adminpanel/users/?search=${encodeURIComponent(search)}` : "/adminpanel/users/",
+    "Failed to fetch student accounts."
+  );
+  const users = usersRes?.data ?? [];
+  const error = actionError || loadError;
 
   const handleModerate = async (isBanned: boolean) => {
     if (!selectedUser) return;
@@ -53,7 +44,7 @@ export default function AdminUsersPage() {
       setMsg(res.message || "User moderation status updated.");
       setSelectedUser(null);
       setBanReason("");
-      fetchUsers();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Moderation action failed."));
     } finally {
