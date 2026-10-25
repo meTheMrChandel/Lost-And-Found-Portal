@@ -30,8 +30,8 @@ export const ItemDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     const loadPost = async () => {
       try {
-        const res = await apiClient.get(`/posts/${postId}/`);
-        setPost(res.data?.data || res.data);
+        const postData = await postsApi.getPostDetail(postId);
+        setPost(postData);
       } catch (e: any) {
         Alert.alert("Error", e.message || "Failed to load item details");
       } finally {
@@ -115,7 +115,9 @@ export const ItemDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
           {/* Title & Category */}
           <Text style={styles.title}>{post.title}</Text>
-          <Text style={styles.category}>{post.category?.name || "General Item"}</Text>
+          <Text style={styles.category}>
+            {post.category_name || (typeof post.category === "object" ? post.category?.name : post.category) || "General Item"}
+          </Text>
 
           {/* Location & Date Card */}
           <View style={styles.metaBox}>

@@ -456,6 +456,13 @@ class TestPhase5FeedAndFoundReports:
         assert str(p_phone.id) in search_ids
         assert str(p_keys.id) not in search_ids
 
+        # Mobile param format: type=lost & category=all
+        res_mobile = client.get("/api/v1/posts/feed/?type=lost&category=all")
+        assert res_mobile.status_code == 200
+        mobile_ids = [p["id"] for p in res_mobile.json()["data"]]
+        assert str(p_keys.id) in mobile_ids
+        assert str(p_phone.id) not in mobile_ids
+
     def test_student_can_report_abuse(self, client, student_user, other_student):
         """Student can report abuse on a post; duplicate reporting is prevented."""
         cat = Category.objects.get(slug="bottle")

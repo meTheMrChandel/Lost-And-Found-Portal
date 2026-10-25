@@ -2,6 +2,7 @@
 posts/views.py — API views for Category listing, Lost Post reporting, and My Reports.
 """
 
+import uuid
 from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
@@ -335,10 +336,14 @@ class PublicFeedView(APIView):
 
         # Filters
         category_param = request.query_params.get("category")
-        if category_param:
-            posts = posts.filter(category_id=category_param)
+        if category_param and category_param.upper() != "ALL":
+            try:
+                uuid.UUID(str(category_param))
+                posts = posts.filter(category_id=category_param)
+            except (ValueError, AttributeError):
+                posts = posts.filter(category__slug__iexact=category_param)
 
-        post_type_param = request.query_params.get("post_type")
+        post_type_param = request.query_params.get("post_type") or request.query_params.get("type")
         if post_type_param and post_type_param.upper() in ["LOST", "FOUND"]:
             posts = posts.filter(post_type=post_type_param.upper())
 

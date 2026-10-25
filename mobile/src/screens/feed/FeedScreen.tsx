@@ -38,7 +38,10 @@ export const FeedScreen: React.FC = () => {
   const loadPosts = useCallback(async () => {
     try {
       const params: any = {};
-      if (selectedType !== "all") params.type = selectedType;
+      if (selectedType !== "all") {
+        params.post_type = selectedType.toUpperCase();
+        params.type = selectedType.toUpperCase();
+      }
       if (selectedCategory !== "all") params.category = selectedCategory;
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
