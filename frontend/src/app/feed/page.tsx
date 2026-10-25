@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { Category, Post } from "@/types/post";
 import { useAuth } from "@/context/AuthContext";
 
@@ -11,10 +12,7 @@ function FeedContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
 
-  const [posts, setPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   // Filters
   const [selectedType, setSelectedType] = useState<string>(
@@ -24,6 +22,7 @@ function FeedContent() {
     searchParams.get("category") || "ALL"
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [ordering, setOrdering] = useState("-created_at");
 
   // Selected item modal
@@ -37,46 +36,37 @@ function FeedContent() {
   const [abuseMsg, setAbuseMsg] = useState("");
   const [abuseError, setAbuseError] = useState("");
 
-  const fetchCategories = async () => {
-    try {
-      const res = await apiClient("/posts/categories/");
-      if (res?.data) {
-        setCategories(res.data);
-      }
-    } catch (err) {
-      console.error("Failed to load categories", err);
-    }
-  };
+  const feedQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedType !== "ALL") params.append("post_type", selectedType);
+    if (selectedCategory !== "ALL") params.append("category", selectedCategory);
+    if (appliedSearch) params.append("search", appliedSearch);
+    if (ordering) params.append("ordering", ordering);
+    return params.toString();
+  }, [selectedType, selectedCategory, appliedSearch, ordering]);
 
-  const fetchPosts = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams();
-      if (selectedType !== "ALL") params.append("post_type", selectedType);
-      if (selectedCategory !== "ALL") params.append("category", selectedCategory);
-      if (searchQuery.trim()) params.append("search", searchQuery.trim());
-      if (ordering) params.append("ordering", ordering);
+  const {
+    data: feed,
+    loading,
+    error,
+    refresh,
+  } = useApiQuery<{ data?: Post[] }>(`/posts/feed/?${feedQuery}`, "Failed to load campus feed.");
+  const posts = feed?.data ?? [];
 
-      const endpoint = `/posts/feed/?${params.toString()}`;
-      const res = await apiClient(endpoint);
-      if (res?.data) {
-        setPosts(res.data);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load campus feed."));
-    } finally {
-      setLoading(false);
-    }
+  const applySearch = () => {
+    setAppliedSearch(searchQuery.trim());
+    refresh();
   };
 
   useEffect(() => {
-    fetchCategories();
+    apiClient("/posts/categories/")
+      .then((res) => {
+        if (res?.data) {
+          setCategories(res.data);
+        }
+      })
+      .catch((err) => console.error("Failed to load categories", err));
   }, []);
-
-  useEffect(() => {
-    fetchPosts();
-  }, [selectedType, selectedCategory, ordering]);
 
   const handleReportAbuse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,7 +201,7 @@ function FeedContent() {
               placeholder="Search by keywords, location (e.g. library, hostel, cafeteria)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchPosts()}
+              onKeyDown={(e) => e.key === "Enter" && applySearch()}
               className="w-full px-4 py-2.5 rounded-2xl bg-white border border-[#E2DDD2] text-xs focus:ring-2 focus:ring-[#047857] outline-none shadow-sm"
             />
           </div>
@@ -228,7 +218,7 @@ function FeedContent() {
             </select>
 
             <button
-              onClick={fetchPosts}
+              onClick={applySearch}
               className="px-5 py-2.5 rounded-2xl bg-[#047857] hover:bg-[#10B981] text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
             >
               Search
