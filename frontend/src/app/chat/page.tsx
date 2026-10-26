@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
@@ -53,7 +53,8 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [loadingConvs, setLoadingConvs] = useState(true);
-  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  // Conversation whose messages are currently loaded; loading is derived from it
+  const [loadedConvId, setLoadedConvId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -70,50 +71,52 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Fetch list of conversations
-  const fetchConversations = useCallback(async () => {
-    try {
-      const res = await apiClient<ListResponse<Conversation>>("/chat/conversations/");
-      const items = unwrapList(res);
-      setConversations(items);
-      if (items.length > 0 && !activeConv) {
-        setActiveConv(items[0]);
-      }
-    } catch (err) {
-      console.error("Failed to load conversations", err);
-    } finally {
-      setLoadingConvs(false);
-    }
-  }, [activeConv]);
-
+  // Fetch list of conversations once; selecting a conversation must not refetch it
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
-
-  // Fetch messages for active conversation
-  const fetchMessages = useCallback(async (convId: string) => {
-    setLoadingMsgs(true);
-    try {
-      const res = await apiClient<ListResponse<Message>>(`/chat/conversations/${convId}/messages/`);
-      setMessages(unwrapList(res));
-
-      // Mark conversation as read
-      await apiClient(`/chat/conversations/${convId}/read/`, { method: "POST" });
-      setConversations((prev) =>
-        prev.map((c) => (c.id === convId ? { ...c, unread_count: 0 } : c))
-      );
-    } catch (err) {
-      console.error("Failed to fetch messages", err);
-    } finally {
-      setLoadingMsgs(false);
-    }
+    apiClient<ListResponse<Conversation>>("/chat/conversations/")
+      .then((res) => {
+        const items = unwrapList(res);
+        setConversations(items);
+        setActiveConv((prev) => prev ?? items[0] ?? null);
+      })
+      .catch((err) => console.error("Failed to load conversations", err))
+      .finally(() => setLoadingConvs(false));
   }, []);
+
+  const activeConvId = activeConv?.id ?? null;
+  const loadingMsgs = activeConvId !== null && loadedConvId !== activeConvId;
+
+  // Fetch messages for the active conversation, ignoring responses that
+  // arrive after the user has already switched to another conversation
+  useEffect(() => {
+    if (!activeConvId) return;
+    let cancelled = false;
+
+    apiClient<ListResponse<Message>>(`/chat/conversations/${activeConvId}/messages/`)
+      .then(async (res) => {
+        if (cancelled) return;
+        setMessages(unwrapList(res));
+        setLoadedConvId(activeConvId);
+
+        // Mark conversation as read
+        await apiClient(`/chat/conversations/${activeConvId}/read/`, { method: "POST" });
+        setConversations((prev) =>
+          prev.map((c) => (c.id === activeConvId ? { ...c, unread_count: 0 } : c))
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to fetch messages", err);
+        if (!cancelled) setLoadedConvId(activeConvId);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConvId]);
 
   // Set up WebSocket connection for active conversation
   useEffect(() => {
-    if (!activeConv) return;
-
-    fetchMessages(activeConv.id);
+    if (!activeConvId) return;
 
     // Close any previous WebSocket
     if (wsRef.current) {
@@ -127,7 +130,7 @@ export default function ChatPage() {
     const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.hostname;
     // Backend port 8000 for local dev
-    const wsUrl = `${wsProtocol}//${host}:8000/ws/chat/${activeConv.id}/?token=${token}`;
+    const wsUrl = `${wsProtocol}//${host}:8000/ws/chat/${activeConvId}/?token=${token}`;
 
     try {
       const socket = new WebSocket(wsUrl);
@@ -138,7 +141,7 @@ export default function ChatPage() {
           if (payload.type === "chat_message" && payload.message) {
             const newMsg: Message = {
               id: payload.message.id,
-              conversation: activeConv.id,
+              conversation: activeConvId,
               sender_id: payload.message.sender_id,
               sender: {
                 id: payload.message.sender_id,
@@ -160,7 +163,7 @@ export default function ChatPage() {
             // Update last message in list
             setConversations((prev) =>
               prev.map((c) =>
-                c.id === activeConv.id
+                c.id === activeConvId
                   ? {
                       ...c,
                       last_message: {
@@ -193,7 +196,7 @@ export default function ChatPage() {
         wsRef.current = null;
       }
     };
-  }, [activeConv?.id, fetchMessages, user?.id]);
+  }, [activeConvId, user?.id]);
 
   // Send message
   const handleSendMessage = async (e: React.FormEvent) => {
