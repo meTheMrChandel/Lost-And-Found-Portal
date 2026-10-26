@@ -111,6 +111,12 @@ apiClient.interceptors.response.use(
         await storage.removeItem("access_token");
         await storage.removeItem("refresh_token");
         await storage.removeItem("user_data");
+
+        // If the original request was a GET request (e.g. public feed/categories), retry anonymously
+        if (originalRequest.method?.toLowerCase() === "get" && originalRequest.headers) {
+          delete originalRequest.headers.Authorization;
+          return apiClient(originalRequest);
+        }
         return Promise.reject(refreshErr);
       }
     }
