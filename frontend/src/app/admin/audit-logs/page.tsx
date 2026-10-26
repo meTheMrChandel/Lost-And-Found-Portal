@@ -1,33 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiClient, getErrorMessage } from "@/lib/api";
+import { useState } from "react";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { PostAuditLog } from "@/types/auth";
 
 export default function AdminAuditLogsPage() {
-  const [logs, setLogs] = useState<PostAuditLog[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [filterAction, setFilterAction] = useState("");
 
-  const fetchLogs = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await apiClient("/adminpanel/audit-logs/");
-      if (res?.data) {
-        setLogs(res.data);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load audit logs."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchLogs();
-  }, []);
+  const {
+    data: logsRes,
+    loading,
+    error,
+    refresh,
+  } = useApiQuery<{ data?: PostAuditLog[] }>("/adminpanel/audit-logs/", "Failed to load audit logs.");
+  const logs = logsRes?.data ?? [];
 
   const filteredLogs = filterAction
     ? logs.filter((log) =>
@@ -49,7 +35,7 @@ export default function AdminAuditLogsPage() {
           </p>
         </div>
         <button
-          onClick={fetchLogs}
+          onClick={refresh}
           disabled={loading}
           className="self-start md:self-auto px-4 py-2 rounded-xl bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-xs font-semibold transition-all cursor-pointer shadow-sm"
         >

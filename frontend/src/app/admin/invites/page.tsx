@@ -1,30 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { AdminInvite } from "@/types/auth";
 
 export default function AdminInvitesPage() {
-  const [invites, setInvites] = useState<AdminInvite[]>([]);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const fetchInvites = async () => {
-    try {
-      const res = await apiClient("/adminpanel/invites/");
-      if (res?.data) {
-        setInvites(res.data);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load invites list."));
-    }
-  };
-
-  useEffect(() => {
-    fetchInvites();
-  }, []);
+  const { data: invitesRes, error: loadError, refresh } = useApiQuery<{ data?: AdminInvite[] }>(
+    "/adminpanel/invites/",
+    "Failed to load invites list."
+  );
+  const invites = invitesRes?.data ?? [];
+  const error = actionError || loadError;
 
   const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +31,7 @@ export default function AdminInvitesPage() {
       });
       setSuccess(res.message || "Invitation sent successfully!");
       setEmail("");
-      fetchInvites();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to send invitation."));
     } finally {

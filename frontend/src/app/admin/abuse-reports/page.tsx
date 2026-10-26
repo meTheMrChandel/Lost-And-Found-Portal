@@ -1,34 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { AbuseReport } from "@/types/post";
 
 export default function AdminAbuseReportsPage() {
-  const [reports, setReports] = useState<AbuseReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
-  const fetchReports = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await apiClient("/adminpanel/abuse-reports/");
-      if (res?.data) {
-        setReports(res.data);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load abuse reports."));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: reportsRes,
+    loading,
+    error: loadError,
+    refresh,
+  } = useApiQuery<{ data?: AbuseReport[] }>("/adminpanel/abuse-reports/", "Failed to load abuse reports.");
+  const reports = reportsRes?.data ?? [];
+  const error = actionError || loadError;
 
-  useEffect(() => {
-    fetchReports();
-  }, []);
+  const refreshReports = () => {
+    setError("");
+    refresh();
+  };
 
   const handleResolve = async (id: string) => {
     setResolvingId(id);
@@ -39,7 +33,7 @@ export default function AdminAbuseReportsPage() {
         method: "POST",
       });
       setMsg(res.message || "Abuse report marked as resolved.");
-      fetchReports();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to resolve report."));
     } finally {
@@ -59,7 +53,7 @@ export default function AdminAbuseReportsPage() {
           </p>
         </div>
         <button
-          onClick={fetchReports}
+          onClick={refreshReports}
           disabled={loading}
           className="self-start md:self-auto px-4 py-2 rounded-xl bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-xs font-semibold shadow-sm transition-all cursor-pointer"
         >
