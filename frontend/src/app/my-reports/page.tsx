@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { Post, PostStatus } from "@/types/post";
 
 function MyReportsContent() {
@@ -12,33 +13,21 @@ function MyReportsContent() {
   const searchParams = useSearchParams();
   const justSubmitted = searchParams.get("submitted") === "true";
 
-  const [reports, setReports] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [activeTab, setActiveTab] = useState<string>("ALL");
   const [selectedReport, setSelectedReport] = useState<Post | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
 
-  const fetchReports = async () => {
-    setLoading(true);
-    try {
-      const res = await apiClient("/posts/lost/my-reports/");
-      if (res?.data) {
-        setReports(res.data);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load your reports."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchReports();
-    }
-  }, [user]);
+  // Only fetch once the signed-in user is known
+  const {
+    data: reportsRes,
+    loading,
+    error: loadError,
+    refresh,
+  } = useApiQuery<{ data?: Post[] }>(user ? "/posts/lost/my-reports/" : null, "Failed to load your reports.");
+  const reports = reportsRes?.data ?? [];
+  const error = actionError || loadError;
 
   const handleWithdraw = async (postId: string) => {
     if (!confirm("Are you sure you want to withdraw this lost item report?")) return;
@@ -47,7 +36,7 @@ function MyReportsContent() {
       await apiClient(`/posts/lost/${postId}/`, { method: "DELETE" });
       setActionMsg("Report withdrawn successfully.");
       setSelectedReport(null);
-      fetchReports();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to withdraw report."));
     } finally {
