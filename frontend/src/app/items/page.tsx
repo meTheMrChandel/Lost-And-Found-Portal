@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 
 interface CategorySummary {
   id: string;
@@ -25,10 +26,8 @@ interface RegisteredItem {
 }
 
 export default function MyValuablesPage() {
-  const [items, setItems] = useState<RegisteredItem[]>([]);
   const [categories, setCategories] = useState<CategorySummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   // Register modal
@@ -44,37 +43,30 @@ export default function MyValuablesPage() {
   const [stickerSvg, setStickerSvg] = useState<string>("");
   const [loadingSticker, setLoadingSticker] = useState(false);
 
-  const fetchItems = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await apiClient("/items/");
-      if (res?.data) {
-        setItems(Array.isArray(res.data) ? res.data : res.data.results || []);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load registered valuables."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const res = await apiClient<ListResponse<CategorySummary>>("/posts/categories/");
-      const list = unwrapList(res);
-      if (list.length > 0) {
-        setCategories(list);
-        setCategoryInput((prev) => (prev ? prev : list[0].slug));
-      }
-    } catch (err) {
-      console.error("Failed to load categories", err);
-    }
-  };
+  const {
+    data: itemsRes,
+    loading,
+    error: loadError,
+    refresh: refreshItems,
+  } = useApiQuery<{ results?: RegisteredItem[]; data?: ListResponse<RegisteredItem> }>(
+    "/items/",
+    "Failed to load registered valuables."
+  );
+  // GET /items/ is a DRF paginated page ({ count, results }); also accept the { data } envelope
+  const items = itemsRes?.results ?? unwrapList(itemsRes?.data);
+  const [dismissedLoadError, setDismissedLoadError] = useState("");
+  const error = actionError || (loadError !== dismissedLoadError ? loadError : "");
 
   useEffect(() => {
-    fetchItems();
-    fetchCategories();
+    apiClient<ListResponse<CategorySummary>>("/posts/categories/")
+      .then((res) => {
+        const list = unwrapList(res);
+        if (list.length > 0) {
+          setCategories(list);
+          setCategoryInput((prev) => (prev ? prev : list[0].slug));
+        }
+      })
+      .catch((err) => console.error("Failed to load categories", err));
   }, []);
 
   const handleRegisterItem = async (e: React.FormEvent) => {
@@ -98,7 +90,7 @@ export default function MyValuablesPage() {
       setNameInput("");
       setDescInput("");
       setSerialInput("");
-      await fetchItems();
+      refreshItems();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to register item."));
     } finally {
@@ -112,7 +104,7 @@ export default function MyValuablesPage() {
         method: "POST",
       });
       setSuccessMsg(res?.message || "QR sticker status updated.");
-      await fetchItems();
+      refreshItems();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to toggle active state."));
     }
@@ -125,7 +117,7 @@ export default function MyValuablesPage() {
     try {
       await apiClient(`/items/${item.id}/`, { method: "DELETE" });
       setSuccessMsg(`"${item.name}" removed successfully.`);
-      await fetchItems();
+      refreshItems();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to remove item."));
     }
@@ -213,7 +205,15 @@ export default function MyValuablesPage() {
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs flex items-center justify-between">
             <span>{error}</span>
-            <button onClick={() => setError("")} className="font-bold ml-2">✕</button>
+            <button
+              onClick={() => {
+                setError("");
+                setDismissedLoadError(loadError);
+              }}
+              className="font-bold ml-2"
+            >
+              ✕
+            </button>
           </div>
         )}
 
