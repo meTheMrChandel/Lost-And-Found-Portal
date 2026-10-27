@@ -84,14 +84,66 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Mutex / promise queue to prevent simultaneous multiple refresh requests
+let isRefreshing = false;
+let refreshSubscribers: ((token: string | null) => void)[] = [];
+
+const subscribeTokenRefresh = (cb: (token: string | null) => void) => {
+  refreshSubscribers.push(cb);
+};
+
+const onTokenRefreshed = (token: string | null) => {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+};
+
 // Response interceptor to automatically refresh expired tokens
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Do not attempt refresh on auth login, OTP or refresh endpoints
+    const requestUrl = originalRequest?.url || "";
+    const isAuthEndpoint =
+      requestUrl.includes("/auth/login/") ||
+      requestUrl.includes("/auth/token/refresh/") ||
+      requestUrl.includes("/auth/refresh/") ||
+      requestUrl.includes("/auth/request-otp/") ||
+      requestUrl.includes("/auth/verify-otp/");
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
+
+      if (isRefreshing) {
+        // Wait for active refresh to complete
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh(async (newToken) => {
+            if (newToken) {
+              if (originalRequest.headers) {
+                (originalRequest.headers as any).Authorization = `Bearer ${newToken}`;
+              }
+              resolve(apiClient(originalRequest));
+            } else {
+              // Refresh failed, retry public GET requests anonymously
+              if (originalRequest.method?.toLowerCase() === "get" && originalRequest.headers) {
+                if (typeof (originalRequest.headers as any).delete === "function") {
+                  (originalRequest.headers as any).delete("Authorization");
+                  (originalRequest.headers as any).delete("authorization");
+                }
+                delete (originalRequest.headers as any).Authorization;
+                delete (originalRequest.headers as any).authorization;
+                resolve(axios(originalRequest));
+              } else {
+                reject(error);
+              }
+            }
+          });
+        });
+      }
+
+      isRefreshing = true;
+
       try {
         const refreshToken = await storage.getItem("refresh_token");
         if (!refreshToken) {
@@ -108,21 +160,34 @@ apiClient.interceptors.response.use(
           if (refreshRes.data.refresh) {
             await storage.setItem("refresh_token", refreshRes.data.refresh);
           }
-          originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+          onTokenRefreshed(newAccess);
+          if (originalRequest.headers) {
+            (originalRequest.headers as any).Authorization = `Bearer ${newAccess}`;
+          }
           return apiClient(originalRequest);
+        } else {
+          throw new Error("No access token in refresh response");
         }
       } catch (refreshErr) {
         // Refresh token failed -> clear credentials
+        onTokenRefreshed(null);
         await storage.removeItem("access_token");
         await storage.removeItem("refresh_token");
         await storage.removeItem("user_data");
 
         // If the original request was a GET request (e.g. public feed/categories), retry anonymously
         if (originalRequest.method?.toLowerCase() === "get" && originalRequest.headers) {
-          delete originalRequest.headers.Authorization;
-          return apiClient(originalRequest);
+          if (typeof (originalRequest.headers as any).delete === "function") {
+            (originalRequest.headers as any).delete("Authorization");
+            (originalRequest.headers as any).delete("authorization");
+          }
+          delete (originalRequest.headers as any).Authorization;
+          delete (originalRequest.headers as any).authorization;
+          return axios(originalRequest);
         }
         return Promise.reject(error);
+      } finally {
+        isRefreshing = false;
       }
     }
 

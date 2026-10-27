@@ -31,7 +31,13 @@ export const FeedScreen: React.FC = () => {
 
   // Fetch categories
   useEffect(() => {
-    postsApi.getCategories().then(setCategories).catch(console.error);
+    postsApi
+      .getCategories()
+      .then(setCategories)
+      .catch((err) => {
+        // Fallback to empty categories gracefully if backend is rebooting
+        setCategories([]);
+      });
   }, []);
 
   // Fetch feed items
@@ -48,7 +54,8 @@ export const FeedScreen: React.FC = () => {
       const data = await postsApi.getFeed(params);
       setPosts(data);
     } catch (e: any) {
-      console.error("Failed to load feed", e?.formattedMessage || e?.response?.data || e.message || e);
+      // Graceful feed fallback
+      setPosts([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
