@@ -138,9 +138,12 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return result as T;
 }
 
-/** WebSocket URL on the same host as the REST API (e.g. ws://localhost:8000/ws/...). */
+/**
+ * WebSocket URL on the same host as the REST API (e.g. ws://localhost:8000/ws/...).
+ * API_BASE may be relative ("/api/v1" behind nginx), so resolve it against the page.
+ */
 export function websocketUrl(path: string): string {
-  const api = new URL(API_BASE);
+  const api = new URL(API_BASE, window.location.href);
   const protocol = api.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${api.host}${path}`;
 }
