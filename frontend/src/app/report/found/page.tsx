@@ -112,19 +112,8 @@ function ReportFoundContent() {
         formData.append("images", img);
       });
 
-      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-      const res = await fetch("http://127.0.0.1:8000/api/v1/posts/found/", {
-        method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || data.error || "Failed to submit found item report.");
-      }
+      // apiClient attaches the stored access token and uses the configured API URL
+      await apiClient(`/posts/found/`, { method: "POST", data: formData });
 
       router.push("/my-reports?submitted=true");
     } catch (err) {
