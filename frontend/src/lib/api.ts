@@ -145,6 +145,16 @@ export function websocketUrl(path: string): string {
   return `${protocol}//${api.host}${path}`;
 }
 
+/**
+ * Uploaded files come back as server-relative paths ("/media/posts/x.jpg"), which the
+ * browser would otherwise request from the frontend host. Resolve them against the API.
+ */
+export function mediaUrl(path: string): string {
+  // A relative API_BASE means the API (and /media/) is served from this same host
+  if (!/^https?:\/\//.test(API_BASE)) return path;
+  return new URL(path, API_BASE).href;
+}
+
 export function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
 }

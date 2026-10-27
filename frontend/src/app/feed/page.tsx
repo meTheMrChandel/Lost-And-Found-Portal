@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { apiClient, getErrorMessage } from "@/lib/api";
+import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { Category, Post } from "@/types/post";
 import { useAuth } from "@/context/AuthContext";
@@ -291,7 +291,7 @@ function FeedContent() {
                   <div className="w-full h-44 bg-[#FAF7F2] relative overflow-hidden flex items-center justify-center border-b border-[#EFEAE0]">
                     {post.images && post.images.length > 0 ? (
                       <img
-                        src={post.images[0].image}
+                        src={mediaUrl(post.images[0].image)}
                         alt={post.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -395,7 +395,7 @@ function FeedContent() {
                 {activePost.images.map((img) => (
                   <img
                     key={img.id}
-                    src={img.image}
+                    src={mediaUrl(img.image)}
                     alt=""
                     className="w-28 h-28 object-cover rounded-2xl border border-[#E2DDD2]"
                   />

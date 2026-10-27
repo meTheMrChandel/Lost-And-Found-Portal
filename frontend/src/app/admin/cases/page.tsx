@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { apiClient, getErrorMessage } from "@/lib/api";
+import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { Category, Post, PostStatus } from "@/types/post";
 
@@ -307,7 +307,7 @@ export default function AdminCaseQueuePage() {
                       <div className="flex items-center gap-2">
                         {post.images && post.images.length > 0 && (
                           <img
-                            src={post.images[0].image}
+                            src={mediaUrl(post.images[0].image)}
                             alt=""
                             className="w-8 h-8 rounded-lg object-cover border border-[#E2DDD2]"
                           />
@@ -438,7 +438,7 @@ export default function AdminCaseQueuePage() {
                       className="group relative w-28 h-28 rounded-2xl overflow-hidden border border-[#E2DDD2] flex-shrink-0"
                     >
                       <img
-                        src={img.image}
+                        src={mediaUrl(img.image)}
                         alt="evidence"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />

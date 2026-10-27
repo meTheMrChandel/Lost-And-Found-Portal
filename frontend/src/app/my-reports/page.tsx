@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { apiClient, getErrorMessage } from "@/lib/api";
+import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { Post, PostStatus } from "@/types/post";
 
@@ -249,7 +249,7 @@ function MyReportsContent() {
                   {report.images && report.images.length > 0 && (
                     <div className="w-full h-40 rounded-2xl overflow-hidden mb-4 bg-[#FAF7F2] border border-[#EFEAE0]">
                       <img
-                        src={report.images[0].image}
+                        src={mediaUrl(report.images[0].image)}
                         alt={report.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
@@ -328,7 +328,7 @@ function MyReportsContent() {
                 {selectedReport.images.map((img) => (
                   <img
                     key={img.id}
-                    src={img.image}
+                    src={mediaUrl(img.image)}
                     alt="attachment"
                     className="w-24 h-24 object-cover rounded-xl border border-[#E2DDD2]"
                   />
