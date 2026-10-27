@@ -4,19 +4,24 @@ import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Automatically detect host IP (e.g. 192.168.x.x) when running via Expo Go on physical device:
-const expoHost = Constants.expoConfig?.hostUri
-  ? Constants.expoConfig.hostUri.split(":")[0]
-  : null;
+// Bulletproof host IP detection across Expo Go, emulators, and physical devices:
+const debuggerHost =
+  Constants.expoGoConfig?.debuggerHost ||
+  (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
+  (Constants as any).manifest?.debuggerHost ||
+  Constants.expoConfig?.hostUri;
+
+const expoHost = debuggerHost ? debuggerHost.split(":")[0] : null;
+
+// Fallback to computer's LAN IP when running on physical device outside debugger
+const LAN_FALLBACK_HOST = "192.168.31.9";
 
 const DEFAULT_API_BASE =
   Platform.OS === "web"
     ? "http://127.0.0.1:8000/api/v1"
     : expoHost
     ? `http://${expoHost}:8000/api/v1`
-    : Platform.OS === "android"
-    ? "http://10.0.2.2:8000/api/v1"
-    : "http://127.0.0.1:8000/api/v1";
+    : `http://${LAN_FALLBACK_HOST}:8000/api/v1`;
 
 export const API_URL = DEFAULT_API_BASE;
 
@@ -117,7 +122,7 @@ apiClient.interceptors.response.use(
           delete originalRequest.headers.Authorization;
           return apiClient(originalRequest);
         }
-        return Promise.reject(refreshErr);
+        return Promise.reject(error);
       }
     }
 

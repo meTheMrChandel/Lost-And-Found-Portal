@@ -19,6 +19,10 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*", cast=Csv())
 if "testserver" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append("testserver")
+if DEBUG:
+    for h in ["*", "10.0.2.2", "127.0.0.1", "localhost"]:
+        if h not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(h)
 
 # ─── Application Definition ───────────────────────────────────────────────────
 DJANGO_APPS = [

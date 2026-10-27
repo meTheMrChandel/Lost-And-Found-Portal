@@ -47,8 +47,8 @@ export const FeedScreen: React.FC = () => {
 
       const data = await postsApi.getFeed(params);
       setPosts(data);
-    } catch (e) {
-      console.error("Failed to load feed", e);
+    } catch (e: any) {
+      console.error("Failed to load feed", e?.formattedMessage || e?.response?.data || e.message || e);
     } finally {
       setLoading(false);
       setRefreshing(false);
