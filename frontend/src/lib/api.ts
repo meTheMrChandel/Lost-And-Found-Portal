@@ -133,6 +133,13 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return result as T;
 }
 
+/** WebSocket URL on the same host as the REST API (e.g. ws://localhost:8000/ws/...). */
+export function websocketUrl(path: string): string {
+  const api = new URL(API_BASE);
+  const protocol = api.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${api.host}${path}`;
+}
+
 export function getErrorMessage(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
 }

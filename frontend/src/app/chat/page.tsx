@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
+import { apiClient, getErrorMessage, ListResponse, unwrapList, websocketUrl } from "@/lib/api";
 import NotificationBell from "@/components/NotificationBell";
 
 interface Participant {
@@ -127,10 +127,8 @@ export default function ChatPage() {
     const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
     if (!token) return;
 
-    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.hostname;
-    // Backend port 8000 for local dev
-    const wsUrl = `${wsProtocol}//${host}:8000/ws/chat/${activeConvId}/?token=${token}`;
+    // Connect to the API host, not the frontend host, so this also works when deployed separately
+    const wsUrl = websocketUrl(`/ws/chat/${activeConvId}/?token=${token}`);
 
     try {
       const socket = new WebSocket(wsUrl);
