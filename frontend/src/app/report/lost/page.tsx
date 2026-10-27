@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { nowForDateTimeInput } from "@/lib/datetime";
 import { apiClient, getErrorMessage } from "@/lib/api";
 import { Category } from "@/types/post";
 
@@ -29,8 +30,10 @@ export default function ReportLostItemPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [lastSeenPlace, setLastSeenPlace] = useState("");
-  const [lastSeenTime, setLastSeenTime] = useState("");
-  const [maxDate, setMaxDate] = useState("");
+  // The date input only renders after auth resolves on the client, so reading
+  // the clock here cannot cause a hydration mismatch
+  const [lastSeenTime, setLastSeenTime] = useState(nowForDateTimeInput);
+  const [maxDate] = useState(nowForDateTimeInput);
   const [hiddenProof, setHiddenProof] = useState("");
   const [rewardAmount, setRewardAmount] = useState<number | string>(0);
   const [images, setImages] = useState<File[]>([]);
@@ -40,12 +43,6 @@ export default function ReportLostItemPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const nowStr = new Date().toISOString().slice(0, 16);
-    setLastSeenTime(nowStr);
-    setMaxDate(nowStr);
-
-    // Fetch categories
-
     apiClient("/posts/categories/")
       .then((res) => {
         if (res?.data) {
