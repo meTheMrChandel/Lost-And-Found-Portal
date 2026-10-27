@@ -5,18 +5,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { User } from "@/types/auth";
+
+const toFormData = (user: User | null) => ({
+  full_name: user?.full_name || "",
+  hostel: user?.hostel || "",
+  phone: user?.phone || "",
+  department: user?.department || "CSE",
+  program_year: user?.program_year || "BTECH_1",
+});
 
 export default function ProfilePage() {
   const { user, loading, logout, setUser } = useAuth();
   const router = useRouter();
 
-  const [formData, setFormData] = useState({
-    full_name: "",
-    hostel: "",
-    phone: "",
-    department: "",
-    program_year: "",
-  });
+  const [formData, setFormData] = useState(() => toFormData(user));
+
+  // Re-seed the form whenever a different user object arrives (initial load
+  // or after saving), during render instead of in an effect
+  const [seededFrom, setSeededFrom] = useState(user);
+  if (user !== seededFrom) {
+    setSeededFrom(user);
+    setFormData(toFormData(user));
+  }
 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -25,14 +36,6 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
-    } else if (user) {
-      setFormData({
-        full_name: user.full_name || "",
-        hostel: user.hostel || "",
-        phone: user.phone || "",
-        department: user.department || "CSE",
-        program_year: user.program_year || "BTECH_1",
-      });
     }
   }, [user, loading, router]);
 
