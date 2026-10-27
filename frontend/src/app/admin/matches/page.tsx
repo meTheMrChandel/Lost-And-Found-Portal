@@ -113,8 +113,9 @@ export default function AdminMatchesPage() {
     loading,
     error: loadError,
     refresh,
-  } = useApiQuery<{ data?: ListResponse<MatchItem> }>(`/matching/?${matchesQuery}`, "Failed to load matching queue.");
-  const matches = unwrapList(matchesRes?.data);
+  } = useApiQuery<ListResponse<MatchItem>>(`/matching/?${matchesQuery}`, "Failed to load matching queue.");
+  // GET /matching/ is a DRF paginated page ({ count, results }), not the { data } envelope
+  const matches = unwrapList(matchesRes);
   const [dismissedLoadError, setDismissedLoadError] = useState("");
   const error = actionError || (loadError !== dismissedLoadError ? loadError : "");
 

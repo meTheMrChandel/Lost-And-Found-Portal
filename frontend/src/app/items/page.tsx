@@ -48,12 +48,9 @@ export default function MyValuablesPage() {
     loading,
     error: loadError,
     refresh: refreshItems,
-  } = useApiQuery<{ results?: RegisteredItem[]; data?: ListResponse<RegisteredItem> }>(
-    "/items/",
-    "Failed to load registered valuables."
-  );
-  // GET /items/ is a DRF paginated page ({ count, results }); also accept the { data } envelope
-  const items = itemsRes?.results ?? unwrapList(itemsRes?.data);
+  } = useApiQuery<ListResponse<RegisteredItem>>("/items/", "Failed to load registered valuables.");
+  // GET /items/ is a DRF paginated page ({ count, results }), not the { data } envelope
+  const items = unwrapList(itemsRes);
   const [dismissedLoadError, setDismissedLoadError] = useState("");
   const error = actionError || (loadError !== dismissedLoadError ? loadError : "");
 

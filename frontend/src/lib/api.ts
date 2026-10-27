@@ -9,12 +9,17 @@ interface ApiErrorBody {
   errors?: Record<string, unknown>;
 }
 
-/** List endpoints return a bare array, a DRF paginated page, or the { data } envelope. */
-export type ListResponse<T> = T[] | { data?: T[]; results?: T[] };
+/**
+ * List endpoints come in three shapes: a bare array, the { success, data: [...] }
+ * envelope, or a DRF paginated page { count, results } (e.g. /matching/, /items/,
+ * /notifications/). The envelope may also wrap a page.
+ */
+export type ListResponse<T> = T[] | { data?: T[] | { results?: T[] }; results?: T[] };
 
 export function unwrapList<T>(res: ListResponse<T> | null | undefined): T[] {
   if (Array.isArray(res)) return res;
-  return res?.data || res?.results || [];
+  if (Array.isArray(res?.data)) return res.data;
+  return res?.data?.results || res?.results || [];
 }
 
 // Shared across callers: refresh tokens rotate and are single-use, so concurrent
