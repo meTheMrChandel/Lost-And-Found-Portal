@@ -11,6 +11,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
@@ -32,6 +33,22 @@ MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"]
 
 
+def _validate_image_magic_bytes(f) -> bool:
+    """Validate binary magic bytes signature to prevent spoofed scripts/executables."""
+    try:
+        header = f.read(16)
+        f.seek(0)
+        if header.startswith(b"\xff\xd8\xff"):
+            return True  # JPEG / JPG
+        if header.startswith(b"\x89PNG\r\n\x1a\n"):
+            return True  # PNG
+        if header.startswith(b"RIFF") and len(header) >= 12 and header[8:12] == b"WEBP":
+            return True  # WEBP
+        return False
+    except Exception:
+        return False
+
+
 def _process_uploaded_images(post: Post, files: list) -> list:
     """Validate and attach uploaded images to a post."""
     if len(files) > MAX_IMAGES_ALLOWED:
@@ -44,6 +61,10 @@ def _process_uploaded_images(post: Post, files: list) -> list:
         if f.content_type not in ALLOWED_CONTENT_TYPES:
             raise ValidationError(
                 f"File '{f.name}' is not an accepted image format (JPG, PNG, WEBP)."
+            )
+        if not _validate_image_magic_bytes(f):
+            raise ValidationError(
+                f"File '{f.name}' has invalid image binary signature (spoofed or corrupted file)."
             )
 
         post_img = PostImage.objects.create(
@@ -78,6 +99,8 @@ class LostPostCreateView(APIView):
     """
 
     permission_classes = [IsAuthenticated, IsNotBanned]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "post_create"
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @extend_schema(
@@ -261,6 +284,8 @@ class FoundPostCreateView(APIView):
     """
 
     permission_classes = [IsAuthenticated, IsNotBanned]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "post_create"
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     @extend_schema(

@@ -5,6 +5,7 @@ accounts/views/auth.py — OTP and Authentication API endpoints.
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 from django.conf import settings
@@ -26,6 +27,8 @@ class RequestOTPView(APIView):
     Generate and email a 6-digit verification code.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "otp_request"
 
     @extend_schema(request=RequestOTPSerializer, responses={200: dict})
     def post(self, request):
@@ -128,6 +131,8 @@ class LoginView(TokenObtainPairView):
     For web clients, sets secure httpOnly cookies.
     """
     serializer_class = CustomTokenObtainPairSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)

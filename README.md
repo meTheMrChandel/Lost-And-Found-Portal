@@ -266,6 +266,36 @@ npm run dev
 
 ---
 
+## 🔒 Phase 10: Hardening, Rate Limiting & Load Testing (Completed)
+
+- **API Throttling & Scoped Rate Limiting (`DRF + LocMemCache`):**
+  - Configured scoped rate limiters protecting against brute-force attacks and abuse:
+    - `anon`: 1,000 requests/day
+    - `user`: 10,000 requests/day
+    - `otp_request`: 5 requests/minute (prevents email bombing)
+    - `login`: 10 requests/minute (guards against password dictionary attacks)
+    - `post_create`: 20 requests/hour (prevents spam listing creation)
+    - `chat_message`: 60 requests/minute (prevents chat flooding)
+  - Applied `ScopedRateThrottle` across sensitive endpoints (`RequestOTPView`, `LoginView`, `LostPostCreateView`, `FoundPostCreateView`, `ConversationMessagesListView`).
+- **Production Security Headers:**
+  - `SECURE_BROWSER_XSS_FILTER = True`
+  - `SECURE_CONTENT_TYPE_NOSNIFF = True` (blocks browser MIME-type sniffing attacks)
+  - `X_FRAME_OPTIONS = "DENY"` (protects against clickjacking and unauthorized iframe embedding)
+  - `SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"`
+- **Binary Signature (Magic Bytes) MIME Upload Hardening:**
+  - Enforced deep binary inspection validating true file signatures on multi-photo uploads (`_validate_image_magic_bytes`):
+    - JPEG: `\xff\xd8\xff`
+    - PNG: `\x89PNG\r\n\x1a\n`
+    - WebP: `RIFF....WEBP`
+  - Rejects disguised executables, scripts, or webshells even if forged with image headers or `.jpg` extensions with strict `400 Bad Request`.
+- **Locust Load Testing Suite (`tests/load_testing/`):**
+  - Developed end-to-end load testing scenarios simulating real campus peak traffic:
+    - `CampusVisitorUser`: Browses public feed (weight 5), filters by categories (weight 3), executes keyword searches (weight 3), scans item QR codes (weight 2), and requests OTPs (weight 1).
+    - `AuthenticatedStudentUser`: Authenticates with JWT, polls unread notifications badge (weight 4), views submitted reports (weight 3), inspects registered valuables (weight 2), and accesses handover chat (weight 2).
+  - Headless benchmark runner (`run_benchmarks.py`) supporting parameterized concurrency and spawn rates.
+
+---
+
 ## 🗺️ Roadmap & Phase Timeline
 
 | Phase | Milestone | Status |
@@ -280,7 +310,7 @@ npm run dev
 | **Phase 7** | QR Sticker System for Valuables (Zero-knowledge public scans) | **Completed** |
 | **Phase 8** | Real-Time Chat & Notifications (Django Channels & Badges) | **Completed** |
 | **Phase 9** | Cross-Platform Mobile App (React Native + Expo for iOS & Android) | **Completed** |
-| **Phase 10**| Hardening, Rate Limiting & Load Testing | *Next* |
-| **Phase 11**| Staging & Production Campus Deployment | Planned |
+| **Phase 10**| Hardening, Rate Limiting & Load Testing | **Completed** |
+| **Phase 11**| Staging & Production Campus Deployment | *Next* |
 
 

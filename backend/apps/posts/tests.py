@@ -512,4 +512,38 @@ class TestPhase5FeedAndFoundReports:
         post.refresh_from_db()
         assert post.renewed_at is not None
 
+    def test_upload_mime_binary_magic_bytes_validation(self, client, student_user):
+        """Files with spoofed image content-type but invalid binary signatures are rejected."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        client.force_authenticate(user=student_user)
+
+        # 1. Spoofed executable/script pretending to be an image
+        fake_image = SimpleUploadedFile(
+            name="malicious.jpg",
+            content=b"#!/usr/bin/env python\nimport os\nprint('pwned')",
+            content_type="image/jpeg",
+        )
+        payload = {
+            "title": "Lost Wallet with Fake Image",
+            "category": "bicycle",
+            "last_seen_place": "Hostel",
+            "last_seen_time": "2026-10-20T10:00:00Z",
+            "description": "Lost bike description with spoofed image",
+            "images": [fake_image],
+        }
+        res_spoofed = client.post("/api/v1/posts/lost/", data=payload, format="multipart")
+        assert res_spoofed.status_code == 400
+        assert "invalid image binary signature" in str(res_spoofed.data).lower()
+
+        # 2. Genuine PNG binary file header
+        genuine_png = SimpleUploadedFile(
+            name="valid.png",
+            content=b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01",
+            content_type="image/png",
+        )
+        payload["images"] = [genuine_png]
+        res_valid = client.post("/api/v1/posts/lost/", data=payload, format="multipart")
+        assert res_valid.status_code == 201
+
 

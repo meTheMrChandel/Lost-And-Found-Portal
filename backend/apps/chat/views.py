@@ -12,6 +12,7 @@ from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
@@ -131,6 +132,8 @@ class ConversationMessagesListView(APIView):
       Send a message. Validates blocklist and direct approval.
     """
     permission_classes = [IsAuthenticated, IsNotBanned]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "chat_message"
 
     def _get_conversation(self, pk, user):
         is_admin = user.is_staff or getattr(user, "is_campus_admin", False)

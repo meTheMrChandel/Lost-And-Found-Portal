@@ -116,3 +116,26 @@ class TestPhase1AuthenticationAPI:
             HTTP_AUTHORIZATION=f"Bearer {new_access_token}"
         )
         assert res_refreshed.status_code == 200
+
+    def test_security_headers_enforced(self, client):
+        """Security headers (nosniff, X-Frame-Options) are strictly present on responses."""
+        res = client.get("/api/v1/auth/request-otp/")
+        assert res.headers.get("X-Content-Type-Options") == "nosniff"
+        assert res.headers.get("X-Frame-Options") == "DENY"
+
+    def test_rate_limiting_otp_request_throttle(self, client):
+        """Requesting OTP in rapid burst triggers 429 Too Many Requests."""
+        from django.core.cache import cache
+        cache.clear()
+
+        # The rate limit is 5/minute. The 6th request within a minute must be throttled with 429.
+        statuses = []
+        for _ in range(7):
+            res = client.post(
+                "/api/v1/auth/request-otp/",
+                {"email": "throttletest@iitrpr.ac.in", "purpose": "register"},
+            )
+            statuses.append(res.status_code)
+
+        assert 429 in statuses
+        cache.clear()
