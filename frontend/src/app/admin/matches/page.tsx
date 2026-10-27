@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiClient, getErrorMessage } from "@/lib/api";
+import { useMemo, useState } from "react";
+import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 
 interface CategorySummary {
   id: string;
@@ -65,15 +66,14 @@ interface MatchItem {
 }
 
 export default function AdminMatchesPage() {
-  const [matches, setMatches] = useState<MatchItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [runningEngine, setRunningEngine] = useState(false);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>("suggested");
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [minScore, setMinScore] = useState<number>(0.75);
 
   // Action dialog (Confirm / Dismiss)
@@ -100,33 +100,29 @@ export default function AdminMatchesPage() {
   const [settledReward, setSettledReward] = useState<string>("0");
   const [closeNotes, setCloseNotes] = useState("");
 
-  const fetchMatches = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const params = new URLSearchParams();
-      if (statusFilter && statusFilter !== "ALL") params.append("status", statusFilter);
-      if (minScore > 0) params.append("min_score", minScore.toString());
-      if (searchQuery.trim()) params.append("search", searchQuery.trim());
+  const matchesQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    if (statusFilter && statusFilter !== "ALL") params.append("status", statusFilter);
+    if (minScore > 0) params.append("min_score", minScore.toString());
+    if (appliedSearch) params.append("search", appliedSearch);
+    return params.toString();
+  }, [statusFilter, minScore, appliedSearch]);
 
-      const res = await apiClient(`/matching/?${params.toString()}`);
-      if (res?.data) {
-        setMatches(Array.isArray(res.data) ? res.data : res.data.results || []);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load matching queue."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMatches();
-  }, [statusFilter, minScore]);
+  const {
+    data: matchesRes,
+    loading,
+    error: loadError,
+    refresh,
+  } = useApiQuery<{ data?: ListResponse<MatchItem> }>(`/matching/?${matchesQuery}`, "Failed to load matching queue.");
+  const matches = unwrapList(matchesRes?.data);
+  const [dismissedLoadError, setDismissedLoadError] = useState("");
+  const error = actionError || (loadError !== dismissedLoadError ? loadError : "");
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchMatches();
+    setError("");
+    setAppliedSearch(searchQuery.trim());
+    refresh();
   };
 
   const handleTriggerEngine = async () => {
@@ -141,7 +137,7 @@ export default function AdminMatchesPage() {
           data.matches_created || 0
         } new match(es), Updated: ${data.matches_updated || 0}.`
       );
-      await fetchMatches();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to execute matching engine."));
     } finally {
@@ -170,7 +166,7 @@ export default function AdminMatchesPage() {
       setActiveMatch(null);
       setActionType(null);
       setActionNotes("");
-      await fetchMatches();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to process match action."));
     } finally {
@@ -216,7 +212,7 @@ export default function AdminMatchesPage() {
 
       setSuccessMsg(`Proof evaluation recorded. Match is now ${proofDecision.toLowerCase().replace("_", " ")}.`);
       setProofModalMatch(null);
-      await fetchMatches();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to submit proof evaluation."));
     } finally {
@@ -232,7 +228,7 @@ export default function AdminMatchesPage() {
         body: JSON.stringify({ meeting_mode: mode }),
       });
       setSuccessMsg(`Meeting mode updated to: ${mode === "office" ? "Admin / Security Office" : "Direct Meet"}`);
-      await fetchMatches();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to set meeting mode."));
     }
@@ -248,7 +244,7 @@ export default function AdminMatchesPage() {
         setGeneratedCode(res.data.code);
         setSuccessMsg(`Handover code generated: ${res.data.code}`);
       }
-      await fetchMatches();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to generate handover code."));
     } finally {
@@ -270,7 +266,7 @@ export default function AdminMatchesPage() {
       setHandoverModalMatch(null);
       setVerifyCodeInput("");
       setGeneratedCode(null);
-      await fetchMatches();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Invalid handover verification code."));
     } finally {
@@ -295,7 +291,7 @@ export default function AdminMatchesPage() {
       setCloseModalMatch(null);
       setSettledReward("0");
       setCloseNotes("");
-      await fetchMatches();
+      refresh();
     } catch (err) {
       setError(getErrorMessage(err, "Failed to close case."));
     } finally {
@@ -347,7 +343,15 @@ export default function AdminMatchesPage() {
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError("")} className="font-bold ml-2">✕</button>
+          <button
+            onClick={() => {
+              setError("");
+              setDismissedLoadError(loadError);
+            }}
+            className="font-bold ml-2"
+          >
+            ✕
+          </button>
         </div>
       )}
 
