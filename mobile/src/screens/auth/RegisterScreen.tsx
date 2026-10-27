@@ -132,11 +132,11 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
 
           {/* Stepper Progress Bar */}
-          <div style={styles.stepperRow as any}>
+          <View style={styles.stepperRow}>
             <View style={[styles.stepDot, step >= 1 && styles.stepActive]} />
             <View style={[styles.stepDot, step >= 2 && styles.stepActive]} />
             <View style={[styles.stepDot, step >= 3 && styles.stepActive]} />
-          </div>
+          </View>
         </View>
 
         <View style={styles.card}>

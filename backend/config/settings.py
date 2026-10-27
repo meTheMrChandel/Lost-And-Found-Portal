@@ -95,9 +95,13 @@ ASGI_APPLICATION = "config.asgi.application"
 # ─── Database ─────────────────────────────────────────────────────────────────
 _db_engine = config("DATABASE_ENGINE", default="django.db.backends.sqlite3")
 _db_port = config("DATABASE_PORT", default="")
+_db_raw_name = config("DATABASE_NAME", default=BASE_DIR / "db.sqlite3")
+if "sqlite" in _db_engine and not os.path.isabs(str(_db_raw_name)):
+    _db_raw_name = BASE_DIR / _db_raw_name
+
 _db_base = {
     "ENGINE": _db_engine,
-    "NAME": config("DATABASE_NAME", default=BASE_DIR / "db.sqlite3"),
+    "NAME": _db_raw_name,
     "OPTIONS": {"connect_timeout": 10} if "postgresql" in _db_engine or "mysql" in _db_engine else {},
 }
 if _db_port:

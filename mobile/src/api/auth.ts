@@ -44,8 +44,13 @@ export const authApi = {
   },
 
   async getProfile(): Promise<UserProfile> {
-    const res = await apiClient.get("/auth/profile/");
-    return res.data?.data || res.data;
+    try {
+      const res = await apiClient.get("/users/me/");
+      return res.data?.data || res.data;
+    } catch {
+      const res = await apiClient.get("/auth/profile/");
+      return res.data?.data || res.data;
+    }
   },
 
   async resetPassword(data: { email: string; otp_code: string; new_password: string }) {

@@ -27,12 +27,12 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      setError("Please enter your IIT Ropar email and password.");
+      setError("Please enter your email and password.");
       return;
     }
 
-    if (!email.toLowerCase().endsWith("@iitrpr.ac.in")) {
-      setError("Only valid @iitrpr.ac.in emails are accepted.");
+    if (!email.includes("@")) {
+      setError("Please enter a valid email address.");
       return;
     }
 
@@ -116,16 +116,30 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.submitBtn}
           />
 
-          {/* Quick Demo Fill Helper */}
+          {/* Quick Demo Fill Helpers */}
           <TouchableOpacity
             style={styles.demoHelper}
             onPress={() => {
               setEmail("2026aim1023@iitrpr.ac.in");
+              setPassword("Student@123456");
               setError("");
             }}
           >
             <Text style={styles.demoHelperText}>
-              💡 Fill Demo Email (2026aim1023@iitrpr.ac.in)
+              💡 Fill Student Demo (2026aim1023@iitrpr.ac.in)
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.demoHelper, { marginTop: 6, backgroundColor: colors.ocean + "10" }]}
+            onPress={() => {
+              setEmail("admin@iitrpr.ac.in");
+              setPassword("Admin@123456");
+              setError("");
+            }}
+          >
+            <Text style={[styles.demoHelperText, { color: colors.ocean }]}>
+              🛡️ Fill Admin Demo (admin@iitrpr.ac.in)
             </Text>
           </TouchableOpacity>
 
