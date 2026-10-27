@@ -6,7 +6,7 @@ import { SiteSettings } from "@/types/auth";
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -16,27 +16,21 @@ export default function AdminSettingsPage() {
   const [otpExpirySeconds, setOtpExpirySeconds] = useState<number>(300);
   const [otpMaxAttempts, setOtpMaxAttempts] = useState<number>(5);
 
-  const fetchSettings = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await apiClient("/adminpanel/settings/");
-      if (res?.data) {
-        setSettings(res.data);
-        setMatchThreshold(res.data.match_threshold ?? 0.65);
-        setPostExpiryDays(res.data.post_expiry_days ?? 30);
-        setOtpExpirySeconds(res.data.otp_expiry_seconds ?? 300);
-        setOtpMaxAttempts(res.data.otp_max_attempts ?? 5);
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load site configuration."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Seed the form once from the saved settings; start in the loading state so
+  // the default values are never shown (or edited) before the real ones arrive
   useEffect(() => {
-    fetchSettings();
+    apiClient<{ data?: SiteSettings }>("/adminpanel/settings/")
+      .then((res) => {
+        if (res?.data) {
+          setSettings(res.data);
+          setMatchThreshold(res.data.match_threshold ?? 0.65);
+          setPostExpiryDays(res.data.post_expiry_days ?? 30);
+          setOtpExpirySeconds(res.data.otp_expiry_seconds ?? 300);
+          setOtpMaxAttempts(res.data.otp_max_attempts ?? 5);
+        }
+      })
+      .catch((err) => setError(getErrorMessage(err, "Failed to load site configuration.")))
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
