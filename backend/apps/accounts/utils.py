@@ -48,6 +48,11 @@ def create_otp(email: str, purpose: str, user=None) -> str:
     return code
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def send_otp_email(email: str, code: str, purpose: str) -> None:
     """Send OTP via email using configured email backend."""
     subject_map = {
@@ -64,13 +69,24 @@ def send_otp_email(email: str, code: str, purpose: str) -> None:
         f"If you did not request this OTP, please ignore this email.\n\n"
         f"Best regards,\nIIT Ropar Lost & Found Team"
     )
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@iitrpr.ac.in"),
-        recipient_list=[email],
-        fail_silently=False,
-    )
+
+    print(f"\n==========================================")
+    print(f" [OTP DISPATCH] Email: {email} | Purpose: {purpose}")
+    print(f" >>> VERIFICATION CODE: {code} <<<")
+    print(f"==========================================\n")
+    logger.info("Generated OTP %s for %s (%s)", code, email, purpose)
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@iitrpr.ac.in"),
+            recipient_list=[email],
+            fail_silently=False,
+        )
+    except Exception as exc:
+        logger.warning("SMTP email delivery to %s failed: %s", email, exc)
+        print(f"⚠️ SMTP delivery notice ({exc}). Use the printed code above: {code}")
 
 
 def verify_otp(email: str, code: str, purpose: str) -> tuple[bool, str]:

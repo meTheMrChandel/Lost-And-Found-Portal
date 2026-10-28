@@ -53,8 +53,20 @@ export const authApi = {
     }
   },
 
-  async resetPassword(data: { email: string; otp_code: string; new_password: string }) {
-    const res = await apiClient.post("/auth/password-reset/", data);
-    return res.data;
+  async resetPassword(data: { email: string; otp_code?: string; code?: string; new_password: string }) {
+    const code = data.code || data.otp_code || "";
+    const payload = {
+      email: data.email,
+      code,
+      otp_code: code,
+      new_password: data.new_password,
+    };
+    try {
+      const res = await apiClient.post("/auth/password-reset-confirm/", payload);
+      return res.data;
+    } catch {
+      const res = await apiClient.post("/auth/password-reset/", payload);
+      return res.data;
+    }
   },
 };

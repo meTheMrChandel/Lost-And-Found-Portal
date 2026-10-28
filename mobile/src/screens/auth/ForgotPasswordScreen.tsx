@@ -34,7 +34,10 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
     setError("");
     setLoading(true);
     try {
-      await authApi.requestOtp(email.trim().toLowerCase(), "password_reset");
+      const res = await authApi.requestOtp(email.trim().toLowerCase(), "password_reset");
+      if (res && res.debug_otp) {
+        setOtpCode(res.debug_otp);
+      }
       setStep(2);
     } catch (err: any) {
       setError(err.formattedMessage || err.message || "Failed to send reset code.");
@@ -109,6 +112,17 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
                 onPress={handleRequestOtp}
                 loading={loading}
               />
+              <TouchableOpacity
+                style={{ marginTop: 10, padding: 8, backgroundColor: colors.ocean + "12", borderRadius: 8, alignItems: "center" }}
+                onPress={() => {
+                  setEmail("2026aim1023@iitrpr.ac.in");
+                  setError("");
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.ocean }}>
+                  💡 Fill Demo Email (2026aim1023@iitrpr.ac.in)
+                </Text>
+              </TouchableOpacity>
             </>
           ) : (
             <>

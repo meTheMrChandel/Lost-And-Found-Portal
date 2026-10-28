@@ -14,7 +14,7 @@ const debuggerHost =
 const expoHost = debuggerHost ? debuggerHost.split(":")[0] : null;
 
 // Fallback to computer's LAN IP when running on physical device outside debugger
-const LAN_FALLBACK_HOST = "192.168.31.9";
+const LAN_FALLBACK_HOST = "172.26.13.61";
 
 const DEFAULT_API_BASE =
   Platform.OS === "web"

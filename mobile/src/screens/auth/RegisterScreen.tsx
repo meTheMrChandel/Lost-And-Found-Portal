@@ -48,8 +48,13 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     setError("");
     setLoading(true);
     try {
-      await authApi.requestOtp(email.trim().toLowerCase(), "registration");
-      setInfoMsg(`A 6-digit OTP code has been sent to ${email}`);
+      const res = await authApi.requestOtp(email.trim().toLowerCase(), "registration");
+      if (res && res.debug_otp) {
+        setOtpCode(res.debug_otp);
+        setInfoMsg(`OTP generated: ${res.debug_otp} (Auto-filled for testing)`);
+      } else {
+        setInfoMsg(`A 6-digit OTP code has been sent to ${email}`);
+      }
       setStep(2);
     } catch (err: any) {
       setError(err.formattedMessage || err.message || "Failed to send verification code.");
@@ -173,6 +178,17 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 loading={loading}
                 style={styles.btn}
               />
+              <TouchableOpacity
+                style={{ marginTop: 10, padding: 8, backgroundColor: colors.ocean + "12", borderRadius: 8, alignItems: "center" }}
+                onPress={() => {
+                  setEmail("2026aim9999@iitrpr.ac.in");
+                  setError("");
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.ocean }}>
+                  💡 Fill Demo Student Email (2026aim9999@iitrpr.ac.in)
+                </Text>
+              </TouchableOpacity>
             </>
           )}
 
@@ -232,6 +248,19 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 loading={loading}
                 style={styles.btn}
               />
+              <TouchableOpacity
+                style={{ marginTop: 10, padding: 8, backgroundColor: colors.ocean + "12", borderRadius: 8, alignItems: "center" }}
+                onPress={() => {
+                  setFullName("Rahul Sharma");
+                  setRegNo("2026AIM9999");
+                  setPassword("Student@123456");
+                  setError("");
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.ocean }}>
+                  💡 Fill Demo Details (Rahul / 2026AIM9999 / Student@123456)
+                </Text>
+              </TouchableOpacity>
             </>
           )}
 
