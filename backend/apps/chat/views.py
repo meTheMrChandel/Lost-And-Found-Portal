@@ -24,6 +24,7 @@ from apps.chat.serializers import (
     MessageCreateSerializer,
     MessageSerializer,
 )
+from apps.chat.services import conversation_group, message_event_payload
 from apps.matching.models import Match
 from apps.notifications.services import create_notification
 
@@ -202,15 +203,16 @@ class ConversationMessagesListView(APIView):
 
         msg_data = MessageSerializer(msg, context={"request": request}).data
 
-        # Broadcast via Django Channels to WebSocket group
+        # Broadcast via Django Channels to WebSocket group. Use the shared socket payload
+        # rather than msg_data, whose is_me is relative to the sender.
         try:
             channel_layer = get_channel_layer()
             if channel_layer:
                 async_to_sync(channel_layer.group_send)(
-                    f"chat_{conv.id}",
+                    conversation_group(conv.id),
                     {
                         "type": "chat.message",
-                        "message": msg_data,
+                        "message": message_event_payload(msg),
                     },
                 )
         except Exception:
@@ -257,7 +259,7 @@ class ConversationMarkReadView(APIView):
             channel_layer = get_channel_layer()
             if channel_layer:
                 async_to_sync(channel_layer.group_send)(
-                    f"chat_{conv.id}",
+                    conversation_group(conv.id),
                     {
                         "type": "chat.read_receipt",
                         "reader_id": str(user.id),

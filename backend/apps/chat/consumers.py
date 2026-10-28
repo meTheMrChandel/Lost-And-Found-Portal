@@ -1,5 +1,15 @@
 """
 chat/consumers.py — Django Channels WebSocket consumer for realtime chat & receipts.
+
+Client → server frames:
+    {"action": "send_message", "content": "..."}
+    {"action": "mark_read"}
+("type": "message" / "read" are accepted as older spellings of the same actions.)
+
+Server → client frames:
+    {"type": "chat_message", "message": {...}}
+    {"type": "read_receipt", "reader_id": "...", "read_at": "..."}
+    {"type": "error", "error": "..."}
 """
 
 import json
@@ -9,6 +19,10 @@ from django.utils import timezone
 from django.db.models import Q
 
 from apps.chat.models import BlockedUser, Conversation, Message
+from apps.chat.services import conversation_group, message_event_payload
+
+SEND_ACTIONS = {"send_message", "message"}
+READ_ACTIONS = {"mark_read", "read"}
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -19,7 +33,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
-        self.room_group_name = f"chat_{self.conversation_id}"
+        self.room_group_name = conversation_group(self.conversation_id)
         self.user = self.scope.get("user")
 
         # Reject unauthenticated connections
@@ -48,17 +62,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except json.JSONDecodeError:
             return
 
-        action_type = data.get("type", "message")
+        if not isinstance(data, dict):
+            return
 
-        if action_type == "message":
-            content = data.get("content", "").strip()
+        action = data.get("action") or data.get("type") or "send_message"
+
+        if action in SEND_ACTIONS:
+            content = str(data.get("content", "")).strip()
             if not content:
                 return
 
             # Check if direct chat approved and not blocked
             can_send, reason = await self._can_send_message()
             if not can_send:
-                await self.send(text_data=json.dumps({"error": reason}))
+                await self.send(text_data=json.dumps({"type": "error", "error": reason}))
                 return
 
             # Save message to DB
@@ -73,7 +90,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 },
             )
 
-        elif action_type == "read":
+        elif action in READ_ACTIONS:
             # Mark messages read
             read_count = await self._mark_messages_read()
             if read_count > 0:
@@ -89,7 +106,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def chat_message(self, event):
         """Called when a message is broadcast to this group."""
         await self.send(text_data=json.dumps({
-            "type": "message",
+            "type": "chat_message",
             "message": event["message"],
         }))
 
@@ -131,21 +148,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _save_message(self, content: str) -> dict:
-        conv = Conversation.objects.get(id=self.conversation_id)
         msg = Message.objects.create(
-            conversation=conv,
+            conversation_id=self.conversation_id,
             sender=self.user,
             content=content,
         )
-        return {
-            "id": str(msg.id),
-            "conversation_id": str(conv.id),
-            "sender_id": str(self.user.id),
-            "sender_name": self.user.full_name or self.user.email,
-            "content": msg.content,
-            "is_read": msg.is_read,
-            "created_at": msg.created_at.isoformat(),
-        }
+        return message_event_payload(msg)
 
     @database_sync_to_async
     def _mark_messages_read(self) -> int:

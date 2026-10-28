@@ -8,10 +8,11 @@ is not needed.
 import pytest
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
+from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
 from apps.accounts.models import User
-from apps.chat.models import Conversation
+from apps.chat.models import Conversation, Message
 from config.asgi import application
 
 
@@ -118,3 +119,94 @@ class TestChatWebSocketAuth:
         connected, _ = await communicator.connect()
         assert connected
         await communicator.disconnect()
+
+
+async def connected_communicator(conversation, user):
+    communicator = communicator_for(conversation, user)
+    connected, _ = await communicator.connect()
+    assert connected
+    return communicator
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+class TestChatWebSocketMessaging:
+    async def test_sent_message_is_saved_and_broadcast_to_all_participants(
+        self, conversation, owner_user, admin_user
+    ):
+        owner_ws = await connected_communicator(conversation, owner_user)
+        admin_ws = await connected_communicator(conversation, admin_user)
+
+        # Same frame the web client sends
+        await owner_ws.send_json_to({"action": "send_message", "content": "  Lost my blue bottle  "})
+
+        for ws in (owner_ws, admin_ws):
+            frame = await ws.receive_json_from()
+            assert frame["type"] == "chat_message"
+            assert frame["message"]["content"] == "Lost my blue bottle"
+            assert frame["message"]["sender_id"] == str(owner_user.id)
+            assert frame["message"]["sender_name"] == owner_user.full_name
+
+        saved = await database_sync_to_async(
+            lambda: list(Message.objects.filter(conversation=conversation).values_list("content", flat=True))
+        )()
+        assert saved == ["Lost my blue bottle"]
+
+        await owner_ws.disconnect()
+        await admin_ws.disconnect()
+
+    async def test_legacy_type_field_still_sends(self, conversation, owner_user):
+        ws = await connected_communicator(conversation, owner_user)
+        await ws.send_json_to({"type": "message", "content": "hello"})
+        frame = await ws.receive_json_from()
+        assert frame["type"] == "chat_message"
+        assert frame["message"]["content"] == "hello"
+        await ws.disconnect()
+
+    async def test_blank_or_malformed_frames_are_ignored(self, conversation, owner_user):
+        ws = await connected_communicator(conversation, owner_user)
+        await ws.send_json_to({"action": "send_message", "content": "   "})
+        await ws.send_to(text_data="not json")
+        await ws.send_to(text_data="[1, 2, 3]")
+        assert await ws.receive_nothing()
+        assert not await database_sync_to_async(Message.objects.exists)()
+        await ws.disconnect()
+
+    async def test_message_sent_over_rest_reaches_open_sockets(self, conversation, owner_user, admin_user):
+        owner_ws = await connected_communicator(conversation, owner_user)
+
+        def post_as_admin():
+            client = APIClient()
+            client.force_authenticate(user=admin_user)
+            return client.post(
+                f"/api/v1/chat/conversations/{conversation.id}/messages/",
+                {"content": "Please bring your ID to the security office."},
+                format="json",
+            )
+
+        res = await database_sync_to_async(post_as_admin)()
+        assert res.status_code == 201
+
+        frame = await owner_ws.receive_json_from()
+        assert frame["type"] == "chat_message"
+        assert frame["message"]["sender_id"] == str(admin_user.id)
+        assert frame["message"]["sender_name"] == admin_user.full_name
+        assert "is_me" not in frame["message"]
+        await owner_ws.disconnect()
+
+    async def test_mark_read_updates_messages_and_sends_receipt(self, conversation, owner_user, admin_user):
+        await database_sync_to_async(Message.objects.create)(
+            conversation=conversation, sender=admin_user, content="Is this your wallet?"
+        )
+        owner_ws = await connected_communicator(conversation, owner_user)
+        admin_ws = await connected_communicator(conversation, admin_user)
+
+        await owner_ws.send_json_to({"action": "mark_read"})
+
+        frame = await admin_ws.receive_json_from()
+        assert frame["type"] == "read_receipt"
+        assert frame["reader_id"] == str(owner_user.id)
+        assert not await database_sync_to_async(Message.objects.filter(is_read=False).exists)()
+
+        await owner_ws.disconnect()
+        await admin_ws.disconnect()
