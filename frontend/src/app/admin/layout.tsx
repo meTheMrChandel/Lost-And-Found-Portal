@@ -5,6 +5,8 @@ import NotificationBell from "@/components/NotificationBell";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "@/components/Logo";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import HeaderAccount from "@/components/HeaderAccount";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -54,6 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 ← Back to Portal
               </Link>
+              <HeaderAccount />
             </div>
           </div>
 
@@ -82,6 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Content Container */}
         <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8">
+          <Breadcrumbs className="mb-5" />
           {children}
         </main>
       </div>

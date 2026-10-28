@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiClient, getErrorMessage } from "@/lib/api";
 import { loginUrl } from "@/lib/redirect";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { User } from "@/types/auth";
 
 const toFormData = (user: User | null) => ({
@@ -72,6 +73,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-[#FAF7F2] py-12 px-6">
       <div className="max-w-2xl mx-auto">
+        <Breadcrumbs className="mb-5" />
         {/* Header bar */}
         <div className="flex items-center justify-between mb-8">
           <div>

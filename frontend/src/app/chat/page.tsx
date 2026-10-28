@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiClient, getErrorMessage, ListResponse, unwrapList, websocketUrl } from "@/lib/api";
 import NotificationBell from "@/components/NotificationBell";
 import Logo from "@/components/Logo";
+import HeaderAccount from "@/components/HeaderAccount";
 import LoginRequired from "@/components/LoginRequired";
 import SessionCheck from "@/components/SessionCheck";
 
@@ -327,6 +328,7 @@ export default function ChatPage() {
               My Reports
             </Link>
             <NotificationBell />
+            <HeaderAccount />
           </div>
         </div>
       </header>

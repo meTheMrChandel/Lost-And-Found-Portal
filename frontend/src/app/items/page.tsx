@@ -5,6 +5,8 @@ import Link from "next/link";
 import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import Logo from "@/components/Logo";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import HeaderAccount from "@/components/HeaderAccount";
 import { useAuth } from "@/context/AuthContext";
 import LoginRequired from "@/components/LoginRequired";
 import SessionCheck from "@/components/SessionCheck";
@@ -177,12 +179,14 @@ export default function MyValuablesPage() {
             >
               ← Back to Portal
             </Link>
+            <HeaderAccount />
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-6xl w-full mx-auto px-6 py-8 flex-1 space-y-6">
+        <Breadcrumbs />
         {/* Banner */}
         <div className="bg-white p-6 rounded-2xl border border-[#EFEAE0] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>

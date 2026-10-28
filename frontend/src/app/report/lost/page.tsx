@@ -8,6 +8,8 @@ import { nowForDateTimeInput } from "@/lib/datetime";
 import { apiClient, getErrorMessage } from "@/lib/api";
 import { Category } from "@/types/post";
 import Logo from "@/components/Logo";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import HeaderAccount from "@/components/HeaderAccount";
 
 const CAMPUS_LOCATIONS = [
   "Central Library",
@@ -183,12 +185,14 @@ export default function ReportLostItemPage() {
             >
               Cancel
             </Link>
+            <HeaderAccount />
           </div>
         </div>
       </header>
 
       {/* Main Container */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-8">
+        <Breadcrumbs className="mb-5" />
         <div className="mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#D94F3B]/10 text-[#D94F3B] mb-2">
             User 1 Flow • Student Report

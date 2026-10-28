@@ -8,6 +8,8 @@ import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { Post, PostStatus } from "@/types/post";
 import Logo from "@/components/Logo";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import HeaderAccount from "@/components/HeaderAccount";
 
 function MyReportsContent() {
   const { user, loading: authLoading } = useAuth();
@@ -145,12 +147,14 @@ function MyReportsContent() {
             >
               Back to Home
             </Link>
+            <HeaderAccount />
           </div>
         </div>
       </header>
 
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-8">
+        <Breadcrumbs />
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#1C1C1E]">
             My Lost Item Reports

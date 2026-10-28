@@ -8,6 +8,8 @@ import { useApiQuery } from "@/lib/useApiQuery";
 import { Category, Post } from "@/types/post";
 import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import HeaderAccount from "@/components/HeaderAccount";
 
 function FeedContent() {
   const searchParams = useSearchParams();
@@ -141,27 +143,22 @@ function FeedContent() {
             >
               + Report Found
             </Link>
-            {user ? (
+            {user && (
               <Link
                 href="/my-reports"
                 className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#1C1C1E] bg-[#EFEAE0] hover:bg-[#E2DDD2] transition-colors"
               >
                 My Reports
               </Link>
-            ) : (
-              <Link
-                href="/login?redirect=/feed"
-                className="px-4 py-2 rounded-full text-xs font-semibold text-[#1C1C1E] bg-[#EFEAE0] hover:bg-[#E2DDD2] transition-colors"
-              >
-                Log In
-              </Link>
             )}
+            <HeaderAccount />
           </div>
         </div>
       </header>
 
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+        <Breadcrumbs />
         {/* Banner */}
         <div className="p-6 rounded-3xl bg-white border border-[#E2DDD2] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
