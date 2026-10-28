@@ -10,7 +10,9 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.chat.models import BlockedUser, Conversation, Message
+from apps.matching.models import Match
 from apps.notifications.models import Notification
+from apps.posts.models import Category, Post
 
 
 @pytest.fixture
@@ -243,3 +245,119 @@ class TestPhase8MessagingAndRealtimeChat:
         res_owner = api_client.post(f"/api/v1/chat/conversations/{conv.id}/read/")
         assert res_owner.status_code == status.HTTP_200_OK
         assert res_owner.data["marked_read_count"] == 1
+
+
+@pytest.fixture
+def outsider_user(db):
+    user = User.objects.create_user(
+        email="chat_outsider@iitrpr.ac.in",
+        password="ValidPassword@123",
+        full_name="Chirag Outsider",
+        registration_number="2024CSM1063",
+    )
+    user.is_email_verified = True
+    user.save()
+    return user
+
+
+@pytest.fixture
+def match_case(owner_user, finder_user):
+    """A match between owner_user's lost post and finder_user's found post."""
+    category, _ = Category.objects.get_or_create(
+        name="Wallet", defaults={"slug": "wallet", "icon": "wallet", "is_sensitive": True}
+    )
+    now = timezone.now()
+    lost = Post.objects.create(
+        author=owner_user,
+        post_type=Post.PostType.LOST,
+        category=category,
+        title="Brown leather wallet",
+        description="Brown wallet with my hostel ID inside",
+        last_seen_place="Mess hall",
+        last_seen_time=now - timedelta(days=1),
+        status=Post.Status.APPROVED,
+    )
+    found = Post.objects.create(
+        author=finder_user,
+        post_type=Post.PostType.FOUND,
+        category=category,
+        title="Found brown wallet",
+        description="Brown leather wallet near the mess",
+        last_seen_place="Mess hall",
+        last_seen_time=now,
+        status=Post.Status.APPROVED,
+    )
+    return Match.objects.create(lost_post=lost, found_post=found, score=0.9)
+
+
+@pytest.mark.django_db
+class TestConversationCreateAccess:
+    """POST /api/v1/chat/conversations/ only hands out threads the caller belongs in."""
+
+    url = "/api/v1/chat/conversations/"
+
+    def test_owner_gets_or_creates_owner_admin_thread(self, api_client, owner_user, match_case):
+        api_client.force_authenticate(user=owner_user)
+        first = api_client.post(self.url, {"match_id": str(match_case.id)}, format="json")
+        assert first.status_code == status.HTTP_201_CREATED
+
+        again = api_client.post(self.url, {"match_id": str(match_case.id)}, format="json")
+        assert again.status_code == status.HTTP_200_OK
+        assert again.data["data"]["id"] == first.data["data"]["id"]
+
+    def test_finder_cannot_open_owner_admin_thread(self, api_client, owner_user, finder_user, match_case):
+        conv = Conversation.objects.create(
+            match=match_case, conversation_type=Conversation.ConversationType.OWNER_ADMIN
+        )
+        conv.participants.add(owner_user)
+        Message.objects.create(conversation=conv, sender=owner_user, content="My hostel ID is in it")
+
+        api_client.force_authenticate(user=finder_user)
+        res = api_client.post(
+            self.url,
+            {"match_id": str(match_case.id), "conversation_type": "owner_admin"},
+            format="json",
+        )
+        assert res.status_code == status.HTTP_403_FORBIDDEN
+        assert "data" not in res.data
+        assert not conv.participants.filter(pk=finder_user.pk).exists()
+
+    def test_user_outside_the_match_is_refused(self, api_client, outsider_user, match_case):
+        api_client.force_authenticate(user=outsider_user)
+        for conv_type in ("owner_admin", "finder_admin", "direct"):
+            res = api_client.post(
+                self.url, {"match_id": str(match_case.id), "conversation_type": conv_type}, format="json"
+            )
+            assert res.status_code == status.HTTP_403_FORBIDDEN
+        assert not Conversation.objects.exists()
+
+    def test_admin_can_join_existing_thread(self, api_client, owner_user, admin_user, match_case):
+        conv = Conversation.objects.create(
+            match=match_case, conversation_type=Conversation.ConversationType.OWNER_ADMIN
+        )
+        conv.participants.add(owner_user)
+
+        api_client.force_authenticate(user=admin_user)
+        res = api_client.post(self.url, {"match_id": str(match_case.id)}, format="json")
+        assert res.status_code == status.HTTP_200_OK
+        assert conv.participants.filter(pk=admin_user.pk).exists()
+
+    def test_thread_without_match_is_not_shared_between_users(self, api_client, owner_user, outsider_user):
+        api_client.force_authenticate(user=owner_user)
+        mine = api_client.post(self.url, {}, format="json")
+        assert mine.status_code == status.HTTP_201_CREATED
+        Message.objects.create(conversation_id=mine.data["data"]["id"], sender=owner_user, content="private note")
+
+        api_client.force_authenticate(user=outsider_user)
+        theirs = api_client.post(self.url, {}, format="json")
+        assert theirs.status_code == status.HTTP_201_CREATED
+        assert theirs.data["data"]["id"] != mine.data["data"]["id"]
+        assert theirs.data["data"]["last_message"] is None
+
+    def test_unknown_conversation_type_is_rejected(self, api_client, owner_user, match_case):
+        api_client.force_authenticate(user=owner_user)
+        res = api_client.post(
+            self.url, {"match_id": str(match_case.id), "conversation_type": "group"}, format="json"
+        )
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+        assert not Conversation.objects.exists()

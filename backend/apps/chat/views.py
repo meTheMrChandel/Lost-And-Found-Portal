@@ -65,16 +65,36 @@ class ConversationListCreateView(APIView):
     def post(self, request):
         match_id = request.data.get("match_id")
         conv_type = request.data.get("conversation_type", Conversation.ConversationType.OWNER_ADMIN)
+        if conv_type not in Conversation.ConversationType.values:
+            raise ValidationError(
+                {"conversation_type": [f"Must be one of: {', '.join(Conversation.ConversationType.values)}."]}
+            )
         match = get_object_or_404(Match, pk=match_id) if match_id else None
 
         user = request.user
         is_admin = user.is_staff or getattr(user, "is_campus_admin", False)
 
-        # Check existing conversation
-        existing = Conversation.objects.filter(match=match, conversation_type=conv_type).first()
+        # Students may only open their own side of a case: the owner the owner ↔ admin
+        # thread, the finder the finder ↔ admin thread, and either one an existing direct chat
+        if match and not is_admin:
+            owner_id, finder_id = match.lost_post.author_id, match.found_post.author_id
+            allowed_ids = {
+                Conversation.ConversationType.OWNER_ADMIN: {owner_id},
+                Conversation.ConversationType.FINDER_ADMIN: {finder_id},
+                Conversation.ConversationType.DIRECT: {owner_id, finder_id},
+            }[conv_type]
+            if user.id not in allowed_ids:
+                raise PermissionDenied("You do not have access to this conversation for the match case.")
+
+        # Check existing conversation. Threads without a match are personal, so only
+        # reuse one the user is already in.
+        existing = Conversation.objects.filter(match=match, conversation_type=conv_type)
+        if match is None:
+            existing = existing.filter(participants=user)
+        existing = existing.first()
         if existing:
-            # If not yet a participant, add them if authorized
-            if user not in existing.participants.all() and (is_admin or user.id in [match.lost_post.author_id, match.found_post.author_id]):
+            # Authorized above, so add them if they are not yet a participant
+            if not existing.participants.filter(pk=user.pk).exists():
                 existing.participants.add(user)
             return Response(
                 {"success": True, "data": ConversationSerializer(existing, context={"request": request}).data},
