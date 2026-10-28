@@ -4,7 +4,6 @@ chat/views.py — REST endpoints for conversations, messages, offline sync, and 
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -24,9 +23,13 @@ from apps.chat.serializers import (
     MessageCreateSerializer,
     MessageSerializer,
 )
-from apps.chat.services import conversation_group, message_event_payload
+from apps.chat.services import (
+    conversation_group,
+    message_event_payload,
+    notify_recipients,
+    send_block_reason,
+)
 from apps.matching.models import Match
-from apps.notifications.services import create_notification
 
 
 class ConversationListCreateView(APIView):
@@ -179,20 +182,10 @@ class ConversationMessagesListView(APIView):
         serializer = MessageCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Check direct chat approval
-        if conv.conversation_type == Conversation.ConversationType.DIRECT:
-            if not conv.is_direct_approved:
-                raise PermissionDenied("Direct chat between owner and finder requires admin approval before messaging.")
-
-        # Check blocklist between participants
-        other_participants = conv.participants.exclude(id=user.id)
-        for other in other_participants:
-            # Did sender block other or other block sender?
-            is_blocked = BlockedUser.objects.filter(
-                Q(blocker=user, blocked=other) | Q(blocker=other, blocked=user)
-            ).exists()
-            if is_blocked:
-                raise PermissionDenied("Cannot send message: messaging is blocked between users.")
+        # Direct chat needs admin approval, and no participant may have blocked another
+        reason = send_block_reason(conv, user)
+        if reason:
+            raise PermissionDenied(reason)
 
         content = serializer.validated_data["content"]
         msg = Message.objects.create(
@@ -219,15 +212,7 @@ class ConversationMessagesListView(APIView):
             pass
 
         # Dispatch in-app notification to offline participants
-        for other in other_participants:
-            create_notification(
-                recipient=other,
-                notif_type="chat_message",
-                title=f"New message from {user.full_name}",
-                body=content[:100] + ("..." if len(content) > 100 else ""),
-                data={"conversation_id": str(conv.id), "message_id": str(msg.id)},
-                send_email_copy=False,
-            )
+        notify_recipients(msg)
 
         return Response(
             {

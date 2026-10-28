@@ -16,10 +16,15 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.utils import timezone
-from django.db.models import Q
 
-from apps.chat.models import BlockedUser, Conversation, Message
-from apps.chat.services import conversation_group, message_event_payload
+from apps.chat.models import Conversation, Message
+from apps.chat.serializers import MessageCreateSerializer
+from apps.chat.services import (
+    conversation_group,
+    message_event_payload,
+    notify_recipients,
+    send_block_reason,
+)
 
 SEND_ACTIONS = {"send_message", "message"}
 READ_ACTIONS = {"mark_read", "read"}
@@ -39,6 +44,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Reject unauthenticated connections
         if not self.user or not self.user.is_authenticated:
             await self.close(code=4401)
+            return
+
+        # Banned users are locked out of chat, as on the REST endpoints (IsNotBanned)
+        if getattr(self.user, "is_banned", False):
+            await self.close(code=4403)
             return
 
         # Check authorization to join conversation
@@ -72,10 +82,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if not content:
                 return
 
+            # Same length limit as the REST endpoint
+            serializer = MessageCreateSerializer(data={"content": content})
+            if not serializer.is_valid():
+                await self._send_error(serializer.errors["content"][0])
+                return
+
             # Check if direct chat approved and not blocked
-            can_send, reason = await self._can_send_message()
-            if not can_send:
-                await self.send(text_data=json.dumps({"type": "error", "error": reason}))
+            reason = await self._send_block_reason()
+            if reason:
+                await self._send_error(reason)
                 return
 
             # Save message to DB
@@ -103,6 +119,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     },
                 )
 
+    async def _send_error(self, reason):
+        await self.send(text_data=json.dumps({"type": "error", "error": str(reason)}))
+
     async def chat_message(self, event):
         """Called when a message is broadcast to this group."""
         await self.send(text_data=json.dumps({
@@ -127,24 +146,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
         ).exists()
 
     @database_sync_to_async
-    def _can_send_message(self) -> tuple[bool, str]:
+    def _send_block_reason(self):
         try:
             conv = Conversation.objects.get(id=self.conversation_id)
         except Conversation.DoesNotExist:
-            return False, "Conversation not found."
-
-        if conv.conversation_type == Conversation.ConversationType.DIRECT and not conv.is_direct_approved:
-            return False, "Direct owner-finder chat requires campus admin approval."
-
-        other_participants = conv.participants.exclude(id=self.user.id)
-        for other in other_participants:
-            blocked = BlockedUser.objects.filter(
-                Q(blocker=self.user, blocked=other) | Q(blocker=other, blocked=self.user)
-            ).exists()
-            if blocked:
-                return False, "Messaging is blocked between participants."
-
-        return True, ""
+            return "Conversation not found."
+        return send_block_reason(conv, self.user)
 
     @database_sync_to_async
     def _save_message(self, content: str) -> dict:
@@ -153,6 +160,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             sender=self.user,
             content=content,
         )
+        notify_recipients(msg)
         return message_event_payload(msg)
 
     @database_sync_to_async

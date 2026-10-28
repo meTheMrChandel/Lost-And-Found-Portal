@@ -12,7 +12,8 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken
 
 from apps.accounts.models import User
-from apps.chat.models import Conversation, Message
+from apps.chat.models import BlockedUser, Conversation, Message
+from apps.notifications.models import Notification
 from config.asgi import application
 
 
@@ -101,6 +102,16 @@ class TestChatWebSocketAuth:
 
     async def test_non_participant_is_rejected(self, conversation, outsider_user):
         communicator = communicator_for(conversation, outsider_user)
+        connected, close_code = await communicator.connect()
+        assert not connected
+        assert close_code == 4403
+        await communicator.disconnect()
+
+    async def test_banned_user_is_rejected(self, conversation, owner_user):
+        owner_user.is_banned = True
+        await database_sync_to_async(owner_user.save)()
+
+        communicator = communicator_for(conversation, owner_user)
         connected, close_code = await communicator.connect()
         assert not connected
         assert close_code == 4403
@@ -210,3 +221,57 @@ class TestChatWebSocketMessaging:
 
         await owner_ws.disconnect()
         await admin_ws.disconnect()
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+class TestChatWebSocketSendRules:
+    """Sending over the socket follows the same rules as POST .../messages/."""
+
+    async def test_recipients_get_an_in_app_notification(self, conversation, owner_user, admin_user):
+        ws = await connected_communicator(conversation, owner_user)
+        await ws.send_json_to({"action": "send_message", "content": "Found it near the library"})
+        await ws.receive_json_from()
+
+        notified = await database_sync_to_async(
+            lambda: list(Notification.objects.filter(notif_type="chat_message").values_list("recipient_id", flat=True))
+        )()
+        assert notified == [admin_user.id]
+        await ws.disconnect()
+
+    async def test_message_over_length_limit_is_refused(self, conversation, owner_user):
+        ws = await connected_communicator(conversation, owner_user)
+        await ws.send_json_to({"action": "send_message", "content": "x" * 5001})
+
+        frame = await ws.receive_json_from()
+        assert frame["type"] == "error"
+        assert not await database_sync_to_async(Message.objects.exists)()
+        await ws.disconnect()
+
+    async def test_unapproved_direct_chat_is_refused(self, transactional_db, owner_user, outsider_user):
+        def make_direct():
+            conv = Conversation.objects.create(conversation_type=Conversation.ConversationType.DIRECT)
+            conv.participants.add(owner_user, outsider_user)
+            return conv
+
+        conv = await database_sync_to_async(make_direct)()
+        ws = await connected_communicator(conv, owner_user)
+        await ws.send_json_to({"action": "send_message", "content": "Can we meet?"})
+
+        frame = await ws.receive_json_from()
+        assert frame["type"] == "error"
+        assert "requires admin approval" in frame["error"]
+        assert not await database_sync_to_async(Message.objects.exists)()
+        await ws.disconnect()
+
+    async def test_blocked_participant_cannot_send(self, conversation, owner_user, admin_user):
+        await database_sync_to_async(BlockedUser.objects.create)(blocker=admin_user, blocked=owner_user)
+
+        ws = await connected_communicator(conversation, owner_user)
+        await ws.send_json_to({"action": "send_message", "content": "hello?"})
+
+        frame = await ws.receive_json_from()
+        assert frame["type"] == "error"
+        assert "blocked" in frame["error"]
+        assert not await database_sync_to_async(Message.objects.exists)()
+        await ws.disconnect()
