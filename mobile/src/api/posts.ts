@@ -102,6 +102,7 @@ export const postsApi = {
     category?: string;
     search?: string;
     ordering?: string;
+    include_pending?: boolean;
   }): Promise<Post[]> {
     const res = await apiClient.get("/posts/feed/", { params });
     const payload = res.data?.data || res.data;

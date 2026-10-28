@@ -87,10 +87,15 @@ export const ReportFoundScreen: React.FC = () => {
       const formData = new FormData();
       formData.append("title", title.trim());
       formData.append("category", selectedCategory);
+      formData.append("last_seen_place", location.trim());
       formData.append("campus_location", location.trim());
       formData.append("description", description.trim());
-      formData.append("incident_date", new Date().toISOString().split("T")[0]);
+      const nowIso = new Date().toISOString();
+      formData.append("last_seen_time", nowIso);
+      formData.append("incident_date", nowIso.split("T")[0]);
+      formData.append("custody_location", custodyMode);
       formData.append("custody_mode", custodyMode);
+      formData.append("inform_admin_privately", isPrivateAdminOnly ? "true" : "false");
       formData.append("is_private_admin_only", isPrivateAdminOnly ? "true" : "false");
 
       selectedImages.forEach((img, idx) => {

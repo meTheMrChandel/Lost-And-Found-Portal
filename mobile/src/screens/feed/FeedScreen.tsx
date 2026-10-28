@@ -43,7 +43,7 @@ export const FeedScreen: React.FC = () => {
   // Fetch feed items
   const loadPosts = useCallback(async () => {
     try {
-      const params: any = {};
+      const params: any = { include_pending: true };
       if (selectedType !== "all") {
         params.post_type = selectedType.toUpperCase();
         params.type = selectedType.toUpperCase();

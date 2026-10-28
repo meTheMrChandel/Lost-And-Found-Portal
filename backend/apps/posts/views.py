@@ -348,13 +348,26 @@ class PublicFeedView(APIView):
     )
     def get(self, request):
         now = timezone.now()
+        user = request.user if request.user.is_authenticated else None
+        is_staff = user and (user.is_staff or getattr(user, "is_campus_admin", False))
+        include_pending = request.query_params.get("include_pending", "").lower() in ["true", "1"]
+
+        base_filter = Q(
+            category__is_sensitive=False,
+            inform_admin_privately=False,
+            expires_at__gt=now,
+        )
+
+        if include_pending or is_staff:
+            status_filter = Q(status__in=[Post.Status.APPROVED, Post.Status.PENDING])
+        elif user:
+            # Authenticated user sees all approved posts + their own posts (even if pending)
+            status_filter = Q(status=Post.Status.APPROVED) | Q(author=user)
+        else:
+            status_filter = Q(status=Post.Status.APPROVED)
+
         posts = (
-            Post.objects.filter(
-                status=Post.Status.APPROVED,
-                category__is_sensitive=False,
-                inform_admin_privately=False,
-                expires_at__gt=now,
-            )
+            Post.objects.filter(base_filter & status_filter)
             .select_related("category", "author")
             .prefetch_related("images")
         )

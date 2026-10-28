@@ -65,6 +65,20 @@ class LostPostCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "status", "created_at"]
 
+    def to_internal_value(self, data):
+        # Support mobile / frontend field aliases
+        mutable_data = data.copy() if hasattr(data, "copy") else dict(data)
+        if "campus_location" in mutable_data and "last_seen_place" not in mutable_data:
+            mutable_data["last_seen_place"] = mutable_data["campus_location"]
+        if "incident_date" in mutable_data and "last_seen_time" not in mutable_data:
+            val = str(mutable_data["incident_date"])
+            if val and len(val) == 10 and "T" not in val:
+                val = f"{val}T12:00:00Z"
+            mutable_data["last_seen_time"] = val
+        if "last_seen_time" not in mutable_data or not mutable_data["last_seen_time"]:
+            mutable_data["last_seen_time"] = timezone.now().isoformat()
+        return super().to_internal_value(mutable_data)
+
     def validate_last_seen_time(self, value):
         # Prevent reporting items lost in the future
         now_with_buffer = timezone.now() + timedelta(minutes=5)
@@ -224,6 +238,29 @@ class FoundPostCreateSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "status", "created_at"]
+
+    def to_internal_value(self, data):
+        # Support mobile / frontend field aliases
+        mutable_data = data.copy() if hasattr(data, "copy") else dict(data)
+        if "campus_location" in mutable_data and "last_seen_place" not in mutable_data:
+            mutable_data["last_seen_place"] = mutable_data["campus_location"]
+        if "incident_date" in mutable_data and "last_seen_time" not in mutable_data:
+            val = str(mutable_data["incident_date"])
+            if val and len(val) == 10 and "T" not in val:
+                val = f"{val}T12:00:00Z"
+            mutable_data["last_seen_time"] = val
+        if "last_seen_time" not in mutable_data or not mutable_data["last_seen_time"]:
+            mutable_data["last_seen_time"] = timezone.now().isoformat()
+        if "custody_mode" in mutable_data and "custody_location" not in mutable_data:
+            mode = mutable_data["custody_mode"]
+            if mode in [Post.CustodyLocation.WITH_FINDER, Post.CustodyLocation.ADMIN_OFFICE, Post.CustodyLocation.SECURITY_OFFICE]:
+                mutable_data["custody_location"] = mode
+            else:
+                mutable_data["custody_location"] = Post.CustodyLocation.WITH_FINDER
+        if "is_private_admin_only" in mutable_data and "inform_admin_privately" not in mutable_data:
+            val = mutable_data["is_private_admin_only"]
+            mutable_data["inform_admin_privately"] = str(val).lower() in ["true", "1", "yes"]
+        return super().to_internal_value(mutable_data)
 
     def validate_last_seen_time(self, value):
         now_with_buffer = timezone.now() + timedelta(minutes=5)

@@ -96,9 +96,12 @@ export const ReportLostScreen: React.FC = () => {
       const formData = new FormData();
       formData.append("title", title.trim());
       formData.append("category", selectedCategory);
+      formData.append("last_seen_place", location.trim());
       formData.append("campus_location", location.trim());
       formData.append("description", description.trim());
-      formData.append("incident_date", new Date().toISOString().split("T")[0]);
+      const nowIso = new Date().toISOString();
+      formData.append("last_seen_time", nowIso);
+      formData.append("incident_date", nowIso.split("T")[0]);
 
       if (hiddenProof.trim()) {
         formData.append("hidden_proof", hiddenProof.trim());
