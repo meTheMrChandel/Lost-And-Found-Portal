@@ -221,3 +221,25 @@ class TestPhase8MessagingAndRealtimeChat:
         res_convs_after = api_client.get("/api/v1/chat/conversations/")
         owner_conv_after = next(c for c in res_convs_after.data["data"] if c["id"] == str(conv.id))
         assert owner_conv_after["unread_count"] == 0
+
+    def test_non_participant_cannot_mark_conversation_read(
+        self, api_client, owner_user, finder_user, admin_user
+    ):
+        """Only participants (or admins) may mark a thread read; others get 403 and nothing changes."""
+        conv = Conversation.objects.create(
+            conversation_type=Conversation.ConversationType.OWNER_ADMIN,
+        )
+        conv.participants.add(owner_user, admin_user)
+        Message.objects.create(conversation=conv, sender=admin_user, content="Is this your wallet?")
+
+        # finder_user is not part of this owner <-> admin thread
+        api_client.force_authenticate(user=finder_user)
+        res = api_client.post(f"/api/v1/chat/conversations/{conv.id}/read/")
+        assert res.status_code == status.HTTP_403_FORBIDDEN
+        assert conv.messages.filter(is_read=False).count() == 1
+
+        # The owner still sees it as unread and can mark it read themselves
+        api_client.force_authenticate(user=owner_user)
+        res_owner = api_client.post(f"/api/v1/chat/conversations/{conv.id}/read/")
+        assert res_owner.status_code == status.HTTP_200_OK
+        assert res_owner.data["marked_read_count"] == 1

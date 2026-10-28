@@ -32,6 +32,15 @@ from apps.chat.services import (
 from apps.matching.models import Match
 
 
+def get_conversation_for_user(pk, user) -> Conversation:
+    """The conversation, if `user` is a participant or an admin; 404/403 otherwise."""
+    conv = get_object_or_404(Conversation, pk=pk)
+    is_admin = user.is_staff or getattr(user, "is_campus_admin", False)
+    if not is_admin and not conv.participants.filter(pk=user.pk).exists():
+        raise PermissionDenied("You are not a participant in this conversation.")
+    return conv
+
+
 class ConversationListCreateView(APIView):
     """
     GET /api/v1/chat/conversations/
@@ -139,18 +148,9 @@ class ConversationMessagesListView(APIView):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "chat_message"
 
-    def _get_conversation(self, pk, user):
-        is_admin = user.is_staff or getattr(user, "is_campus_admin", False)
-        if is_admin:
-            return get_object_or_404(Conversation, pk=pk)
-        conv = get_object_or_404(Conversation, pk=pk)
-        if user not in conv.participants.all():
-            raise PermissionDenied("You are not a participant in this conversation.")
-        return conv
-
     def get(self, request, pk):
         user = request.user
-        conv = self._get_conversation(pk, user)
+        conv = get_conversation_for_user(pk, user)
 
         qs = conv.messages.select_related("sender").order_by("created_at")
 
@@ -178,7 +178,7 @@ class ConversationMessagesListView(APIView):
 
     def post(self, request, pk):
         user = request.user
-        conv = self._get_conversation(pk, user)
+        conv = get_conversation_for_user(pk, user)
         serializer = MessageCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -233,7 +233,7 @@ class ConversationMarkReadView(APIView):
 
     def post(self, request, pk):
         user = request.user
-        conv = get_object_or_404(Conversation, pk=pk)
+        conv = get_conversation_for_user(pk, user)
 
         updated_count = conv.messages.filter(is_read=False).exclude(sender=user).update(
             is_read=True, read_at=timezone.now()
