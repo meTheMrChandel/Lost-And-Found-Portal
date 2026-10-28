@@ -2,6 +2,8 @@
 matching/serializers.py — Serializers for Match queue, details, and review actions.
 """
 
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.accounts.models import User
@@ -178,6 +180,6 @@ class MatchHandoverVerifySerializer(serializers.Serializer):
 
 class MatchCloseSerializer(serializers.Serializer):
     reward_amount_settled = serializers.DecimalField(
-        max_digits=8, decimal_places=2, min_value=0, required=False, default=0.0
+        max_digits=8, decimal_places=2, min_value=Decimal("0.00"), required=False, default=Decimal("0.00")
     )
     notes = serializers.CharField(required=False, allow_blank=True, default="")

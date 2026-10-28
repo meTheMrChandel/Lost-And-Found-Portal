@@ -436,7 +436,7 @@ class AdminMatchCloseView(APIView):
         serializer = MatchCloseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        reward_amount = serializer.validated_data.get("reward_amount_settled", 0.0)
+        reward_amount = serializer.validated_data["reward_amount_settled"]
         notes = serializer.validated_data.get("notes", "")
         from_status = match.status
 
