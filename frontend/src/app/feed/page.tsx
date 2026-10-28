@@ -457,20 +457,12 @@ function FeedContent() {
                 🚩 Report Abuse
               </button>
 
-              <div className="flex gap-2">
-                <Link
-                  href="/report/lost"
-                  className="px-4 py-2 rounded-xl bg-[#047857] hover:bg-[#10B981] text-white text-xs font-bold transition-all shadow-sm"
-                >
-                  Is This Yours? Claim Item
-                </Link>
-                <button
-                  onClick={() => setActivePost(null)}
-                  className="px-4 py-2 rounded-xl bg-[#1C1C1E] text-white text-xs font-bold"
-                >
-                  Close
-                </button>
-              </div>
+              <button
+                onClick={() => setActivePost(null)}
+                className="px-4 py-2 rounded-xl bg-[#1C1C1E] text-white text-xs font-bold"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
