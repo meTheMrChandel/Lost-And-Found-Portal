@@ -6,6 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 import { apiClient, getErrorMessage, ListResponse, unwrapList, websocketUrl } from "@/lib/api";
 import NotificationBell from "@/components/NotificationBell";
 import Logo from "@/components/Logo";
+import LoginRequired from "@/components/LoginRequired";
+import SessionCheck from "@/components/SessionCheck";
 
 interface Participant {
   id: string;
@@ -48,7 +50,7 @@ interface Message {
 }
 
 export default function ChatPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -283,6 +285,16 @@ export default function ChatPage() {
         return type;
     }
   };
+
+  if (authLoading) return <SessionCheck />;
+  if (!user) {
+    return (
+      <LoginRequired
+        returnTo="/chat"
+        message="Sign in with your campus account to chat with owners, finders and the admin office."
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-[#1C1C1E]">

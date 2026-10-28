@@ -5,6 +5,9 @@ import Link from "next/link";
 import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import Logo from "@/components/Logo";
+import { useAuth } from "@/context/AuthContext";
+import LoginRequired from "@/components/LoginRequired";
+import SessionCheck from "@/components/SessionCheck";
 
 interface CategorySummary {
   id: string;
@@ -27,6 +30,7 @@ interface RegisteredItem {
 }
 
 export default function MyValuablesPage() {
+  const { user, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<CategorySummary[]>([]);
   const [actionError, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -49,7 +53,7 @@ export default function MyValuablesPage() {
     loading,
     error: loadError,
     refresh: refreshItems,
-  } = useApiQuery<ListResponse<RegisteredItem>>("/items/", "Failed to load registered valuables.");
+  } = useApiQuery<ListResponse<RegisteredItem>>(user ? "/items/" : null, "Failed to load registered valuables.");
   // GET /items/ is a DRF paginated page ({ count, results }), not the { data } envelope
   const items = unwrapList(itemsRes);
   const [dismissedLoadError, setDismissedLoadError] = useState("");
@@ -138,6 +142,16 @@ export default function MyValuablesPage() {
       setLoadingSticker(false);
     }
   };
+
+  if (authLoading) return <SessionCheck />;
+  if (!user) {
+    return (
+      <LoginRequired
+        returnTo="/items"
+        message="Sign in with your campus account to register valuables and print QR recovery stickers."
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-[#1C1C1E] flex flex-col">
