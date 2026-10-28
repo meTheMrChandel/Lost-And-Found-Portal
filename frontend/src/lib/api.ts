@@ -6,6 +6,7 @@ interface RequestOptions extends RequestInit {
 
 interface ApiErrorBody {
   message?: string;
+  code?: string;
   errors?: Record<string, unknown>;
 }
 
@@ -107,7 +108,13 @@ function sendRequest(endpoint: string, options: RequestOptions, token: string | 
     body: requestBody,
   };
 
-  return fetch(`${API_BASE}${endpoint}`, config);
+  return fetch(`${API_BASE}${endpoint}`, config).catch((err) => {
+    // fetch only rejects when the server can't be reached at all
+    if (err instanceof TypeError) {
+      throw new ApiError("Can't reach the server. Check your internet connection and try again.", 0);
+    }
+    throw err;
+  });
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -119,23 +126,72 @@ async function parseResponse<T>(response: Response): Promise<T> {
   } else {
     const text = await response.text();
     if (!response.ok) {
-      throw new Error(`Server returned error (${response.status}): ${response.statusText}`);
+      throw new ApiError(describeError(response.status, null), response.status);
     }
     return text as T;
   }
 
   if (!response.ok) {
-    let errorMsg = result?.message;
-    if (result?.errors && typeof result.errors === "object" && Object.keys(result.errors).length > 0) {
-      const fieldErrors = Object.values(result.errors).flat().join(" ");
-      if (fieldErrors) {
-        errorMsg = fieldErrors;
-      }
-    }
-    throw new Error(errorMsg || `Request failed (${response.status})`);
+    throw new ApiError(describeError(response.status, result), response.status, result?.code);
   }
 
   return result as T;
+}
+
+/** Thrown by apiClient; `message` is already worded for showing to the user. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code?: string
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+const MESSAGES_BY_CODE: Record<string, string> = {
+  token_not_valid: "Your session has expired. Please log in again.",
+  authentication_failed: "Your session has expired. Please log in again.",
+  not_authenticated: "Please log in to continue.",
+  no_active_account: "Incorrect email or password.",
+  permission_denied: "You don't have permission to do that.",
+};
+
+function fieldLabel(field: string): string {
+  return field.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function describeError(status: number, body: ApiErrorBody | null): string {
+  const errors = body?.errors ?? {};
+  // SimpleJWT reports a bad token as field errors ({detail, code, messages}), not as a code
+  const tokenInvalid = Array.isArray(errors.code) && errors.code.includes("token_not_valid");
+  const code = tokenInvalid ? "token_not_valid" : body?.code;
+  if (code && MESSAGES_BY_CODE[code]) return MESSAGES_BY_CODE[code];
+
+  if (status === 429) {
+    const wait = body?.message?.match(/(\d+) seconds?/);
+    return wait
+      ? `Too many attempts. Please wait ${wait[1]} seconds and try again.`
+      : "Too many attempts. Please wait a moment and try again.";
+  }
+  if (status >= 500) return "Something went wrong on our side. Please try again in a moment.";
+
+  // Label each field error so "This field is required." says which field
+  const fieldMessages = Object.entries(errors).flatMap(([field, messages]) =>
+    (Array.isArray(messages) ? messages : [messages]).map((m) => {
+      const text = String(m);
+      if (field === "non_field_errors" || field === "detail") return text;
+      const label = fieldLabel(field);
+      return text.toLowerCase().startsWith(label.toLowerCase()) ? text : `${label}: ${text}`;
+    })
+  );
+  if (fieldMessages.length > 0) return fieldMessages.join(" ");
+
+  if (status === 404 && (!body?.message || body.message === "Not found.")) {
+    return "We couldn't find that. It may have been removed.";
+  }
+  return body?.message || `Request failed (${status}).`;
 }
 
 /**
