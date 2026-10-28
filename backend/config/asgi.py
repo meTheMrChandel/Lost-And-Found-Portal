@@ -17,12 +17,15 @@ django_asgi_app = get_asgi_application()
 
 # Import routing after Django is set up
 from apps.chat import routing as chat_routing  # noqa: E402
+from apps.chat.middleware import JWTQueryAuthMiddleware  # noqa: E402
 
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
         "websocket": AllowedHostsOriginValidator(
-            AuthMiddlewareStack(URLRouter(chat_routing.websocket_urlpatterns))
+            AuthMiddlewareStack(
+                JWTQueryAuthMiddleware(URLRouter(chat_routing.websocket_urlpatterns))
+            )
         ),
     }
 )
