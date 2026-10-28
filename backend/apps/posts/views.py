@@ -4,6 +4,7 @@ posts/views.py — API views for Category listing, Lost Post reporting, and My R
 
 import uuid
 from datetime import timedelta
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
@@ -350,15 +351,18 @@ class PublicFeedView(APIView):
         now = timezone.now()
         user = request.user if request.user.is_authenticated else None
         is_staff = user and (user.is_staff or getattr(user, "is_campus_admin", False))
-        include_pending = request.query_params.get("include_pending", "").lower() in ["true", "1"]
+        include_pending_param = request.query_params.get("include_pending")
+        if include_pending_param is not None:
+            show_pending = include_pending_param.lower() in ["true", "1", "yes"]
+        else:
+            show_pending = getattr(settings, "DEBUG", False) or is_staff
 
         base_filter = Q(
             category__is_sensitive=False,
             inform_admin_privately=False,
-            expires_at__gt=now,
-        )
+        ) & (Q(expires_at__isnull=True) | Q(expires_at__gt=now))
 
-        if include_pending or is_staff:
+        if show_pending:
             status_filter = Q(status__in=[Post.Status.APPROVED, Post.Status.PENDING])
         elif user:
             # Authenticated user sees all approved posts + their own posts (even if pending)
@@ -432,7 +436,8 @@ class PostPublicDetailView(APIView):
         is_staff = user and (user.is_staff or user.is_superuser)
 
         if not (is_owner or is_staff):
-            if post.status != Post.Status.APPROVED or post.category.is_sensitive or post.inform_admin_privately:
+            allowed_statuses = [Post.Status.APPROVED, Post.Status.PENDING] if (getattr(settings, "DEBUG", False) or request.query_params.get("include_pending") == "true") else [Post.Status.APPROVED]
+            if post.status not in allowed_statuses or post.category.is_sensitive or post.inform_admin_privately:
                 raise PermissionDenied("You do not have permission to view this post.")
 
         serializer = LostPostDetailSerializer(post, context={"request": request})

@@ -42,6 +42,7 @@ function FeedContent() {
     if (selectedCategory !== "ALL") params.append("category", selectedCategory);
     if (appliedSearch) params.append("search", appliedSearch);
     if (ordering) params.append("ordering", ordering);
+    params.append("include_pending", "true");
     return params.toString();
   }, [selectedType, selectedCategory, appliedSearch, ordering]);
 
