@@ -230,6 +230,10 @@ npm run dev
   - Instant incremental message synchronization for users returning from offline states or backgrounded apps via `/api/v1/chat/conversations/<id>/messages/?since=<timestamp>`.
 - **WebSocket Real-Time Broadcasts (`Django Channels`):**
   - WebSocket routing at `ws/chat/<conversation_id>/` with JWT authentication and group broadcasts.
+  - Connect with the access token in the query string: `ws://<api-host>/ws/chat/<conversation_id>/?token=<access>`. Close codes: `4401` missing/invalid/expired token, `4403` not a participant or banned.
+  - Client → server: `{"action": "send_message", "content": "..."}` and `{"action": "mark_read"}`.
+  - Server → client: `{"type": "chat_message", "message": {id, conversation_id, sender_id, sender_name, content, is_read, created_at}}`, `{"type": "read_receipt", "reader_id", "read_at"}` and `{"type": "error", "error": "..."}`.
+  - Socket sends follow the same rules as `POST .../messages/` (direct-chat approval, block list, 5000 character limit, recipient notifications), and messages sent over REST are broadcast to open sockets in the same format.
 - **Campus Notifications Hub (`/api/v1/notifications/`):**
   - Unified notifications system for match alerts, handover updates, case resolutions, and chat messages.
   - Real-time unread badge counter (`/api/v1/notifications/unread-count/`).
