@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { apiClient, getErrorMessage } from "@/lib/api";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import SessionCheck from "@/components/SessionCheck";
+import { useRedirectIfSignedIn } from "@/lib/redirect";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const redirecting = useRedirectIfSignedIn("/");
 
   // Step 1: Request OTP, Step 2: Verify OTP, Step 3: Fill Profile
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -80,13 +83,15 @@ export default function RegisterPage() {
           ...formData,
         },
       });
-      router.push("/login?registered=true");
+      router.replace("/login?registered=true");
     } catch (err) {
       setError(getErrorMessage(err, "Failed to complete registration."));
     } finally {
       setLoading(false);
     }
   };
+
+  if (redirecting) return <SessionCheck />;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#FAF7F2]">

@@ -1,15 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { getErrorMessage } from "@/lib/api";
+import { safeRedirect, useRedirectIfSignedIn } from "@/lib/redirect";
 import Logo from "@/components/Logo";
+import SessionCheck from "@/components/SessionCheck";
 
-export default function LoginPage() {
-  const router = useRouter();
-  const { login } = useAuth();
+// Notices other pages hand over via the query string after a redirect here
+const NOTICES: Record<string, string> = {
+  registered: "Account created. Log in to get started.",
+  reset: "Password updated. Log in with your new password.",
+  admin_activated: "Admin access activated. Log in to open the Admin Portal.",
+};
+
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const { user, login } = useAuth();
+  const redirectTo = safeRedirect(searchParams.get("redirect"));
+  // Already signed in, or just signed in: move on, replacing this page in history
+  const redirecting = useRedirectIfSignedIn(redirectTo);
+  const notice = Object.keys(NOTICES).find((key) => searchParams.has(key));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,13 +36,16 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push("/");
     } catch (err) {
       setError(getErrorMessage(err, "Failed to log in. Please check your credentials."));
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (redirecting) {
+    return <SessionCheck message={user ? "You're signed in. Taking you there..." : "Checking your session..."} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#FAF7F2]">
@@ -43,6 +59,12 @@ export default function LoginPage() {
             Log in with your IIT Ropar credentials
           </p>
         </div>
+
+        {notice && !error && (
+          <div className="p-4 rounded-2xl bg-[#047857]/10 border border-[#047857]/20 text-[#047857] text-sm mb-6 font-medium">
+            {NOTICES[notice]}
+          </div>
+        )}
 
         {error && (
           <div className="p-4 rounded-2xl bg-[#D94F3B]/10 border border-[#D94F3B]/20 text-[#D94F3B] text-sm mb-6 font-medium">
@@ -104,5 +126,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<SessionCheck />}>
+      <LoginForm />
+    </Suspense>
   );
 }

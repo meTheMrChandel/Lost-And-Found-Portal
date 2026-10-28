@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { loginUrl } from "@/lib/redirect";
 import { User } from "@/types/auth";
 
 const toFormData = (user: User | null) => ({
@@ -32,12 +33,14 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  // Set on purpose-logout so the "not signed in" redirect below doesn't send us to /login
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
+    if (!loading && !user && !loggingOut) {
+      router.replace(loginUrl("/profile"));
     }
-  }, [user, loading, router]);
+  }, [user, loading, loggingOut, router]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,8 +84,9 @@ export default function ProfilePage() {
           </div>
           <button
             onClick={() => {
+              setLoggingOut(true);
+              router.replace("/");
               logout();
-              router.push("/");
             }}
             className="px-4 py-2 rounded-full border border-[#D94F3B] text-[#D94F3B] hover:bg-[#D94F3B] hover:text-white text-xs font-semibold transition-all cursor-pointer"
           >

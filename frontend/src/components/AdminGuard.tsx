@@ -1,22 +1,24 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { loginUrl } from "@/lib/redirect";
 import { useEffect } from "react";
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        router.push("/login?redirect=/admin");
+        router.replace(loginUrl(pathname));
       } else if (!user.is_staff && user.role !== "admin") {
-        router.push("/");
+        router.replace("/");
       }
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, pathname]);
 
   if (loading) {
     return (

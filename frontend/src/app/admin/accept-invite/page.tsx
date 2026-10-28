@@ -37,7 +37,7 @@ function AcceptInviteContent() {
 
       setSuccess(res.message || "Invitation accepted! Redirecting to login...");
       setTimeout(() => {
-        router.push("/login?admin_activated=true");
+        router.replace("/login?admin_activated=true");
       }, 2000);
     } catch (err) {
       setError(getErrorMessage(err, "Failed to accept admin invite."));

@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { apiClient, getErrorMessage } from "@/lib/api";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import SessionCheck from "@/components/SessionCheck";
+import { useRedirectIfSignedIn } from "@/lib/redirect";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const redirecting = useRedirectIfSignedIn("/");
 
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState("");
@@ -44,13 +47,15 @@ export default function ForgotPasswordPage() {
         method: "POST",
         data: { email, code, new_password: newPassword },
       });
-      router.push("/login?reset=success");
+      router.replace("/login?reset=success");
     } catch (err) {
       setError(getErrorMessage(err, "Failed to reset password."));
     } finally {
       setLoading(false);
     }
   };
+
+  if (redirecting) return <SessionCheck />;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#FAF7F2]">
