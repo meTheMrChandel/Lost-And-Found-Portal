@@ -4,6 +4,7 @@ import AdminGuard from "@/components/AdminGuard";
 import NotificationBell from "@/components/NotificationBell";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Logo from "@/components/Logo";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -27,9 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="max-w-6xl mx-auto px-6 h-18 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-[#047857] flex items-center justify-center text-white font-bold text-lg shadow-sm">
-                  LF
-                </div>
+                <Logo size={36} />
                 <div>
                   <span className="font-serif text-xl font-bold tracking-tight text-[#1C1C1E]">
                     Admin Portal

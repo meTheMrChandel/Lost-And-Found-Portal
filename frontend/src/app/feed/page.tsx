@@ -7,6 +7,7 @@ import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { Category, Post } from "@/types/post";
 import { useAuth } from "@/context/AuthContext";
+import Logo from "@/components/Logo";
 
 function FeedContent() {
   const searchParams = useSearchParams();
@@ -116,9 +117,7 @@ function FeedContent() {
       <header className="border-b border-[#EFEAE0] bg-[#FAF7F2]/90 backdrop-blur sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-6 h-18 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#047857] flex items-center justify-center text-white font-bold text-lg shadow-sm">
-              LF
-            </div>
+            <Logo size={36} />
             <div>
               <span className="font-serif text-xl font-bold tracking-tight text-[#1C1C1E]">
                 Campus Feed

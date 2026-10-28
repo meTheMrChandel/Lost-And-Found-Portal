@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { getErrorMessage } from "@/lib/api";
+import Logo from "@/components/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,9 +35,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#FAF7F2]">
       <div className="w-full max-w-md p-8 rounded-3xl bg-[#EFEAE0]/80 border border-[#EFEAE0] shadow-lg">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-[#047857] flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 shadow-sm">
-            LF
-          </div>
+          <Logo size={48} variant="tile" className="mx-auto mb-4" />
           <h1 className="font-serif text-3xl font-bold text-[#1C1C1E]">
             Welcome Back
           </h1>

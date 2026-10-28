@@ -6,6 +6,7 @@ import RecentActivity from "@/components/RecentActivity";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { useState } from "react";
+import Logo from "@/components/Logo";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -17,9 +18,7 @@ export default function Home() {
       <header className="border-b border-[#EFEAE0] bg-[#FAF7F2]/90 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#047857] flex items-center justify-center text-white font-bold text-xl shadow-sm">
-              LF
-            </div>
+            <Logo size={40} />
             <div>
               <span className="font-serif text-2xl font-bold tracking-tight text-[#1C1C1E]">
                 Lost & Found

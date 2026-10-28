@@ -1,12 +1,11 @@
 import Link from "next/link";
+import Logo from "@/components/Logo";
 
 export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#FAF7F2] text-[#1C1C1E]">
       <div className="max-w-md w-full text-center">
-        <div className="w-14 h-14 mx-auto mb-6 rounded-2xl bg-[#047857] flex items-center justify-center text-white font-bold text-2xl shadow-sm">
-          LF
-        </div>
+        <Logo size={56} variant="tile" className="mx-auto mb-6" />
         <p className="text-xs font-bold uppercase tracking-wider text-[#D94F3B] mb-2">
           Error 404
         </p>

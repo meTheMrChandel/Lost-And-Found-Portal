@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { nowForDateTimeInput } from "@/lib/datetime";
 import { apiClient, getErrorMessage } from "@/lib/api";
 import { Category } from "@/types/post";
+import Logo from "@/components/Logo";
 
 const CAMPUS_LOCATIONS = [
   "Central Library",
@@ -163,9 +164,7 @@ export default function ReportLostItemPage() {
       <header className="border-b border-[#EFEAE0] bg-[#FAF7F2]/90 backdrop-blur sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-6 h-18 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#047857] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-              LF
-            </div>
+            <Logo size={32} />
             <span className="font-serif text-lg font-bold text-[#1C1C1E]">
               Lost & Found
             </span>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiClient, getErrorMessage, ListResponse, unwrapList } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
+import Logo from "@/components/Logo";
 
 interface CategorySummary {
   id: string;
@@ -144,9 +145,7 @@ export default function MyValuablesPage() {
       <header className="border-b border-[#EFEAE0] bg-[#FAF7F2]/90 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#047857] flex items-center justify-center text-white font-bold text-xl shadow-sm">
-              LF
-            </div>
+            <Logo size={40} />
             <div>
               <span className="font-serif text-2xl font-bold tracking-tight text-[#1C1C1E]">
                 Lost & Found
@@ -431,9 +430,7 @@ export default function MyValuablesPage() {
             {/* Sticker Printable Preview Box */}
             <div className="border-2 border-dashed border-[#047857] rounded-2xl p-6 bg-white text-center space-y-3">
               <div className="flex items-center justify-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-[#047857] flex items-center justify-center text-white font-bold text-xs">
-                  LF
-                </div>
+                <Logo size={24} />
                 <span className="font-serif font-bold text-sm tracking-tight text-[#1C1C1E]">
                   IIT Ropar Lost & Found
                 </span>

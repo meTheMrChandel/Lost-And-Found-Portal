@@ -3,6 +3,7 @@
 import { useEffect, useState, use, Suspense } from "react";
 import Link from "next/link";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import Logo from "@/components/Logo";
 
 interface ScanData {
   item_name: string;
@@ -53,9 +54,7 @@ function ScanContent({ params }: { params: Promise<{ uuid: string }> }) {
       <header className="border-b border-[#EFEAE0] bg-white sticky top-0 z-50">
         <div className="max-w-md mx-auto px-6 h-18 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#047857] flex items-center justify-center text-white font-bold text-lg shadow-sm">
-              LF
-            </div>
+            <Logo size={36} />
             <div>
               <span className="font-serif text-lg font-bold tracking-tight text-[#1C1C1E] block leading-tight">
                 IIT Ropar
