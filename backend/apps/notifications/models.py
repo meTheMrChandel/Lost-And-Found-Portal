@@ -19,6 +19,8 @@ class Notification(models.Model):
         MATCH_FOUND = "match_found", _("Match found")
         HANDOVER_READY = "handover_ready", _("Handover ready")
         REWARD_RECORDED = "reward_recorded", _("Reward recorded")
+        POST_EXPIRING = "post_expiring", _("Post expiring soon")
+        POST_EXPIRED = "post_expired", _("Post expired")
         GENERAL = "general", _("General")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

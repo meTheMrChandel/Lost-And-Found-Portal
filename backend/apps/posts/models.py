@@ -200,6 +200,11 @@ class Post(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     renewed_at = models.DateTimeField(null=True, blank=True)
+    expiry_reminder_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When the owner was reminded to renew; cleared on approval and renewal."),
+    )
 
     class Meta:
         verbose_name = _("post")

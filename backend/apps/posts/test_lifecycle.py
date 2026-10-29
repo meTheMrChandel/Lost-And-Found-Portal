@@ -12,6 +12,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.adminpanel.models import PostAuditLog
+from apps.posts.lifecycle import run_post_lifecycle
 from apps.posts.models import Category, Post, SiteSettings
 
 
@@ -97,3 +98,69 @@ class TestExpiryTimerStartsAtApproval:
 
         post.refresh_from_db()
         assert days_from_now(post.expires_at) == 14
+
+
+@pytest.mark.django_db
+class TestAutoExpiry:
+    def test_overdue_post_expires_and_leaves_the_feed(self, client, owner, make_post):
+        post = make_post(expires_at=timezone.now() - timedelta(minutes=5))
+
+        call_command("run_lifecycle")
+
+        post.refresh_from_db()
+        assert post.status == Post.Status.EXPIRED
+        feed = client.get("/api/v1/posts/feed/?include_pending=false")
+        assert all(item["id"] != str(post.id) for item in feed.data["data"])
+
+        log = PostAuditLog.objects.get(post=post)
+        assert (log.action, log.previous_status, log.new_status) == ("EXPIRE", "APPROVED", "EXPIRED")
+        assert log.admin is None
+        assert owner.notifications.filter(notif_type="post_expired", data__post_id=str(post.id)).exists()
+
+    def test_only_overdue_approved_posts_expire(self, make_post):
+        still_live = make_post(expires_at=timezone.now() + timedelta(days=3))
+        pending = make_post(status=Post.Status.PENDING, expires_at=timezone.now() - timedelta(days=1))
+
+        result = run_post_lifecycle()
+
+        assert result["posts_expired"] == 0
+        still_live.refresh_from_db()
+        pending.refresh_from_db()
+        assert still_live.status == Post.Status.APPROVED
+        assert pending.status == Post.Status.PENDING
+
+    def test_running_twice_expires_once(self, owner, make_post):
+        make_post(expires_at=timezone.now() - timedelta(hours=1))
+
+        assert run_post_lifecycle()["posts_expired"] == 1
+        assert run_post_lifecycle()["posts_expired"] == 0
+        assert PostAuditLog.objects.filter(action="EXPIRE").count() == 1
+        assert owner.notifications.filter(notif_type="post_expired").count() == 1
+
+
+@pytest.mark.django_db
+class TestRenewalReminder:
+    def test_owner_is_reminded_once_when_five_days_are_left(self, owner, make_post):
+        post = make_post(expires_at=timezone.now() + timedelta(days=4, hours=12))
+
+        assert run_post_lifecycle()["reminders_sent"] == 1
+        assert run_post_lifecycle()["reminders_sent"] == 0
+
+        reminders = owner.notifications.filter(notif_type="post_expiring")
+        assert reminders.count() == 1
+        assert "5 days" in reminders.first().title
+        post.refresh_from_db()
+        assert post.expiry_reminder_sent_at is not None
+
+    def test_no_reminder_while_more_than_five_days_are_left(self, owner, make_post):
+        make_post(expires_at=timezone.now() + timedelta(days=6))
+        assert run_post_lifecycle()["reminders_sent"] == 0
+        assert not owner.notifications.exists()
+
+    def test_approval_clears_an_earlier_reminder(self, client, admin_user, make_post):
+        post = make_post(status=Post.Status.HIDDEN, expiry_reminder_sent_at=timezone.now() - timedelta(days=2))
+        client.force_authenticate(user=admin_user)
+        client.post(f"/api/v1/adminpanel/posts/{post.id}/review/", {"action": "APPROVE"})
+
+        post.refresh_from_db()
+        assert post.expiry_reminder_sent_at is None

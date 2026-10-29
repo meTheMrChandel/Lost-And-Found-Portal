@@ -155,6 +155,7 @@ class AdminPostReviewView(APIView):
             post.reviewed_at = timezone.now()
             # The expiry timer runs from approval, not from when the report was submitted
             post.expires_at = new_expiry_date(post.reviewed_at)
+            post.expiry_reminder_sent_at = None
             post.save()
 
             PostAuditLog.objects.create(
