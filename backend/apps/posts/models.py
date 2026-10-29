@@ -205,6 +205,11 @@ class Post(models.Model):
         blank=True,
         help_text=_("When the owner was reminded to renew; cleared on approval and renewal."),
     )
+    sla_alert_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_("When admins were alerted that this post overran the review SLA."),
+    )
 
     class Meta:
         verbose_name = _("post")

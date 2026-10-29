@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.adminpanel.models import AdminInvite, PostAuditLog
 from apps.accounts.models import User, validate_iitrpr_email
 from apps.posts.models import Post, PostImage, Category, AbuseReport
+from apps.posts.lifecycle import sla_cutoff
 from apps.posts.serializers import PostImageSerializer
 
 
@@ -120,8 +121,10 @@ class AdminPostListSerializer(serializers.ModelSerializer):
     def get_is_sla_breached(self, obj) -> bool:
         if obj.status != Post.Status.PENDING:
             return False
-        # SLA breached if pending for more than 24 hours
-        return (timezone.now() - obj.created_at).total_seconds() > 24 * 3600
+        # SLA breached if pending for longer than SiteSettings.admin_review_sla_hours.
+        # Work the cutoff out once per response, not once per post.
+        cutoff = self.context.setdefault("sla_cutoff", sla_cutoff())
+        return obj.created_at < cutoff
 
 
 class AdminAuthorProfileSerializer(serializers.ModelSerializer):

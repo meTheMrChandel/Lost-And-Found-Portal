@@ -18,7 +18,7 @@ from apps.adminpanel.serializers import (
     AdminPostListSerializer,
     AdminPostReviewSerializer,
 )
-from apps.posts.lifecycle import new_expiry_date
+from apps.posts.lifecycle import new_expiry_date, sla_cutoff
 from apps.posts.models import Category, Post
 
 
@@ -75,8 +75,7 @@ class AdminPostQueueView(APIView):
 
         sla_param = request.query_params.get("sla_breached")
         if sla_param in ["true", "True", True]:
-            cutoff = timezone.now() - timedelta(hours=24)
-            posts = posts.filter(status=Post.Status.PENDING, created_at__lt=cutoff)
+            posts = posts.filter(status=Post.Status.PENDING, created_at__lt=sla_cutoff())
 
         date_from = request.query_params.get("date_from")
         if date_from:

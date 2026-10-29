@@ -209,3 +209,52 @@ class TestRenewal:
         assert post.status == status
         assert post.renewed_at is None
         assert not PostAuditLog.objects.filter(action="RENEW").exists()
+
+
+@pytest.mark.django_db
+class TestReviewSlaWatchdog:
+    def test_admins_are_alerted_once_about_overdue_reviews(self, admin_user, owner, make_post):
+        second_admin = User.objects.create_user(
+            email="lifecycle.admin2@iitrpr.ac.in",
+            registration_number="2024ADM1052",
+            password="AdminPassword123",
+            full_name="Second Admin",
+            is_staff=True,
+        )
+        old = timezone.now() - timedelta(hours=30)
+        overdue_a = make_post(status=Post.Status.PENDING, created_at=old)
+        overdue_b = make_post(status=Post.Status.PENDING, created_at=old)
+        make_post(status=Post.Status.PENDING)  # submitted just now, still within the SLA
+
+        assert run_post_lifecycle()["overdue_reviews_flagged"] == 2
+        assert run_post_lifecycle()["overdue_reviews_flagged"] == 0
+
+        for admin in (admin_user, second_admin):
+            alerts = admin.notifications.filter(notif_type="review_overdue")
+            assert alerts.count() == 1
+            assert alerts.first().title == "2 reports waiting over 24h for review"
+            assert set(alerts.first().data["post_ids"]) == {str(overdue_a.id), str(overdue_b.id)}
+        assert not owner.notifications.filter(notif_type="review_overdue").exists()
+
+    def test_sla_hours_come_from_site_settings(self, client, admin_user, make_post):
+        site = SiteSettings.get()
+        site.admin_review_sla_hours = 4
+        site.save()
+        post = make_post(status=Post.Status.PENDING, created_at=timezone.now() - timedelta(hours=5))
+
+        client.force_authenticate(user=admin_user)
+        queue = client.get("/api/v1/adminpanel/posts/?sla_breached=true")
+        assert [item["id"] for item in queue.data["data"]] == [str(post.id)]
+        assert queue.data["data"][0]["is_sla_breached"] is True
+
+        stats = client.get("/api/v1/adminpanel/statistics/")
+        assert stats.data["data"]["posts"]["sla_breached"] == 1
+
+        assert run_post_lifecycle()["overdue_reviews_flagged"] == 1
+        alert = admin_user.notifications.get(notif_type="review_overdue")
+        assert alert.title == "1 report waiting over 4h for review"
+
+    def test_reviewed_posts_are_not_flagged(self, admin_user, make_post):
+        make_post(status=Post.Status.APPROVED, created_at=timezone.now() - timedelta(days=3))
+        assert run_post_lifecycle()["overdue_reviews_flagged"] == 0
+        assert not admin_user.notifications.exists()
