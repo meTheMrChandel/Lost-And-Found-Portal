@@ -18,6 +18,7 @@ from apps.adminpanel.serializers import (
     AdminPostListSerializer,
     AdminPostReviewSerializer,
 )
+from apps.posts.lifecycle import new_expiry_date
 from apps.posts.models import Category, Post
 
 
@@ -152,6 +153,8 @@ class AdminPostReviewView(APIView):
             post.admin_remarks = remarks
             post.reviewed_by = request.user
             post.reviewed_at = timezone.now()
+            # The expiry timer runs from approval, not from when the report was submitted
+            post.expires_at = new_expiry_date(post.reviewed_at)
             post.save()
 
             PostAuditLog.objects.create(
