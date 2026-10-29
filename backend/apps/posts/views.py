@@ -240,7 +240,21 @@ class LostPostDetailView(APIView):
 
         serializer = LostPostUpdateSerializer(post, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        updated_post = serializer.save()
+
+        # The author answering an info request sends the report back to the review queue
+        resubmitted = post.status == Post.Status.INFO_REQUESTED and post.author == request.user
+        if resubmitted:
+            updated_post = serializer.save(status=Post.Status.PENDING, sla_alert_sent_at=None)
+            PostAuditLog.objects.create(
+                post=updated_post,
+                admin=request.user,
+                action="RESUBMIT",
+                previous_status=Post.Status.INFO_REQUESTED,
+                new_status=Post.Status.PENDING,
+                notes="Author updated the report in reply to the admin's request for more information.",
+            )
+        else:
+            updated_post = serializer.save()
 
         # Handle optional new image attachments
         new_images = request.FILES.getlist("images")
@@ -258,7 +272,11 @@ class LostPostDetailView(APIView):
         return Response(
             {
                 "success": True,
-                "message": "Lost item report updated successfully.",
+                "message": (
+                    "Report updated and sent back for admin review."
+                    if resubmitted
+                    else "Lost item report updated successfully."
+                ),
                 "data": response_serializer.data,
             },
             status=status.HTTP_200_OK,

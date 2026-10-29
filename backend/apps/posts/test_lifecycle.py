@@ -258,3 +258,58 @@ class TestReviewSlaWatchdog:
         make_post(status=Post.Status.APPROVED, created_at=timezone.now() - timedelta(days=3))
         assert run_post_lifecycle()["overdue_reviews_flagged"] == 0
         assert not admin_user.notifications.exists()
+
+
+@pytest.mark.django_db
+class TestResubmissionAfterInfoRequest:
+    def test_author_update_sends_the_report_back_for_review(self, client, owner, admin_user, make_post):
+        post = make_post(status=Post.Status.PENDING)
+        client.force_authenticate(user=admin_user)
+        client.post(
+            f"/api/v1/adminpanel/posts/{post.id}/review/",
+            {"action": "INFO_REQUESTED", "remarks": "What brand is the bottle?"},
+        )
+
+        client.force_authenticate(user=owner)
+        res = client.patch(
+            f"/api/v1/posts/lost/{post.id}/",
+            {"description": "Blue Milton Thermosteel bottle with a dent near the cap"},
+            format="json",
+        )
+        assert res.status_code == 200
+        assert res.data["data"]["status"] == "PENDING"
+
+        post.refresh_from_db()
+        assert post.status == Post.Status.PENDING
+        assert "Thermosteel" in post.description
+        log = PostAuditLog.objects.get(post=post, action="RESUBMIT")
+        assert (log.previous_status, log.new_status, log.admin) == ("INFO_REQUESTED", "PENDING", owner)
+
+        client.force_authenticate(user=admin_user)
+        queue = client.get("/api/v1/adminpanel/posts/?status=PENDING")
+        assert str(post.id) in [item["id"] for item in queue.data["data"]]
+
+    def test_resubmission_rearms_the_sla_alert(self, client, owner, make_post):
+        post = make_post(status=Post.Status.INFO_REQUESTED, sla_alert_sent_at=timezone.now() - timedelta(days=1))
+        client.force_authenticate(user=owner)
+        client.patch(f"/api/v1/posts/lost/{post.id}/", {"title": "Blue Milton bottle (steel)"}, format="json")
+
+        post.refresh_from_db()
+        assert post.sla_alert_sent_at is None
+
+    def test_editing_a_pending_report_does_not_log_a_resubmission(self, client, owner, make_post):
+        post = make_post(status=Post.Status.PENDING)
+        client.force_authenticate(user=owner)
+        client.patch(f"/api/v1/posts/lost/{post.id}/", {"title": "Blue bottle"}, format="json")
+
+        post.refresh_from_db()
+        assert post.status == Post.Status.PENDING
+        assert not PostAuditLog.objects.filter(action="RESUBMIT").exists()
+
+    def test_admin_edit_keeps_the_info_request_open(self, client, admin_user, make_post):
+        post = make_post(status=Post.Status.INFO_REQUESTED)
+        client.force_authenticate(user=admin_user)
+        client.patch(f"/api/v1/posts/lost/{post.id}/", {"title": "Blue bottle"}, format="json")
+
+        post.refresh_from_db()
+        assert post.status == Post.Status.INFO_REQUESTED
