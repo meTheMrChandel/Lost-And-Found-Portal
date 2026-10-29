@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from apps.accounts.permissions import IsNotBanned, IsOwnerOrAdmin
+from apps.adminpanel.models import PostAuditLog
 from apps.posts.models import Category, Post, PostImage, AbuseReport, SiteSettings
 from apps.posts.serializers import (
     CategorySerializer,
@@ -270,6 +271,15 @@ class LostPostDetailView(APIView):
         if post.author != request.user and not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("You do not have permission to withdraw this report.")
 
+        is_author = post.author == request.user
+        PostAuditLog.objects.create(
+            post=post,
+            admin=request.user,
+            action="WITHDRAW" if is_author else "DELETE",
+            previous_status=post.status,
+            new_status="DELETED",
+            notes="Report withdrawn by its author." if is_author else "Report deleted by an administrator.",
+        )
         post.delete()
         return Response(
             {"success": True, "message": "Report has been withdrawn and removed."},

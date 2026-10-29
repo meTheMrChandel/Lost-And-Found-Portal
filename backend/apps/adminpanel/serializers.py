@@ -69,7 +69,6 @@ class AcceptAdminInviteSerializer(serializers.Serializer):
 class PostAuditLogSerializer(serializers.ModelSerializer):
     """Serializer for reviewing administrative actions on posts."""
     admin_email = serializers.EmailField(source="admin.email", read_only=True)
-    post_title = serializers.CharField(source="post.title", read_only=True)
 
     class Meta:
         model = PostAuditLog

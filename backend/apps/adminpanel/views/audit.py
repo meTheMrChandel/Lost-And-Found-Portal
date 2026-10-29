@@ -24,7 +24,8 @@ class PostAuditLogListView(APIView):
         logs = PostAuditLog.objects.select_related("post", "admin").all().order_by("-created_at")
         post_id = request.query_params.get("post_id")
         if post_id:
-            logs = logs.filter(post_id=post_id)
+            # post_ref still matches after the post itself is deleted
+            logs = logs.filter(post_ref=post_id)
 
         serializer = PostAuditLogSerializer(logs, many=True)
         return Response({"success": True, "data": serializer.data}, status=status.HTTP_200_OK)
