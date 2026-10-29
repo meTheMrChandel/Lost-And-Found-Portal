@@ -3,7 +3,6 @@ posts/views.py — API views for Category listing, Lost Post reporting, and My R
 """
 
 import uuid
-from datetime import timedelta
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
@@ -18,6 +17,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from apps.accounts.permissions import IsNotBanned, IsOwnerOrAdmin
 from apps.adminpanel.models import PostAuditLog
+from apps.posts.lifecycle import new_expiry_date
 from apps.posts.models import Category, Post, PostImage, AbuseReport, SiteSettings
 from apps.posts.serializers import (
     CategorySerializer,
@@ -497,7 +497,9 @@ class PostReportAbuseView(APIView):
 class PostRenewView(APIView):
     """
     POST /api/v1/posts/<id>/renew/
-    Author extends active listing by post_expiry_days (default 30 days).
+    Author extends a live or expired listing by post_expiry_days (default 30 days).
+    An expired post goes back on the feed; posts still in review, rejected,
+    hidden or returned cannot be renewed.
     """
 
     permission_classes = [IsAuthenticated, IsNotBanned]
@@ -511,12 +513,28 @@ class PostRenewView(APIView):
         if post.author != request.user and not (request.user.is_staff or request.user.is_superuser):
             raise PermissionDenied("Only the post author can renew this listing.")
 
-        site_settings = SiteSettings.get()
-        expiry_days = site_settings.post_expiry_days or 30
+        if post.status not in [Post.Status.APPROVED, Post.Status.EXPIRED]:
+            raise ValidationError(
+                f"Only live or expired posts can be renewed, not posts in status '{post.get_status_display()}'."
+            )
 
-        post.expires_at = timezone.now() + timedelta(days=expiry_days)
-        post.renewed_at = timezone.now()
+        now = timezone.now()
+        previous_status = post.status
+        post.status = Post.Status.APPROVED
+        post.expires_at = new_expiry_date(now)
+        post.renewed_at = now
+        post.expiry_reminder_sent_at = None
         post.save()
+
+        expiry_days = SiteSettings.get().post_expiry_days or 30
+        PostAuditLog.objects.create(
+            post=post,
+            admin=request.user,
+            action="RENEW",
+            previous_status=previous_status,
+            new_status=post.status,
+            notes=f"Renewed for {expiry_days} days, until {timezone.localtime(post.expires_at):%d %b %Y}.",
+        )
 
         return Response(
             {
@@ -524,6 +542,7 @@ class PostRenewView(APIView):
                 "message": f"Post renewed for {expiry_days} additional days.",
                 "data": {
                     "id": post.id,
+                    "status": post.status,
                     "expires_at": post.expires_at,
                     "renewed_at": post.renewed_at,
                 },

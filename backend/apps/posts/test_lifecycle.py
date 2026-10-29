@@ -164,3 +164,48 @@ class TestRenewalReminder:
 
         post.refresh_from_db()
         assert post.expiry_reminder_sent_at is None
+
+
+@pytest.mark.django_db
+class TestRenewal:
+    def test_renewing_an_expired_post_puts_it_back_on_the_feed(self, client, owner, make_post):
+        post = make_post(expires_at=timezone.now() - timedelta(days=1))
+        run_post_lifecycle()
+
+        client.force_authenticate(user=owner)
+        res = client.post(f"/api/v1/posts/{post.id}/renew/")
+        assert res.status_code == 200
+        assert res.data["data"]["status"] == "APPROVED"
+
+        post.refresh_from_db()
+        assert post.status == Post.Status.APPROVED
+        assert days_from_now(post.expires_at) == 30
+        log = PostAuditLog.objects.get(post=post, action="RENEW")
+        assert (log.previous_status, log.new_status, log.admin) == ("EXPIRED", "APPROVED", owner)
+
+    def test_renewal_rearms_the_reminder(self, client, owner, make_post):
+        post = make_post(expires_at=timezone.now() + timedelta(days=2))
+        run_post_lifecycle()
+        post.refresh_from_db()
+        assert post.expiry_reminder_sent_at is not None
+
+        client.force_authenticate(user=owner)
+        client.post(f"/api/v1/posts/{post.id}/renew/")
+        post.refresh_from_db()
+        assert post.expiry_reminder_sent_at is None
+        assert post.renewed_at is not None
+
+    @pytest.mark.parametrize(
+        "status",
+        [Post.Status.PENDING, Post.Status.INFO_REQUESTED, Post.Status.REJECTED, Post.Status.HIDDEN, Post.Status.RETURNED],
+    )
+    def test_posts_outside_the_feed_lifecycle_cannot_be_renewed(self, client, owner, make_post, status):
+        post = make_post(status=status)
+        client.force_authenticate(user=owner)
+        res = client.post(f"/api/v1/posts/{post.id}/renew/")
+        assert res.status_code == 400
+
+        post.refresh_from_db()
+        assert post.status == status
+        assert post.renewed_at is None
+        assert not PostAuditLog.objects.filter(action="RENEW").exists()
