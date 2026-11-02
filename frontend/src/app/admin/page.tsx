@@ -1,29 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/api";
+import { useEffect } from "react";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { AdminStats } from "@/types/post";
 import Link from "next/link";
 
-export default function AdminOverviewPage() {
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [loading, setLoading] = useState(true);
+const REFRESH_INTERVAL_MS = 30_000;
 
+const formatTime = (timestamp: number) =>
+  new Date(timestamp).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+export default function AdminOverviewPage() {
+  const { data, error, refresh, updatedAt } = useApiQuery<{ data?: AdminStats }>(
+    "/adminpanel/statistics/",
+    "Failed to load campus statistics."
+  );
+  const stats = data?.data ?? null;
+  // Only the first load counts as loading: background refreshes keep the current numbers on screen
+  const loading = !stats && !error;
+  // A dash, not a zero, when the numbers could not be loaded
+  const metric = (value: number | undefined) => (loading ? "..." : value ?? "—");
+
+  // Keep the numbers current, but don't poll from a tab nobody is looking at
   useEffect(() => {
-    async function fetchStats() {
-      try {
-        const res = await apiClient("/adminpanel/statistics/");
-        if (res?.data) {
-          setStats(res.data);
-        }
-      } catch (err) {
-        console.error("Failed to load admin stats:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchStats();
-  }, []);
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const timer = setInterval(refreshIfVisible, REFRESH_INTERVAL_MS);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [refresh]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -37,13 +46,31 @@ export default function AdminOverviewPage() {
             Campus-wide Lost & Found case queue, moderation decisions, and live statistics.
           </p>
         </div>
-        <Link
-          href="/admin/cases"
-          className="self-start md:self-auto px-5 py-2.5 rounded-xl bg-[#047857] hover:bg-[#10B981] text-white text-xs font-bold shadow-sm transition-all"
-        >
-          Open Case Queue →
-        </Link>
+        <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
+          {updatedAt && (
+            <span className="text-[11px] text-[#6B7280]">Updated {formatTime(updatedAt)}</span>
+          )}
+          <button
+            onClick={refresh}
+            className="px-4 py-2.5 rounded-xl bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-xs font-semibold shadow-sm transition-all cursor-pointer"
+          >
+            ↻ Refresh
+          </button>
+          <Link
+            href="/admin/cases"
+            className="px-5 py-2.5 rounded-xl bg-[#047857] hover:bg-[#10B981] text-white text-xs font-bold shadow-sm transition-all"
+          >
+            Open Case Queue →
+          </Link>
+        </div>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-2xl bg-[#D94F3B]/10 border border-[#D94F3B]/20 text-[#D94F3B] text-sm font-medium">
+          {error}
+          {updatedAt && ` Showing the numbers from ${formatTime(updatedAt)}.`}
+        </div>
+      )}
 
       {/* Case Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -64,7 +91,7 @@ export default function AdminOverviewPage() {
               )}
             </div>
             <span className="font-serif text-4xl font-bold text-[#1C1C1E]">
-              {loading ? "..." : stats?.posts.pending ?? 0}
+              {metric(stats?.posts.pending)}
             </span>
           </div>
           <span className="text-xs text-[#047857] font-semibold mt-3 block">
@@ -82,7 +109,7 @@ export default function AdminOverviewPage() {
               Active on Feed
             </span>
             <span className="font-serif text-4xl font-bold text-[#047857]">
-              {loading ? "..." : stats?.posts.approved ?? 0}
+              {metric(stats?.posts.approved)}
             </span>
           </div>
           <span className="text-xs text-[#6B7280] mt-3 block">
@@ -97,7 +124,7 @@ export default function AdminOverviewPage() {
               Successfully Returned
             </span>
             <span className="font-serif text-4xl font-bold text-[#047857]">
-              {loading ? "..." : stats?.posts.returned ?? 0}
+              {metric(stats?.posts.returned)}
             </span>
           </div>
           <span className="text-xs text-[#6B7280] mt-3 block">
@@ -115,7 +142,7 @@ export default function AdminOverviewPage() {
               Abuse Reports
             </span>
             <span className="font-serif text-4xl font-bold text-[#D94F3B]">
-              {loading ? "..." : stats?.abuse_reports.pending ?? 0}
+              {metric(stats?.abuse_reports.pending)}
             </span>
           </div>
           <span className="text-xs text-[#D94F3B] font-semibold mt-3 block">
@@ -134,7 +161,9 @@ export default function AdminOverviewPage() {
 
           {loading ? (
             <p className="text-xs text-[#6B7280]">Loading category metrics...</p>
-          ) : stats?.category_breakdown && stats.category_breakdown.length > 0 ? (
+          ) : !stats ? (
+            <p className="text-xs text-[#6B7280]">Category metrics are unavailable right now.</p>
+          ) : stats.category_breakdown.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {stats.category_breakdown.map((cat) => (
                 <div
@@ -165,19 +194,19 @@ export default function AdminOverviewPage() {
               <div className="flex justify-between pb-2 border-b border-[#EFEAE0]">
                 <span className="text-[#6B7280]">Registered Students</span>
                 <span className="font-bold text-[#1C1C1E]">
-                  {stats?.users.students ?? 0}
+                  {metric(stats?.users.students)}
                 </span>
               </div>
               <div className="flex justify-between pb-2 border-b border-[#EFEAE0]">
                 <span className="text-[#6B7280]">New This Week</span>
                 <span className="font-bold text-[#047857]">
-                  +{stats?.users.new_this_week ?? 0}
+                  {stats ? `+${stats.users.new_this_week}` : metric(undefined)}
                 </span>
               </div>
               <div className="flex justify-between pb-2 border-b border-[#EFEAE0]">
                 <span className="text-[#6B7280]">Suspended Accounts</span>
                 <span className="font-bold text-[#D94F3B]">
-                  {stats?.users.banned ?? 0}
+                  {metric(stats?.users.banned)}
                 </span>
               </div>
             </div>

@@ -7,6 +7,8 @@ interface QueryState<T> {
   key: string;
   data: T | undefined;
   error: string;
+  /** When `data` last came back from the server. */
+  updatedAt?: number;
 }
 
 /**
@@ -24,7 +26,7 @@ export function useApiQuery<T>(endpoint: string | null, fallbackError: string) {
     let cancelled = false;
     apiClient<T>(endpoint)
       .then((res) => {
-        if (!cancelled) setState({ key, data: res, error: "" });
+        if (!cancelled) setState({ key, data: res, error: "", updatedAt: Date.now() });
       })
       .catch((err) => {
         if (!cancelled) {
@@ -32,6 +34,7 @@ export function useApiQuery<T>(endpoint: string | null, fallbackError: string) {
             key,
             data: prev?.data,
             error: getErrorMessage(err, fallbackError),
+            updatedAt: prev?.updatedAt,
           }));
         }
       });
@@ -48,6 +51,7 @@ export function useApiQuery<T>(endpoint: string | null, fallbackError: string) {
     data: state?.data,
     loading,
     error: !loading && state ? state.error : "",
+    updatedAt: state?.updatedAt,
     refresh,
   };
 }
