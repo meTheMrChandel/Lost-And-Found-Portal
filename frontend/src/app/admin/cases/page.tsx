@@ -1,22 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { Category, Post, PostStatus } from "@/types/post";
 
-export default function AdminCaseQueuePage() {
+function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: string; initialSlaBreached: boolean }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [actionError, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
-  const [slaBreachedOnly, setSlaBreachedOnly] = useState(false);
+  const [slaBreachedOnly, setSlaBreachedOnly] = useState(initialSlaBreached);
 
   // Review modal
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -125,7 +126,7 @@ export default function AdminCaseQueuePage() {
       badgeClass = isSlaBreached
         ? "bg-[#D94F3B] text-white animate-pulse"
         : "bg-[#F5B73B]/20 text-[#B45309]";
-      label = isSlaBreached ? "⚠️ SLA BREACHED (24h+)" : "PENDING REVIEW";
+      label = isSlaBreached ? "⚠️ SLA BREACHED" : "PENDING REVIEW";
     } else if (status === "APPROVED") {
       badgeClass = "bg-[#047857]/15 text-[#047857]";
       label = "APPROVED / LIVE";
@@ -692,5 +693,26 @@ export default function AdminCaseQueuePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// The overview links here with filters in the URL (e.g. ?status=PENDING). Keyed on them
+// so following another link, including the plain Case Queue tab, starts from its filters.
+function CaseQueueFromUrl() {
+  const searchParams = useSearchParams();
+  return (
+    <CaseQueue
+      key={searchParams.toString()}
+      initialStatus={searchParams.get("status")?.toUpperCase() || "ALL"}
+      initialSlaBreached={searchParams.get("sla_breached") === "true"}
+    />
+  );
+}
+
+export default function AdminCaseQueuePage() {
+  return (
+    <Suspense fallback={<p className="text-xs text-[#6B7280]">Loading case queue...</p>}>
+      <CaseQueueFromUrl />
+    </Suspense>
   );
 }

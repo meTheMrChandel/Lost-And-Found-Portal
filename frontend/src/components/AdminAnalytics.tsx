@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AdminStats } from "@/types/post";
 
 function percent(part: number, whole: number): string {
@@ -69,7 +70,13 @@ export function SlaGaugeCard({ posts }: { posts: AdminStats["posts"] }) {
         {posts.pending > 0 ? (
           <div className="text-xs space-y-2">
             <p className="font-semibold text-[#047857]">{onTime} within the review window</p>
-            <p className="font-semibold text-[#D94F3B]">{overdue} overdue</p>
+            {overdue > 0 ? (
+              <Link href="/admin/cases?sla_breached=true" className="block font-semibold text-[#D94F3B] hover:underline">
+                {overdue} overdue →
+              </Link>
+            ) : (
+              <p className="font-semibold text-[#D94F3B]">0 overdue</p>
+            )}
           </div>
         ) : (
           <p className="text-xs text-[#6B7280]">Nothing waiting for review.</p>
