@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useApiQuery } from "@/lib/useApiQuery";
+import { RecoveryRateCard } from "@/components/AdminAnalytics";
 import { AdminStats } from "@/types/post";
 import Link from "next/link";
 
@@ -121,14 +122,14 @@ export default function AdminOverviewPage() {
         <div className="p-6 rounded-3xl bg-white border border-[#E2DDD2] shadow-sm flex flex-col justify-between">
           <div>
             <span className="text-xs font-bold text-[#6B7280] uppercase tracking-wider block mb-1">
-              Successfully Returned
+              Reports Returned
             </span>
             <span className="font-serif text-4xl font-bold text-[#047857]">
               {metric(stats?.posts.returned)}
             </span>
           </div>
           <span className="text-xs text-[#6B7280] mt-3 block">
-            Reunited with rightful owners
+            Lost and found reports closed by a handover
           </span>
         </div>
 
@@ -150,6 +151,13 @@ export default function AdminOverviewPage() {
           </span>
         </Link>
       </div>
+
+      {/* Campus Analytics */}
+      {stats && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RecoveryRateCard posts={stats.posts} />
+        </div>
+      )}
 
       {/* Middle Section: Categories & Quick Links */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
