@@ -8,6 +8,7 @@ import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { Post, PostStatus } from "@/types/post";
 import Logo from "@/components/Logo";
+import InfoReplyForm from "@/components/InfoReplyForm";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import HeaderAccount from "@/components/HeaderAccount";
 
@@ -399,6 +400,24 @@ function MyReportsContent() {
                 <p className="text-[#1C1C1E]">{selectedReport.admin_remarks}</p>
               </div>
             )}
+
+            {/* Answer an admin's request for more information */}
+            {selectedReport.status === "INFO_REQUESTED" &&
+              (selectedReport.post_type === "LOST" ? (
+                <InfoReplyForm
+                  key={selectedReport.id}
+                  postId={selectedReport.id}
+                  onSent={(message) => {
+                    setActionMsg(message);
+                    setSelectedReport(null);
+                    refresh();
+                  }}
+                />
+              ) : (
+                <p className="text-xs text-[#6B7280]">
+                  Found reports can&apos;t be edited online yet. Please give these details to the admin office.
+                </p>
+              ))}
 
             {/* Actions for Pending or Info Requested */}
             <div className="pt-4 border-t border-[#EFEAE0] flex justify-between items-center">
