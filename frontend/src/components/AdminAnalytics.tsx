@@ -34,3 +34,47 @@ export function RecoveryRateCard({ posts }: { posts: AdminStats["posts"] }) {
     </div>
   );
 }
+
+export function SlaGaugeCard({ posts }: { posts: AdminStats["posts"] }) {
+  // Counted by separate queries, so overdue can briefly exceed pending between the two
+  const overdue = Math.min(posts.sla_breached, posts.pending);
+  const onTime = posts.pending - overdue;
+  const onTimeShare = posts.pending > 0 ? Math.round((onTime / posts.pending) * 100) : 0;
+  const arc = "M 10 60 A 50 50 0 0 1 110 60";
+
+  return (
+    <div className="p-6 rounded-3xl bg-white border border-[#E2DDD2] shadow-sm">
+      <h2 className="font-serif text-lg font-bold text-[#1C1C1E] mb-4">Review SLA</h2>
+      <div className="flex items-center gap-6">
+        <svg
+          viewBox="0 0 120 68"
+          className="w-40 shrink-0"
+          role="img"
+          aria-label={
+            posts.pending > 0
+              ? `${onTimeShare}% of pending reports are within the review window`
+              : "No reports are waiting for review"
+          }
+        >
+          <path d={arc} fill="none" strokeWidth="12" stroke={posts.pending > 0 ? "#D94F3B" : "#EFEAE0"} />
+          {onTime > 0 && (
+            <path d={arc} fill="none" strokeWidth="12" stroke="#047857" pathLength={100} strokeDasharray={`${onTimeShare} 100`} />
+          )}
+          {posts.pending > 0 && (
+            <text x="60" y="58" textAnchor="middle" className="font-serif text-[22px] font-bold" fill="#1C1C1E">
+              {onTimeShare}%
+            </text>
+          )}
+        </svg>
+        {posts.pending > 0 ? (
+          <div className="text-xs space-y-2">
+            <p className="font-semibold text-[#047857]">{onTime} within the review window</p>
+            <p className="font-semibold text-[#D94F3B]">{overdue} overdue</p>
+          </div>
+        ) : (
+          <p className="text-xs text-[#6B7280]">Nothing waiting for review.</p>
+        )}
+      </div>
+    </div>
+  );
+}

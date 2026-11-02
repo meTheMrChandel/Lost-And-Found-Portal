@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useApiQuery } from "@/lib/useApiQuery";
-import { RecoveryRateCard } from "@/components/AdminAnalytics";
+import { RecoveryRateCard, SlaGaugeCard } from "@/components/AdminAnalytics";
 import { AdminStats } from "@/types/post";
 import Link from "next/link";
 
@@ -156,6 +156,7 @@ export default function AdminOverviewPage() {
       {stats && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <RecoveryRateCard posts={stats.posts} />
+          <SlaGaugeCard posts={stats.posts} />
         </div>
       )}
 
