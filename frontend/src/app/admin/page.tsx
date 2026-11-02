@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useApiQuery } from "@/lib/useApiQuery";
-import { RecoveryRateCard, SlaGaugeCard } from "@/components/AdminAnalytics";
+import { CategoryMix, RecoveryRateCard, SlaGaugeCard } from "@/components/AdminAnalytics";
 import { AdminStats } from "@/types/post";
 import Link from "next/link";
 
@@ -162,34 +162,18 @@ export default function AdminOverviewPage() {
 
       {/* Middle Section: Categories & Quick Links */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Category Breakdown (2 columns) */}
+        {/* Category Mix (2 columns) */}
         <div className="lg:col-span-2 p-6 rounded-3xl bg-white border border-[#E2DDD2] shadow-sm">
           <h2 className="font-serif text-lg font-bold text-[#1C1C1E] mb-4">
-            Items Reported by Category
+            Category Mix
           </h2>
 
           {loading ? (
             <p className="text-xs text-[#6B7280]">Loading category metrics...</p>
           ) : !stats ? (
             <p className="text-xs text-[#6B7280]">Category metrics are unavailable right now.</p>
-          ) : stats.category_breakdown.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {stats.category_breakdown.map((cat) => (
-                <div
-                  key={cat.slug}
-                  className="p-3 rounded-2xl bg-[#FAF7F2] border border-[#EFEAE0] flex flex-col justify-between"
-                >
-                  <span className="text-xs font-medium text-[#6B7280] capitalize">
-                    {cat.name}
-                  </span>
-                  <span className="font-serif text-xl font-bold text-[#1C1C1E] mt-1">
-                    {cat.posts_count}
-                  </span>
-                </div>
-              ))}
-            </div>
           ) : (
-            <p className="text-xs text-[#6B7280]">No categories reported yet.</p>
+            <CategoryMix categories={stats.category_breakdown} />
           )}
         </div>
 

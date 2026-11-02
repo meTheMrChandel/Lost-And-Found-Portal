@@ -78,3 +78,43 @@ export function SlaGaugeCard({ posts }: { posts: AdminStats["posts"] }) {
     </div>
   );
 }
+
+export function CategoryMix({ categories }: { categories: AdminStats["category_breakdown"] }) {
+  const reported = categories
+    .filter((category) => category.posts_count > 0)
+    .sort((a, b) => b.posts_count - a.posts_count);
+  const total = reported.reduce((sum, category) => sum + category.posts_count, 0);
+  const emptyCount = categories.length - reported.length;
+
+  if (total === 0) {
+    return <p className="text-xs text-[#6B7280]">No categories reported yet.</p>;
+  }
+
+  return (
+    <>
+      <ul aria-label="Category mix" className="space-y-3">
+        {reported.map((category) => (
+          <li key={category.slug}>
+            <div className="flex justify-between text-xs mb-1">
+              <span className="font-medium text-[#1C1C1E] capitalize">{category.name}</span>
+              <span className="text-[#6B7280]">
+                {category.posts_count} · {percent(category.posts_count, total)}
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-[#EFEAE0] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[#047857]"
+                style={{ width: `${(category.posts_count / total) * 100}%` }}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+      {emptyCount > 0 && (
+        <p className="text-[11px] text-[#6B7280] mt-4">
+          {emptyCount === 1 ? "1 other category has no reports." : `${emptyCount} other categories have no reports.`}
+        </p>
+      )}
+    </>
+  );
+}
