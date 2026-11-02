@@ -121,7 +121,7 @@ npm run dev
 
 ## 📋 Phase 4: Admin Portal & Case Queue (Completed)
 
-- **Case Queue & Filtering:** Centralized administrative case queue (`/api/v1/adminpanel/posts/`) with filtering by status, category, post type, SLA overdue detection (>24h pending), and text search.
+- **Case Queue & Filtering:** Centralized administrative case queue (`/api/v1/adminpanel/posts/`) with filtering by status, category, post type, SLA overdue detection (pending longer than `admin_review_sla_hours`, default 24h), and text search.
 - **Interactive Review & Moderation:** Endpoint (`/api/v1/adminpanel/posts/<id>/review/`) supporting actions: `APPROVE` (publish to feed), `REJECT` (with mandatory reason), `INFO_REQUESTED` (request clarifications from student), `CHANGE_CATEGORY`, and `HIDE`.
 - **Abuse & Flagged Content Review:** Listing and resolving user-submitted abuse reports (`/api/v1/adminpanel/abuse-reports/`).
 - **Platform Analytics:** Real-time metrics endpoint (`/api/v1/adminpanel/statistics/`) calculating pending review counts, SLA breaches, category breakdown, community health, and recent audit activity.
@@ -144,6 +144,22 @@ npm run dev
   - `/report/found`: "I Found Something" multi-section form with custody options, private admin disclosure, and photo upload.
   - Homepage navigation bar and quick action banner updated with links to Feed and Found reporting.
 - **Automated Tests:** 7 comprehensive integration test cases validating found post creation, private admin disclosure, sensitive category suppression, feed filtering, abuse reporting, and post renewal. (39/39 tests passing across repository).
+
+---
+
+## 📋 Post Lifecycle & Governance
+
+- **Status flow:** `PENDING` → admin review → `APPROVED` / `REJECTED` / `INFO_REQUESTED`. When the author edits an `INFO_REQUESTED` report it goes back to `PENDING` for another review. `APPROVED` posts later become `EXPIRED` (not renewed) or `RETURNED`; admins can also `HIDE` or delete a post.
+- **30-day expiry, from approval:** approving a post sets `expires_at` to `SiteSettings.post_expiry_days` (default 30) from the approval time.
+- **Periodic job (`apps/posts/lifecycle.py`):** `run_post_lifecycle()` runs every hour through Celery beat (`apps.posts.tasks.run_post_lifecycle`), or by hand with `python manage.py run_lifecycle`. Each run:
+  - sends the owner one "expiring soon" notification when 5 days or fewer are left
+  - moves `APPROVED` posts past `expires_at` to `EXPIRED`, which takes them off the feed, and notifies the owner
+  - alerts every admin once about reports still `PENDING` after `SiteSettings.admin_review_sla_hours` (default 24)
+  - Running it twice never repeats a reminder, an expiry or an alert.
+- **Renewal (`POST /api/v1/posts/<id>/renew/`):** one click extends an `APPROVED` or `EXPIRED` post by `post_expiry_days` and puts an expired post back on the feed. Posts in other statuses cannot be renewed.
+- **Review SLA:** the case queue's `?sla_breached=true` filter, the `is_sla_breached` flag and the dashboard's overdue count all use `admin_review_sla_hours`.
+- **Audit log (`PostAuditLog`):** every status change is recorded with the previous and new status, the actor (empty for automatic expiry), the time and notes: `APPROVE`, `REJECT`, `INFO_REQUESTED`, `RESUBMIT`, `HIDE`, `CHANGE_CATEGORY`, `RENEW`, `EXPIRE`, `WITHDRAW`, `DELETE`. Entries are append-only (edits and deletes raise `ImmutableAuditLogError`, and the Django admin view is read-only), and they outlive the post: `post_ref` and `post_title` keep which post an entry was about after it is deleted.
+- **Automated Tests:** `apps/posts/test_lifecycle.py` and `apps/adminpanel/test_audit_log.py` (128/128 tests passing across repository).
 
 ---
 

@@ -12,6 +12,7 @@ from drf_spectacular.utils import extend_schema
 
 from apps.accounts.models import User
 from apps.accounts.permissions import IsCampusAdmin
+from apps.posts.lifecycle import sla_cutoff
 from apps.posts.models import AbuseReport, Category, Post
 from apps.adminpanel.models import PostAuditLog
 from apps.adminpanel.serializers import PostAuditLogSerializer
@@ -28,7 +29,6 @@ class AdminStatisticsView(APIView):
     @extend_schema(responses={200: dict})
     def get(self, request):
         now = timezone.now()
-        yesterday = now - timedelta(days=1)
         last_7_days = now - timedelta(days=7)
 
         # User metrics
@@ -50,10 +50,10 @@ class AdminStatisticsView(APIView):
         lost_count = Post.objects.filter(post_type=Post.PostType.LOST).count()
         found_count = Post.objects.filter(post_type=Post.PostType.FOUND).count()
 
-        # SLA breach: pending cases older than 24h
+        # SLA breach: pending cases older than SiteSettings.admin_review_sla_hours
         sla_breached_count = Post.objects.filter(
             status=Post.Status.PENDING,
-            created_at__lt=yesterday,
+            created_at__lt=sla_cutoff(now),
         ).count()
 
         # Abuse reports

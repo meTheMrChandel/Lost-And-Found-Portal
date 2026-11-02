@@ -11,11 +11,38 @@ from django.utils.translation import gettext_lazy as _
 from apps.posts.models import Post
 
 
+class ImmutableAuditLogError(RuntimeError):
+    """Raised on any attempt to change or delete a written audit log entry."""
+
+
+class PostAuditLogQuerySet(models.QuerySet):
+    """Audit entries are append-only, so bulk updates and deletes are refused."""
+
+    def update(self, **kwargs):
+        raise ImmutableAuditLogError("Audit log entries cannot be changed.")
+
+    def delete(self):
+        raise ImmutableAuditLogError("Audit log entries cannot be deleted.")
+
+
 class PostAuditLog(models.Model):
-    """Immutable record of every admin action on a post."""
+    """
+    Immutable record of every status change and admin action on a post.
+
+    Entries outlive the post: deleting a post only clears the foreign key, and
+    post_ref / post_title keep a copy of which post it was.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="audit_logs")
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_logs",
+    )
+    post_ref = models.UUIDField(_("post id"), null=True, blank=True, db_index=True, editable=False)
+    post_title = models.CharField(_("post title"), max_length=200, blank=True, editable=False)
     admin = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -28,13 +55,26 @@ class PostAuditLog(models.Model):
     notes = models.TextField(_("notes"), blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = PostAuditLogQuerySet.as_manager()
+
     class Meta:
         verbose_name = _("post audit log")
         verbose_name_plural = _("post audit logs")
         ordering = ["-created_at"]
 
     def __str__(self) -> str:
-        return f"AuditLog(post={self.post_id}, {self.action})"
+        return f"AuditLog(post={self.post_ref}, {self.action})"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ImmutableAuditLogError("Audit log entries cannot be changed once written.")
+        if self.post_id:
+            self.post_ref = self.post_id
+            self.post_title = self.post.title
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ImmutableAuditLogError("Audit log entries cannot be deleted.")
 
 
 class AdminInvite(models.Model):

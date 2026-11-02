@@ -8,6 +8,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
 from decouple import Csv, config
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
@@ -227,6 +228,14 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+# The DatabaseScheduler copies these into django_celery_beat's tables when beat starts
+CELERY_BEAT_SCHEDULE = {
+    # Renewal reminders, auto-expiry and review SLA alerts (apps/posts/lifecycle.py)
+    "post-lifecycle-hourly": {
+        "task": "apps.posts.tasks.run_post_lifecycle",
+        "schedule": crontab(minute=0),
+    },
+}
 
 # ─── Channels (WebSocket) ────────────────────────────────────────────────────
 CHANNEL_LAYERS = {
