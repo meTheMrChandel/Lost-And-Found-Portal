@@ -11,6 +11,8 @@ import Logo from "@/components/Logo";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import HeaderAccount from "@/components/HeaderAccount";
 
+const SEARCH_DELAY_MS = 300;
+
 function FeedContent() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -61,6 +63,12 @@ function FeedContent() {
     setAppliedSearch(searchQuery.trim());
     refresh();
   };
+
+  // Search as the user types, once they pause
+  useEffect(() => {
+    const timer = setTimeout(() => setAppliedSearch(searchQuery.trim()), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     apiClient("/posts/categories/")
@@ -259,7 +267,7 @@ function FeedContent() {
         )}
 
         {/* Posts Grid */}
-        {loading ? (
+        {loading && !feed ? (
           <div className="py-16 text-center text-xs text-[#6B7280]">
             Loading campus feed...
           </div>
