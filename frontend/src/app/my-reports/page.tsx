@@ -47,6 +47,20 @@ function MyReportsContent() {
     }
   };
 
+  const handleRenew = async (postId: string) => {
+    setActionLoading(true);
+    try {
+      const res = await apiClient(`/posts/${postId}/renew/`, { method: "POST" });
+      setActionMsg(res.message || "Report renewed.");
+      refresh();
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to renew report."));
+    } finally {
+      setSelectedReport(null);
+      setActionLoading(false);
+    }
+  };
+
   const getStatusBadge = (status: PostStatus) => {
     switch (status) {
       case "PENDING":
@@ -184,7 +198,7 @@ function MyReportsContent() {
 
         {/* Tab Filters */}
         <div className="flex gap-2 overflow-x-auto pb-2 border-b border-[#EFEAE0]">
-          {["ALL", "PENDING", "APPROVED", "INFO_REQUESTED", "RETURNED", "REJECTED"].map(
+          {["ALL", "PENDING", "APPROVED", "INFO_REQUESTED", "EXPIRED", "RETURNED", "REJECTED"].map(
             (tab) => {
               const count =
                 tab === "ALL"
@@ -269,6 +283,16 @@ function MyReportsContent() {
                   <p className="text-xs text-[#6B7280] line-clamp-2 mb-3">
                     📍 {report.last_seen_place}
                   </p>
+
+                  {report.status === "APPROVED" && report.expires_at && (
+                    <p className="text-[11px] text-[#6B7280] mb-3">
+                      Listed until{" "}
+                      {new Date(report.expires_at).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </p>
+                  )}
 
                   {/* Admin feedback banner if present */}
                   {report.admin_remarks && (
@@ -389,12 +413,23 @@ function MyReportsContent() {
                 </button>
               )}
 
-              <button
-                onClick={() => setSelectedReport(null)}
-                className="ml-auto px-5 py-2.5 rounded-xl bg-[#1C1C1E] hover:bg-black text-white text-xs font-bold transition-all"
-              >
-                Close
-              </button>
+              <div className="ml-auto flex gap-2">
+                {(selectedReport.status === "APPROVED" || selectedReport.status === "EXPIRED") && (
+                  <button
+                    onClick={() => handleRenew(selectedReport.id)}
+                    disabled={actionLoading}
+                    className="px-5 py-2.5 rounded-xl bg-[#047857] hover:bg-[#10B981] text-white text-xs font-bold transition-all disabled:opacity-50"
+                  >
+                    {actionLoading ? "Renewing..." : "Renew Listing"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedReport(null)}
+                  className="px-5 py-2.5 rounded-xl bg-[#1C1C1E] hover:bg-black text-white text-xs font-bold transition-all"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
