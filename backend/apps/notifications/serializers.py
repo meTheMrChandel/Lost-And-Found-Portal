@@ -47,7 +47,20 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_action_url(self, obj: Notification):
         url = ACTION_URLS.get(obj.notif_type)
-        if url is None and (obj.data or {}).get("post_id"):
-            # General notices about one of the user's reports (hidden, removed)
-            url = "/my-reports"
-        return url
+        if url is not None:
+            return url
+
+        data = obj.data or {}
+        if "abuse_report_id" in data:
+            return "/admin/abuse-reports"
+        if data.get("post_id"):
+            # General notices about a post: admins get case-queue alerts (a new report to
+            # review, a case assigned to them), students notices about their own reports
+            return "/admin/cases" if self._viewer_is_staff(obj) else "/my-reports"
+        return None
+
+    def _viewer_is_staff(self, obj: Notification) -> bool:
+        # Users only ever list their own notifications, so the viewer is the recipient
+        request = self.context.get("request")
+        viewer = request.user if request and request.user.is_authenticated else obj.recipient
+        return viewer.is_staff

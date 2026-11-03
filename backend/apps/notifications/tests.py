@@ -107,3 +107,39 @@ class TestNotificationsSystem:
         notice = results["Campus notice"]
         assert notice["message"] == "The admin office is closed on Sunday."
         assert notice["action_url"] is None
+
+    def test_admin_alerts_link_to_the_admin_pages(self, api_client, student_user):
+        """Admins' case-queue alerts open the admin pages; students' post notices open My Reports."""
+        admin = User.objects.create_user(
+            email="notif_admin@iitrpr.ac.in",
+            password="AdminPassword@123",
+            full_name="Notification Admin",
+            registration_number="2020ADM0009",
+            is_staff=True,
+        )
+        for title, data in [
+            ("New lost report to review", {"post_id": "p1"}),
+            ("A case was assigned to you", {"post_id": "p2"}),
+            ("New abuse report", {"post_id": "p3", "abuse_report_id": "a1"}),
+        ]:
+            create_notification(
+                recipient=admin, notif_type=Notification.NotifType.GENERAL, title=title, body="", data=data,
+                send_email_copy=False,
+            )
+        create_notification(
+            recipient=student_user, notif_type=Notification.NotifType.GENERAL, title="Your report was hidden",
+            body="", data={"post_id": "p4"}, send_email_copy=False,
+        )
+
+        api_client.force_authenticate(user=admin)
+        res = api_client.get("/api/v1/notifications/")
+        links = {item["title"]: item["action_url"] for item in res.data.get("results", res.data)}
+        assert links == {
+            "New lost report to review": "/admin/cases",
+            "A case was assigned to you": "/admin/cases",
+            "New abuse report": "/admin/abuse-reports",
+        }
+
+        api_client.force_authenticate(user=student_user)
+        res = api_client.get("/api/v1/notifications/")
+        assert [item["action_url"] for item in res.data.get("results", res.data)] == ["/my-reports"]
