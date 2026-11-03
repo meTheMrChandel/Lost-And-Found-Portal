@@ -34,6 +34,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "date_joined",
         ]
 
+    def validate_photo(self, photo):
+        # Same limits as report photos (apps/posts/views.py)
+        from apps.posts.views import ALLOWED_CONTENT_TYPES, MAX_IMAGE_SIZE_BYTES, _validate_image_magic_bytes
+
+        if photo is None:
+            return photo
+        if photo.size > MAX_IMAGE_SIZE_BYTES:
+            raise serializers.ValidationError("Profile photo must be 5MB or smaller.")
+        if getattr(photo, "content_type", None) not in ALLOWED_CONTENT_TYPES or not _validate_image_magic_bytes(photo):
+            raise serializers.ValidationError("Profile photo must be a JPG, PNG or WEBP image.")
+        return photo
+
 
 class DeviceTokenSerializer(serializers.ModelSerializer):
     """Serializer for registering push notification device tokens."""

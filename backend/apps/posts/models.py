@@ -80,6 +80,11 @@ class SiteSettings(models.Model):
         default=24,
         help_text=_("Remind admin if post not reviewed within this window."),
     )
+    abuse_auto_hide_threshold = models.PositiveSmallIntegerField(
+        _("abuse reports before auto-hide"),
+        default=3,
+        help_text=_("Hide a post once this many different users report it. 0 turns auto-hide off."),
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -192,6 +197,14 @@ class Post(models.Model):
         null=True,
         blank=True,
         related_name="reviewed_posts",
+    )
+    # The admin responsible for following this case up (plan, Phase 4: "assign to another admin")
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_posts",
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
 

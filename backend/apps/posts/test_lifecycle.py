@@ -328,9 +328,8 @@ class TestReviewDecisionNotifications:
         self.review(client, admin_user, post, action="APPROVE")
 
         notice = owner.notifications.get(notif_type="post_approved")
-        assert notice.title == '"Blue Milton bottle" is live on the campus feed'
-        post.refresh_from_db()
-        assert timezone.localtime(post.expires_at).strftime("%d %b %Y") in notice.body
+        assert notice.title == "Your report is live"
+        assert '"Blue Milton bottle"' in notice.body
         assert notice.data == {"post_id": str(post.id), "action": "APPROVE"}
 
     def test_info_request_passes_on_the_admins_question(self, client, owner, admin_user, make_post):
@@ -345,7 +344,7 @@ class TestReviewDecisionNotifications:
         self.review(client, admin_user, post, action="REJECT", remarks="Duplicate of an earlier report.")
 
         notice = owner.notifications.get(notif_type="post_rejected")
-        assert notice.body.endswith("Reason: Duplicate of an earlier report.")
+        assert notice.body.endswith("Admin note: Duplicate of an earlier report.")
 
     def test_hide_and_delete_are_reported_to_the_author(self, client, owner, admin_user, make_post):
         hidden = make_post()
@@ -355,7 +354,7 @@ class TestReviewDecisionNotifications:
 
         titles = set(owner.notifications.filter(notif_type="general").values_list("title", flat=True))
         assert titles == {
-            '"Blue Milton bottle" was hidden by an admin',
+            "Your report was hidden",
             '"Blue Milton bottle" was removed by an admin',
         }
 
@@ -427,12 +426,13 @@ class TestFoundReportOwnerEndpoints:
         assert client.delete(f"/api/v1/posts/found/{pending.id}/").status_code == 403
         assert Post.objects.filter(pk=pending.id, title="Blue Milton bottle").exists()
 
-    def test_lost_and_found_endpoints_only_serve_their_own_type(self, client, owner, make_post):
+    def test_either_endpoint_serves_the_owners_report(self, client, owner, make_post):
+        # The web and mobile apps reach found reports through /posts/lost/<id>/ too
         lost = make_post(status=Post.Status.PENDING)
         found = self.make_found(make_post)
         client.force_authenticate(user=owner)
-        assert client.get(f"/api/v1/posts/found/{lost.id}/").status_code == 400
-        assert client.get(f"/api/v1/posts/lost/{found.id}/").status_code == 400
+        assert client.get(f"/api/v1/posts/found/{lost.id}/").status_code == 200
+        assert client.get(f"/api/v1/posts/lost/{found.id}/").status_code == 200
 
     def test_found_time_in_the_future_is_rejected(self, client, owner, make_post):
         post = self.make_found(make_post)

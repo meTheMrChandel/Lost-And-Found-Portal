@@ -346,6 +346,8 @@ class AbuseReportCreateSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         post = self.context.get("post")
         if request and post:
+            if post.author_id == request.user.id:
+                raise serializers.ValidationError("You can't report your own post.")
             if AbuseReport.objects.filter(post=post, reporter=request.user).exists():
                 raise serializers.ValidationError("You have already reported this post for review.")
         return attrs

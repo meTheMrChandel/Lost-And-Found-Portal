@@ -18,6 +18,11 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 
 from apps.accounts.permissions import IsNotBanned, IsOwnerOrAdmin
 from apps.adminpanel.models import PostAuditLog
+from apps.notifications.events import (
+    notify_admins_abuse_report,
+    notify_admins_new_report,
+    notify_author_auto_hidden,
+)
 from apps.posts.lifecycle import new_expiry_date
 from apps.posts.models import Category, Post, PostImage, AbuseReport, SiteSettings
 from apps.posts.serializers import (
@@ -138,6 +143,8 @@ class LostPostCreateView(APIView):
         if images:
             _process_uploaded_images(post, images)
 
+        notify_admins_new_report(post)
+
         response_serializer = LostPostDetailSerializer(post, context={"request": request})
         return Response(
             {
@@ -191,13 +198,10 @@ class MyReportsListView(APIView):
 
 class OwnPostDetailView(APIView):
     """
-    View, edit or withdraw one report. Shared by the lost and found report endpoints;
-    subclasses set post_type, update_serializer_class and report_label.
-
-    GET    — the author and admins see everything; others only an approved, public post.
-    PATCH  — the author (or an admin) edits while PENDING or INFO_REQUESTED. The author
-             editing an INFO_REQUESTED report sends it back to PENDING for review.
-    DELETE — the author withdraws, or an admin deletes; either is written to the audit log.
+    GET /api/v1/posts/lost/<id>/ — View report details.
+    PATCH /api/v1/posts/lost/<id>/ — Edit report (Author only, when PENDING or INFO_REQUESTED).
+    DELETE /api/v1/posts/lost/<id>/ — Withdraw report (Author or Admin).
+    Serves found reports too: the path predates them, and clients already use it for both.
     """
 
     permission_classes = [IsAuthenticated, IsNotBanned]
@@ -211,13 +215,14 @@ class OwnPostDetailView(APIView):
             post = (
                 Post.objects.select_related("category", "author")
                 .prefetch_related("images")
-                .get(pk=pk, post_type=self.post_type)
+                .get(pk=pk)
             )
         except Post.DoesNotExist:
             raise ValidationError("Post does not exist.")
 
         # Access check: Author, Admin, or Approved public post
         if post.author != user and not (user.is_staff or user.is_superuser):
+            # Found items reported privately to the admin are never public
             if post.status != Post.Status.APPROVED or post.category.is_sensitive or post.inform_admin_privately:
                 raise PermissionDenied("You do not have permission to view this report.")
 
@@ -282,7 +287,7 @@ class OwnPostDetailView(APIView):
                 "message": (
                     "Report updated and sent back for admin review."
                     if resubmitted
-                    else f"{self.report_label} updated successfully."
+                    else "Report updated successfully."
                 ),
                 "data": response_serializer.data,
             },
@@ -385,6 +390,8 @@ class FoundPostCreateView(APIView):
         if images:
             _process_uploaded_images(post, images)
 
+        notify_admins_new_report(post)
+
         response_serializer = LostPostDetailSerializer(post, context={"request": request})
         return Response(
             {
@@ -467,13 +474,37 @@ class PublicFeedView(APIView):
 
         ordering = request.query_params.get("ordering", "-created_at")
         allowed_orderings = ["-created_at", "created_at", "-reward_amount", "reward_amount"]
-        if ordering in allowed_orderings:
-            posts = posts.order_by(ordering)
-        else:
-            posts = posts.order_by("-created_at")
+        if ordering not in allowed_orderings:
+            ordering = "-created_at"
+        # id breaks ties so pages never repeat or skip posts with equal sort values
+        posts = posts.order_by(ordering, "id")
 
-        serializer = PublicFeedPostSerializer(posts, many=True)
-        return Response({"success": True, "data": serializer.data}, status=status.HTTP_200_OK)
+        # Paging is opt-in (?page_size=); without it the full list comes back as before
+        page_size_param = request.query_params.get("page_size")
+        if page_size_param is None:
+            serializer = PublicFeedPostSerializer(posts, many=True)
+            return Response({"success": True, "data": serializer.data}, status=status.HTTP_200_OK)
+        try:
+            page_size = min(max(int(page_size_param), 1), 50)
+            page = max(int(request.query_params.get("page", 1)), 1)
+        except ValueError:
+            raise ValidationError("page and page_size must be whole numbers.")
+        total = posts.count()
+        start = (page - 1) * page_size
+        serializer = PublicFeedPostSerializer(posts[start : start + page_size], many=True)
+        return Response(
+            {
+                "success": True,
+                "data": serializer.data,
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total": total,
+                    "has_next": start + page_size < total,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class PostPublicDetailView(APIView):
@@ -511,6 +542,27 @@ class PostPublicDetailView(APIView):
         return Response({"success": True, "data": serializer.data}, status=status.HTTP_200_OK)
 
 
+def _auto_hide_if_reported_enough(post) -> bool:
+    """Hide a live or pending post once enough different users have reported it. Returns True if hidden now."""
+    threshold = SiteSettings.get().abuse_auto_hide_threshold
+    if not threshold or post.status not in [Post.Status.APPROVED, Post.Status.PENDING]:
+        return False
+    if post.abuse_reports.values("reporter").distinct().count() < threshold:
+        return False
+    previous = post.status
+    post.status = Post.Status.HIDDEN
+    post.save(update_fields=["status", "updated_at"])
+    PostAuditLog.objects.create(
+        post=post,
+        admin=None,
+        action="AUTO_HIDE",
+        previous_status=previous,
+        new_status=Post.Status.HIDDEN,
+        notes=f"Hidden automatically after {threshold} users reported it.",
+    )
+    return True
+
+
 class PostReportAbuseView(APIView):
     """
     POST /api/v1/posts/<id>/report-abuse/
@@ -535,12 +587,16 @@ class PostReportAbuseView(APIView):
         )
         serializer.is_valid(raise_exception=True)
 
-        AbuseReport.objects.create(
+        report = AbuseReport.objects.create(
             post=post,
             reporter=request.user,
             reason=serializer.validated_data["reason"],
             description=serializer.validated_data.get("description", ""),
         )
+        auto_hidden = _auto_hide_if_reported_enough(post)
+        notify_admins_abuse_report(report, auto_hidden)
+        if auto_hidden:
+            notify_author_auto_hidden(post)
 
         return Response(
             {
