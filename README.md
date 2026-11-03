@@ -150,6 +150,8 @@ npm run dev
 ## 📋 Post Lifecycle & Governance
 
 - **Status flow:** `PENDING` → admin review → `APPROVED` / `REJECTED` / `INFO_REQUESTED`. When the author edits an `INFO_REQUESTED` report it goes back to `PENDING` for another review. `APPROVED` posts later become `EXPIRED` (not renewed) or `RETURNED`; admins can also `HIDE` or delete a post.
+- **Owner endpoints:** `GET` / `PATCH` / `DELETE` on `/api/v1/posts/lost/<id>/` and `/api/v1/posts/found/<id>/`. The author can edit while `PENDING` or `INFO_REQUESTED` and can withdraw at any time; both report types follow the same rules. An edit and its photo uploads succeed or fail together.
+- **Review decisions notify the author** (in-app and email): approval (with the date the post stays listed until), rejection (with the reason), an info request (with the admin's question), and hiding or removal.
 - **30-day expiry, from approval:** approving a post sets `expires_at` to `SiteSettings.post_expiry_days` (default 30) from the approval time.
 - **Periodic job (`apps/posts/lifecycle.py`):** `run_post_lifecycle()` runs every hour through Celery beat (`apps.posts.tasks.run_post_lifecycle`), or by hand with `python manage.py run_lifecycle`. Each run:
   - sends the owner one "expiring soon" notification when 5 days or fewer are left
@@ -158,8 +160,9 @@ npm run dev
   - Running it twice never repeats a reminder, an expiry or an alert.
 - **Renewal (`POST /api/v1/posts/<id>/renew/`):** one click extends an `APPROVED` or `EXPIRED` post by `post_expiry_days` and puts an expired post back on the feed. Posts in other statuses cannot be renewed.
 - **Review SLA:** the case queue's `?sla_breached=true` filter, the `is_sla_breached` flag and the dashboard's overdue count all use `admin_review_sla_hours`.
-- **Audit log (`PostAuditLog`):** every status change is recorded with the previous and new status, the actor (empty for automatic expiry), the time and notes: `APPROVE`, `REJECT`, `INFO_REQUESTED`, `RESUBMIT`, `HIDE`, `CHANGE_CATEGORY`, `RENEW`, `EXPIRE`, `WITHDRAW`, `DELETE`. Entries are append-only (edits and deletes raise `ImmutableAuditLogError`, and the Django admin view is read-only), and they outlive the post: `post_ref` and `post_title` keep which post an entry was about after it is deleted.
-- **Automated Tests:** `apps/posts/test_lifecycle.py` and `apps/adminpanel/test_audit_log.py` (128/128 tests passing across repository).
+- **Statistics (`/api/v1/adminpanel/statistics/`):** `posts.expired`, `posts.expiring_soon`, and a `lifecycle` block with `review_sla_hours`, `post_expiry_days` and `renewal_reminder_days`.
+- **Audit log (`PostAuditLog`):** every status change is recorded with the previous and new status, the actor (empty for automatic expiry), the time and notes: `APPROVE`, `REJECT`, `INFO_REQUESTED`, `RESUBMIT`, `HIDE`, `CHANGE_CATEGORY`, `RENEW`, `EXPIRE`, `RETURN` (case closed after handover), `WITHDRAW`, `DELETE`. Entries are append-only (edits and deletes raise `ImmutableAuditLogError`, and the Django admin view is read-only), and they outlive the post: `post_ref` and `post_title` keep which post an entry was about after it is deleted.
+- **Automated Tests:** `apps/posts/test_lifecycle.py` and `apps/adminpanel/test_audit_log.py` (143/143 tests passing across repository).
 
 ---
 
@@ -254,6 +257,7 @@ npm run dev
   - Unified notifications system for match alerts, handover updates, case resolutions, and chat messages.
   - Real-time unread badge counter (`/api/v1/notifications/unread-count/`).
   - Mark single (`/api/v1/notifications/<id>/read/`) or bulk (`/api/v1/notifications/mark-all-read/`) read actions.
+  - Each notification has `notification_type`, `title`, `message` and `action_url` (the web page to open, e.g. `/my-reports`), plus the original `notif_type`, `body` and `data` fields.
 - **Frontend Chat & Notification Suite:**
   - `NotificationBell.tsx`: Interactive navigation dropdown with real-time unread count badge, notification list, and time ago formatting.
   - `/chat`: Campus messaging center with active thread sidebar, live message stream, admin approval workflow, user block toggle, and WebSocket connectivity.
