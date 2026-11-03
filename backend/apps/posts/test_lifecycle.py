@@ -490,3 +490,26 @@ class TestReturnedOnCaseClose:
             log = PostAuditLog.objects.get(post=post, action="RETURN")
             assert (log.previous_status, log.new_status, log.admin) == (previous, "RETURNED", admin_user)
             assert str(match.id) in log.notes
+
+
+@pytest.mark.django_db
+class TestLifecycleStatistics:
+    def test_statistics_report_expiry_counts_and_the_rules_behind_them(self, client, admin_user, make_post):
+        site = SiteSettings.get()
+        site.admin_review_sla_hours = 12
+        site.post_expiry_days = 21
+        site.save()
+        make_post(status=Post.Status.EXPIRED)
+        make_post(expires_at=timezone.now() + timedelta(days=2))  # expiring soon
+        make_post(expires_at=timezone.now() + timedelta(days=15))  # comfortably live
+
+        client.force_authenticate(user=admin_user)
+        data = client.get("/api/v1/adminpanel/statistics/").data["data"]
+
+        assert data["posts"]["expired"] == 1
+        assert data["posts"]["expiring_soon"] == 1
+        assert data["lifecycle"] == {
+            "review_sla_hours": 12,
+            "post_expiry_days": 21,
+            "renewal_reminder_days": 5,
+        }

@@ -12,8 +12,8 @@ from drf_spectacular.utils import extend_schema
 
 from apps.accounts.models import User
 from apps.accounts.permissions import IsCampusAdmin
-from apps.posts.lifecycle import sla_cutoff
-from apps.posts.models import AbuseReport, Category, Post
+from apps.posts.lifecycle import RENEWAL_REMINDER_DAYS, sla_cutoff
+from apps.posts.models import AbuseReport, Category, Post, SiteSettings
 from apps.adminpanel.models import PostAuditLog
 from apps.adminpanel.serializers import PostAuditLogSerializer
 
@@ -45,6 +45,14 @@ class AdminStatisticsView(APIView):
         returned_posts = Post.objects.filter(status=Post.Status.RETURNED).count()
         rejected_posts = Post.objects.filter(status=Post.Status.REJECTED).count()
         hidden_posts = Post.objects.filter(status=Post.Status.HIDDEN).count()
+        expired_posts = Post.objects.filter(status=Post.Status.EXPIRED).count()
+        # Live posts whose owners are due a renewal reminder (or have had one)
+        expiring_soon_posts = Post.objects.filter(
+            status=Post.Status.APPROVED,
+            expires_at__gt=now,
+            expires_at__lte=now + timedelta(days=RENEWAL_REMINDER_DAYS),
+        ).count()
+        site_settings = SiteSettings.get()
 
         # Posts by type
         lost_count = Post.objects.filter(post_type=Post.PostType.LOST).count()
@@ -93,7 +101,15 @@ class AdminStatisticsView(APIView):
                         "returned": returned_posts,
                         "rejected": rejected_posts,
                         "hidden": hidden_posts,
+                        "expired": expired_posts,
+                        "expiring_soon": expiring_soon_posts,
                         "sla_breached": sla_breached_count,
+                    },
+                    # The rules behind the counts above, so the dashboard can label them
+                    "lifecycle": {
+                        "review_sla_hours": site_settings.admin_review_sla_hours or 24,
+                        "post_expiry_days": site_settings.post_expiry_days or 30,
+                        "renewal_reminder_days": RENEWAL_REMINDER_DAYS,
                     },
                     "abuse_reports": {
                         "pending": pending_abuse_reports,
