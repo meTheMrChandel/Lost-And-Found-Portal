@@ -13,6 +13,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from apps.accounts.permissions import IsCampusAdmin
 from apps.adminpanel.models import PostAuditLog
+from apps.notifications.events import notify_assignee, notify_author_of_review
 from apps.adminpanel.serializers import (
     AdminPostDetailSerializer,
     AdminPostListSerializer,
@@ -125,6 +126,12 @@ class AdminPostQueueView(APIView):
                 | Q(author__email__icontains=q)
                 | Q(author__registration_number__icontains=q)
             )
+
+        assigned_param = request.query_params.get("assigned_to")
+        if assigned_param == "me":
+            posts = posts.filter(assigned_to=request.user)
+        elif assigned_param == "none":
+            posts = posts.filter(assigned_to__isnull=True)
 
         sla_param = request.query_params.get("sla_breached")
         if sla_param in ["true", "True", True]:
@@ -282,6 +289,22 @@ class AdminPostReviewView(APIView):
                 notes=f"Category changed from {old_cat_name} to {new_cat.name}. {remarks}".strip(),
             )
 
+        elif action == "ASSIGN":
+            assignee = serializer.validated_data["assignee"]
+            post.assigned_to = assignee
+            post.save(update_fields=["assigned_to", "updated_at"])
+
+            PostAuditLog.objects.create(
+                post=post,
+                admin=request.user,
+                action="ASSIGN",
+                previous_status=old_status,
+                new_status=post.status,
+                notes=f"Case assigned to {assignee.full_name or assignee.email}. {remarks}".strip(),
+            )
+            if assignee != request.user:
+                notify_assignee(post, assignee, request.user, remarks)
+
         elif action == "DELETE":
             PostAuditLog.objects.create(
                 post=post,
@@ -298,7 +321,7 @@ class AdminPostReviewView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        notify_review_decision(post, action, remarks)
+        notify_author_of_review(post, action, remarks)
 
         updated_serializer = AdminPostDetailSerializer(post)
         return Response(

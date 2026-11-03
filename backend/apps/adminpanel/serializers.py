@@ -95,6 +95,7 @@ class AdminPostListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     images = PostImageSerializer(many=True, read_only=True)
     is_sla_breached = serializers.SerializerMethodField()
+    assigned_to_email = serializers.EmailField(source="assigned_to.email", read_only=True, default=None)
 
     class Meta:
         model = Post
@@ -113,6 +114,8 @@ class AdminPostListSerializer(serializers.ModelSerializer):
             "author_email",
             "author_registration_number",
             "images",
+            "assigned_to",
+            "assigned_to_email",
             "is_sla_breached",
             "created_at",
             "expires_at",
@@ -150,6 +153,7 @@ class AdminPostDetailSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     images = PostImageSerializer(many=True, read_only=True)
     reviewed_by_email = serializers.EmailField(source="reviewed_by.email", read_only=True)
+    assigned_to_email = serializers.EmailField(source="assigned_to.email", read_only=True, default=None)
     audit_history = serializers.SerializerMethodField()
 
     class Meta:
@@ -172,6 +176,8 @@ class AdminPostDetailSerializer(serializers.ModelSerializer):
             "author",
             "reviewed_by_email",
             "reviewed_at",
+            "assigned_to",
+            "assigned_to_email",
             "images",
             "audit_history",
             "created_at",
@@ -187,10 +193,11 @@ class AdminPostDetailSerializer(serializers.ModelSerializer):
 class AdminPostReviewSerializer(serializers.Serializer):
     """Payload serializer for admin moderation actions."""
     action = serializers.ChoiceField(
-        choices=["APPROVE", "REJECT", "INFO_REQUESTED", "HIDE", "CHANGE_CATEGORY", "DELETE"]
+        choices=["APPROVE", "REJECT", "INFO_REQUESTED", "HIDE", "CHANGE_CATEGORY", "DELETE", "ASSIGN"]
     )
     remarks = serializers.CharField(required=False, allow_blank=True, default="")
     new_category = serializers.CharField(required=False, allow_blank=True, default="")
+    assign_to = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, attrs):
         action = attrs.get("action")
@@ -199,6 +206,17 @@ class AdminPostReviewSerializer(serializers.Serializer):
 
         if action in ["REJECT", "INFO_REQUESTED"] and not remarks:
             raise serializers.ValidationError({"remarks": f"Remarks are required when action is {action}."})
+
+        if action == "ASSIGN":
+            from apps.accounts.models import User
+
+            assignee_id = attrs.get("assign_to")
+            if not assignee_id:
+                raise serializers.ValidationError({"assign_to": "Choose the admin to assign this case to."})
+            assignee = User.objects.filter(pk=assignee_id, is_staff=True, is_active=True, is_banned=False).first()
+            if assignee is None:
+                raise serializers.ValidationError({"assign_to": "Cases can only be assigned to an active admin."})
+            attrs["assignee"] = assignee
 
         if action == "CHANGE_CATEGORY":
             if not new_category:
@@ -214,6 +232,7 @@ class AbuseReportSerializer(serializers.ModelSerializer):
     reporter_email = serializers.EmailField(source="reporter.email", read_only=True)
     reporter_name = serializers.CharField(source="reporter.full_name", read_only=True)
     post_title = serializers.CharField(source="post.title", read_only=True)
+    post_status = serializers.CharField(source="post.status", read_only=True)
     resolved_by_email = serializers.EmailField(source="resolved_by.email", read_only=True)
 
     class Meta:
@@ -222,6 +241,7 @@ class AbuseReportSerializer(serializers.ModelSerializer):
             "id",
             "post",
             "post_title",
+            "post_status",
             "reporter",
             "reporter_name",
             "reporter_email",

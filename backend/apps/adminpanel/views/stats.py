@@ -2,7 +2,8 @@
 adminpanel/views/stats.py — Operational metrics and campus statistics for staff dashboard.
 """
 
-from django.db.models import Count, Avg, F
+from django.db.models import Count, Avg, F, OuterRef, Subquery
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework import status
@@ -13,9 +14,78 @@ from drf_spectacular.utils import extend_schema
 from apps.accounts.models import User
 from apps.accounts.permissions import IsCampusAdmin
 from apps.posts.lifecycle import RENEWAL_REMINDER_DAYS, sla_cutoff
+from apps.matching.models import Match
 from apps.posts.models import AbuseReport, Category, Post, SiteSettings
 from apps.adminpanel.models import PostAuditLog
 from apps.adminpanel.serializers import PostAuditLogSerializer
+
+
+TREND_DAYS = 14
+# The admin decisions that count as "responding" to a report
+REVIEW_ACTIONS = ["APPROVE", "REJECT", "INFO_REQUESTED", "HIDE"]
+
+
+def _average_hours(pairs):
+    """Mean of (later - earlier) in hours, or None when there is nothing to measure."""
+    deltas = [(later - earlier).total_seconds() for later, earlier in pairs if later and earlier]
+    return round(sum(deltas) / len(deltas) / 3600, 1) if deltas else None
+
+
+def _trends(today):
+    """Beta success metrics: daily activity plus how fast items come back and admins respond."""
+    start = today - timedelta(days=TREND_DAYS - 1)
+    posts_by_day = (
+        Post.objects.filter(created_at__date__gte=start)
+        .annotate(day=TruncDate("created_at"))
+        .values("day", "post_type")
+        .annotate(n=Count("id"))
+    )
+    users_by_day = (
+        User.objects.filter(date_joined__date__gte=start)
+        .annotate(day=TruncDate("date_joined"))
+        .values("day")
+        .annotate(n=Count("id"))
+    )
+    counts = {}
+    for row in posts_by_day:
+        counts[(row["day"], row["post_type"])] = row["n"]
+    registrations = {row["day"]: row["n"] for row in users_by_day}
+    daily = []
+    for offset in range(TREND_DAYS):
+        day = start + timedelta(days=offset)
+        daily.append(
+            {
+                "date": day.isoformat(),
+                "lost": counts.get((day, Post.PostType.LOST), 0),
+                "found": counts.get((day, Post.PostType.FOUND), 0),
+                "registrations": registrations.get(day, 0),
+            }
+        )
+
+    # Time to return: from the lost report to the closed handover
+    returns = list(
+        Match.objects.filter(status=Match.Status.CLOSED, reward_settled_at__isnull=False).values_list(
+            "reward_settled_at", "lost_post__created_at"
+        )
+    )
+    # Admin response: from submission to the first review decision on it
+    first_review = (
+        PostAuditLog.objects.filter(post=OuterRef("pk"), action__in=REVIEW_ACTIONS)
+        .order_by("created_at")
+        .values("created_at")[:1]
+    )
+    reviews = list(
+        Post.objects.annotate(first_review_at=Subquery(first_review))
+        .filter(first_review_at__isnull=False)
+        .values_list("first_review_at", "created_at")
+    )
+    return {
+        "daily": daily,
+        "avg_hours_to_return": _average_hours(returns),
+        "returns_measured": len(returns),
+        "avg_hours_to_first_review": _average_hours(reviews),
+        "reviews_measured": len(reviews),
+    }
 
 
 class AdminStatisticsView(APIView):
@@ -116,6 +186,8 @@ class AdminStatisticsView(APIView):
                     },
                     "category_breakdown": category_stats,
                     "recent_activity": recent_activity,
+                    "review_sla_hours": SiteSettings.get().admin_review_sla_hours or 24,
+                    "trends": _trends(timezone.localdate()),
                 },
             },
             status=status.HTTP_200_OK,

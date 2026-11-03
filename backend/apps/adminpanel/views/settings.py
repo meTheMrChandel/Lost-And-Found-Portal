@@ -21,9 +21,13 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             "post_expiry_days",
             "otp_expiry_seconds",
             "otp_max_attempts",
+            "admin_review_sla_hours",
+            "abuse_auto_hide_threshold",
             "updated_at",
         ]
         read_only_fields = ["updated_at"]
+        # 0 hours would flag every pending report as overdue the moment it arrives
+        extra_kwargs = {"admin_review_sla_hours": {"min_value": 1}}
 
 
 class AdminSiteSettingsView(APIView):

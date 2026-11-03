@@ -51,6 +51,9 @@ class AdminUserListView(APIView):
     @extend_schema(responses={200: AdminUserListSerializer(many=True)})
     def get(self, request):
         query = User.objects.all().order_by("-date_joined")
+        # ?staff=true lists the admins a case can be assigned to
+        if request.query_params.get("staff") == "true":
+            query = query.filter(is_staff=True, is_active=True, is_banned=False)
         search = request.query_params.get("search")
         if search:
             query = query.filter(
