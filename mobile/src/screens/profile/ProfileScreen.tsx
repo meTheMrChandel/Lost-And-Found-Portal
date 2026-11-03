@@ -85,6 +85,20 @@ export const ProfileScreen: React.FC = () => {
 
         <TouchableOpacity
           style={styles.menuItem}
+          onPress={() => navigation.navigate("MyReports")}
+        >
+          <View style={styles.menuIconBox}>
+            <Text style={styles.menuEmoji}>📋</Text>
+          </View>
+          <View style={styles.menuTextCol}>
+            <Text style={styles.menuLabel}>My Reports</Text>
+            <Text style={styles.menuDesc}>Status, admin notes, renew or update your reports</Text>
+          </View>
+          <Text style={styles.arrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
           onPress={() => navigation.navigate("Valuables")}
         >
           <View style={styles.menuIconBox}>
@@ -121,6 +135,23 @@ export const ProfileScreen: React.FC = () => {
           <View style={styles.menuTextCol}>
             <Text style={styles.menuLabel}>Scan Item Sticker</Text>
             <Text style={styles.menuDesc}>Scan belongings found across campus</Text>
+          </View>
+          <Text style={styles.arrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.menuSection}>
+        <Text style={styles.sectionTitle}>Beta</Text>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate("Feedback", { from: "Profile" })}
+        >
+          <View style={styles.menuIconBox}>
+            <Text style={styles.menuEmoji}>💬</Text>
+          </View>
+          <View style={styles.menuTextCol}>
+            <Text style={styles.menuLabel}>Send Feedback</Text>
+            <Text style={styles.menuDesc}>Tell the team what works and what doesn't</Text>
           </View>
           <Text style={styles.arrow}>›</Text>
         </TouchableOpacity>

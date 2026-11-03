@@ -2,6 +2,7 @@
   "expo": {
     "name": "Lost & Found IIT Ropar",
     "slug": "lost-and-found-iitrpr",
+    "scheme": "lostandfound",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,6 +25,23 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "lostandfound.iitrpr.ac.in",
+              "pathPrefix": "/scan/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "plugins": [

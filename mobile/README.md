@@ -1,6 +1,6 @@
 # 📱 IIT Ropar Lost & Found — Cross-Platform Mobile App (React Native & Expo)
 
-Cross-platform mobile client for the **IIT Ropar Lost & Found Portal** built with **React Native**, **Expo SDK 52**, and **TypeScript** for deployment on both **iOS** and **Android** devices.
+Cross-platform mobile client for the **IIT Ropar Lost & Found Portal** built with **React Native**, **Expo SDK 58**, and **TypeScript** for deployment on both **iOS** and **Android** devices.
 
 ---
 
@@ -29,7 +29,7 @@ Cross-platform mobile client for the **IIT Ropar Lost & Found Portal** built wit
 
 ## 🛠️ Tech Stack
 
-- **Framework:** React Native + Expo (SDK 52)
+- **Framework:** React Native + Expo (SDK 58)
 - **Language:** TypeScript
 - **Navigation:** React Navigation v7 (Native Stack & Bottom Tabs)
 - **Network & State:** Axios with interceptors, Context API
@@ -54,9 +54,48 @@ npm install
 npx expo start
 ```
 
-### 3. Run on Devices
+### 3. Choose the Backend (optional)
+During development the app talks to the backend on the computer running Expo
+(`http://<that computer's IP>:8000/api/v1`), so start the backend with
+`python manage.py runserver 0.0.0.0:8000`.
+
+To use another server, set `EXPO_PUBLIC_API_URL` to its full API base before starting Expo:
+```powershell
+$env:EXPO_PUBLIC_API_URL = "https://lostandfound.iitrpr.ac.in/api/v1"; npx expo start -c
+```
+Release builds get it from the build profile in `eas.json` (see below).
+
+### 4. Run on Devices
 - **Physical Device (iOS or Android):**
   - Download the **Expo Go** app from the App Store or Google Play.
   - Scan the terminal QR code using Expo Go (Android) or the native Camera app (iOS).
 - **Android Emulator:** Press `a` in the terminal (API points to `http://10.0.2.2:8000/api/v1`).
 - **iOS Simulator:** Press `i` in the terminal (API points to `http://127.0.0.1:8000/api/v1`).
+
+---
+
+## 🔗 Sticker Links
+
+The app opens straight to a scan result from `lostandfound://scan/<uuid>`, and on Android from the
+printed sticker URL `https://lostandfound.iitrpr.ac.in/scan/<uuid>`. For Android to open those https
+links without asking, the server must serve `/.well-known/assetlinks.json` with the app's signing
+certificate fingerprint (shown by `eas credentials`). In Expo Go, test with
+`npx uri-scheme open "exp://<your-ip>:8081/--/scan/<uuid>" --android`.
+
+---
+
+## 📦 Building Installable Apps (EAS)
+
+Build profiles live in `eas.json`. `preview` and `production` set `EXPO_PUBLIC_API_URL` to the
+deployed server; change it there if the domain differs.
+
+```bash
+npm install -g eas-cli
+eas login
+eas build --profile preview --platform android      # APK to share with beta testers
+eas build --profile production --platform android   # Play Store bundle (.aab)
+eas submit --profile production --platform android  # upload to Play Console
+```
+
+The `development` profile builds a development client, which needs `npx expo install expo-dev-client`
+first. It is also what push notifications will need, since Expo Go cannot receive them.
