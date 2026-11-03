@@ -10,6 +10,10 @@ from apps.chat.views import (
     ConversationListCreateView,
     ConversationMarkReadView,
     ConversationMessagesListView,
+    MessageRequestRespondView,
+    MessageRequestView,
+    QRConversationView,
+    StudentLookupView,
     UserBlockToggleView,
 )
 
@@ -20,6 +24,12 @@ urlpatterns = [
     path("conversations/<uuid:pk>/messages/", ConversationMessagesListView.as_view(), name="conversation-messages"),
     path("conversations/<uuid:pk>/read/", ConversationMarkReadView.as_view(), name="conversation-mark-read"),
     path("conversations/<uuid:pk>/approve-direct/", ConversationApproveDirectChatView.as_view(), name="conversation-approve-direct"),
+
+    # Student ↔ student: by registration number (a message request) or from a QR sticker
+    path("students/lookup/", StudentLookupView.as_view(), name="chat-student-lookup"),
+    path("requests/", MessageRequestView.as_view(), name="chat-message-request"),
+    path("requests/<uuid:pk>/respond/", MessageRequestRespondView.as_view(), name="chat-message-request-respond"),
+    path("qr/", QRConversationView.as_view(), name="chat-qr-conversation"),
 
     # Block list
     path("block/", UserBlockToggleView.as_view(), name="chat-user-block-toggle"),

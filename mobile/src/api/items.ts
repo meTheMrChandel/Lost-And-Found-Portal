@@ -24,6 +24,10 @@ export interface QRScanResult {
   qr_uuid: string;
   is_active: boolean;
   notice?: string;
+  is_owner?: boolean;
+  // Signed-in students scanning someone else's sticker can see the owner's number and chat
+  can_chat?: boolean;
+  owner_registration_number?: string;
 }
 
 export const itemsApi = {

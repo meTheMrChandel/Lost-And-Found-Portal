@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsCampusAdmin, IsNotBanned
 from apps.items.models import RegisteredItem
+from apps.notifications.events import notify_owner_sticker_scanned
 from apps.items.serializers import (
     AdminRegisteredItemSerializer,
     PublicQRScanSerializer,
@@ -158,7 +159,9 @@ class PublicQRScanView(APIView):
     GET /api/v1/items/scan/<uuid:qr_uuid>/
     Public endpoint hit when any phone camera scans the QR sticker.
     Returns strictly whitelisted fields: item name, category, and owner name.
-    Strictly conceals phone number, email, registration number, and serial numbers.
+    A signed-in student scanning someone else's sticker also gets the owner's
+    registration number and can open a chat with them. Phone number, email and
+    serial number are never shown.
     If deactivated, returns a neutral, non-identifying notice.
     """
     permission_classes = [AllowAny]
@@ -186,11 +189,18 @@ class PublicQRScanView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        serializer = PublicQRScanSerializer(item.public_qr_data)
+        notify_owner_sticker_scanned(item, request.user if request.user.is_authenticated else None)
+
+        data = PublicQRScanSerializer(item.public_qr_data).data
+        scanner = request.user if request.user.is_authenticated else None
+        data["is_owner"] = bool(scanner and scanner.id == item.owner_id)
+        data["can_chat"] = bool(scanner and not data["is_owner"] and not scanner.is_banned)
+        if data["can_chat"]:
+            data["owner_registration_number"] = item.owner.registration_number
         return Response(
             {
                 "success": True,
-                "data": serializer.data,
+                "data": data,
             },
             status=status.HTTP_200_OK,
         )

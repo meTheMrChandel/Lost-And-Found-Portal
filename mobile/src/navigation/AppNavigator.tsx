@@ -9,6 +9,7 @@ import { AuthNavigator } from "./AuthNavigator";
 import { BottomTabNavigator } from "./BottomTabNavigator";
 import { ItemDetailScreen } from "../screens/feed/ItemDetailScreen";
 import { ChatScreen } from "../screens/chat/ChatScreen";
+import { ChatListScreen } from "../screens/chat/ChatListScreen";
 import { NotificationsScreen } from "../screens/notifications/NotificationsScreen";
 import { ValuablesScreen } from "../screens/qr/ValuablesScreen";
 import { MyReportsScreen } from "../screens/reports/MyReportsScreen";
@@ -81,6 +82,11 @@ export const AppNavigator: React.FC = () => {
           options={({ route }) => ({
             title: route.params.title || "Campus Handover Chat",
           })}
+        />
+        <Stack.Screen
+          name="Messages"
+          component={ChatListScreen}
+          options={{ title: "Messages" }}
         />
         <Stack.Screen
           name="Notifications"

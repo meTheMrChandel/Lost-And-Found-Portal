@@ -452,6 +452,18 @@ function CaseQueue({
               </button>
             </div>
 
+            {/* Found from a QR sticker: whose registered item this is */}
+            {selectedPost.registered_item && (
+              <div className="p-4 rounded-2xl bg-[#047857]/10 border border-[#047857]/20 text-xs">
+                <span className="font-bold text-[#047857] block mb-1">Reported from a QR sticker</span>
+                <span className="text-[#1C1C1E]">
+                  Registered item &quot;{selectedPost.registered_item.name}&quot; belongs to{" "}
+                  <strong>{selectedPost.registered_item.owner_name}</strong> ({selectedPost.registered_item.owner_email} • Reg:{" "}
+                  {selectedPost.registered_item.owner_registration_number}). The owner has been notified.
+                </span>
+              </div>
+            )}
+
             {/* Author Student Card */}
             {selectedPost.author && (
               <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-[#E2DDD2] flex flex-col sm:flex-row justify-between gap-3 text-xs">

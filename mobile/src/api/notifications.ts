@@ -7,6 +7,8 @@ export interface NotificationItem {
   message: string;
   is_read: boolean;
   action_url?: string;
+  // e.g. {event: "possible_match", found_post_id} or {conversation_id}
+  data?: Record<string, any>;
   created_at: string;
 }
 

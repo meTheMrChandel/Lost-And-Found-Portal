@@ -95,7 +95,8 @@ class TestNewReports:
         assert notes.count() == 1
         assert "Grey hoodie" in notes.first().body
         assert mail.outbox == []
-        assert not notifications_for(owner).exists()
+        # The reporter only gets the in-app receipt
+        assert list(notifications_for(owner).values_list("title", flat=True)) == ["We received your report"]
 
 
 @pytest.mark.django_db

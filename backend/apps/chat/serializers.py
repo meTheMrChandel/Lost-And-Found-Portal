@@ -49,6 +49,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     participants = ChatParticipantSerializer(many=True, read_only=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    item = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
@@ -58,11 +59,29 @@ class ConversationSerializer(serializers.ModelSerializer):
             "match",
             "participants",
             "is_direct_approved",
+            "origin",
+            "request_status",
+            "requested_by",
+            "item",
             "last_message",
             "unread_count",
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+    def get_item(self, obj: Conversation):
+        if obj.item_id is None:
+            return None
+        return {"id": str(obj.item_id), "name": obj.item.name, "owner_id": str(obj.item.owner_id)}
+
+    def to_representation(self, obj: Conversation):
+        data = super().to_representation(obj)
+        request = self.context.get("request")
+        # Students talking to each other see a name and registration number, not an email address
+        if obj.conversation_type == Conversation.ConversationType.STUDENT and not (request and request.user.is_staff):
+            for person in data["participants"]:
+                person.pop("email", None)
+        return data
 
     def get_last_message(self, obj: Conversation):
         last = obj.messages.order_by("-created_at").first()

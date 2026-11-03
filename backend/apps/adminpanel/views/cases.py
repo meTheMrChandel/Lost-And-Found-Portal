@@ -2,6 +2,7 @@
 adminpanel/views/cases.py — Case queue, review, and moderation endpoints for staff.
 """
 
+import logging
 from datetime import datetime, timedelta
 from django.db.models import Q
 from django.utils import timezone
@@ -13,6 +14,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from apps.accounts.permissions import IsCampusAdmin
 from apps.adminpanel.models import PostAuditLog
+from apps.matching.services import run_matching
 from apps.notifications.events import notify_assignee, notify_author_of_review
 from apps.adminpanel.serializers import (
     AdminPostDetailSerializer,
@@ -21,6 +23,8 @@ from apps.adminpanel.serializers import (
 )
 from apps.posts.lifecycle import new_expiry_date, sla_cutoff
 from apps.posts.models import Category, Post
+
+logger = logging.getLogger(__name__)
 
 
 class AdminPostQueueView(APIView):
@@ -172,6 +176,11 @@ class AdminPostReviewView(APIView):
                 new_status=post.status,
                 notes=remarks or "Post approved and published to campus feed.",
             )
+            # Look for matches now rather than waiting for the next scheduled run
+            try:
+                run_matching(post_id=str(post.id))
+            except Exception:
+                logger.exception("Matching after approving post %s failed", post.id)
 
         elif action == "REJECT":
             post.status = Post.Status.REJECTED

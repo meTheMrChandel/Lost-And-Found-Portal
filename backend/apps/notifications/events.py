@@ -5,6 +5,8 @@ Each function is called once by the view that performs the change, so every even
 produces exactly one notification per recipient.
 """
 
+from datetime import timedelta
+
 from django.utils import timezone
 
 from apps.accounts.models import User
@@ -17,16 +19,62 @@ NotifType = Notification.NotifType
 def notify_admins_new_report(post) -> None:
     """In-app only: the review-SLA alert already emails admins about reports left waiting."""
     kind = "lost" if post.post_type == post.PostType.LOST else "found"
+    body = f'"{post.title}" was submitted and is waiting in the case queue.'
+    item = post.registered_item
+    if item is not None:
+        body += f' It was reported from the QR sticker on {item.owner.full_name or item.owner.email}\'s "{item.name}".'
     admins = User.objects.filter(is_staff=True, is_active=True, is_banned=False).exclude(pk=post.author_id)
     for admin in admins:
         create_notification(
             recipient=admin,
             notif_type=NotifType.GENERAL,
             title=f"New {kind} report to review",
-            body=f'"{post.title}" was submitted and is waiting in the case queue.',
+            body=body,
             data={"post_id": str(post.id)},
             send_email_copy=False,
         )
+
+
+def notify_reporter_received(post) -> None:
+    """In-app confirmation, so the reporter knows the report arrived before any review."""
+    if post.author is None:
+        return
+    create_notification(
+        recipient=post.author,
+        notif_type=NotifType.GENERAL,
+        title="We received your report",
+        body=f'"{post.title}" is waiting for an admin to review it. You\'ll be notified when it\'s approved.',
+        data={"post_id": str(post.id)},
+        send_email_copy=False,
+    )
+
+
+CUSTODY_LABELS = {
+    "finder": "The finder is keeping it for now.",
+    "admin_office": "It has been left at the admin office.",
+    "security_office": "It has been left at the security office.",
+}
+
+
+def notify_owner_item_found(post) -> None:
+    """Tell a registered item's owner that someone scanned its sticker and reported finding it.
+
+    The finder isn't named: handovers stay admin-verified, so the owner hears from the admin office.
+    """
+    item = post.registered_item
+    if item is None or item.owner_id == post.author_id:
+        return
+    where = CUSTODY_LABELS.get(post.custody_location, "")
+    create_notification(
+        recipient=item.owner,
+        notif_type=NotifType.MATCH_FOUND,
+        title=f'Someone found your "{item.name}"',
+        body=(
+            f'A student scanned the QR sticker on your "{item.name}" and reported finding it. {where} '
+            "The campus admin office will verify that it's yours and contact you about the handover."
+        ).replace("  ", " "),
+        data={"post_id": str(post.id), "item_id": str(item.id)},
+    )
 
 
 def notify_author_of_review(post, action: str, remarks: str) -> None:
@@ -76,6 +124,29 @@ def notify_author_of_review(post, action: str, remarks: str) -> None:
         title=title,
         body=body,
         data={"post_id": str(post.id), "action": action},
+    )
+
+
+def notify_owner_possible_match(match) -> None:
+    """A found report the engine ranked in the lost report's top suggestions."""
+    lost, found = match.lost_post, match.found_post
+    if lost.author is None:
+        return
+    # Reports kept off the public feed are not linked; an admin handles those
+    public = not (found.category.is_sensitive or found.inform_admin_privately)
+    place = f" near {found.last_seen_place}" if public and found.last_seen_place else ""
+    data = {"match_id": str(match.id), "post_id": str(lost.id), "event": "possible_match"}
+    if public:
+        data["found_post_id"] = str(found.id)
+    create_notification(
+        recipient=lost.author,
+        notif_type=NotifType.MATCH_FOUND,
+        title="This might be yours",
+        body=(
+            f'Someone reported finding an item{place} that looks like your "{lost.title}". '
+            "Take a look. Before any handover, an admin will check the hidden proof you gave."
+        ),
+        data=data,
     )
 
 
@@ -171,4 +242,35 @@ def notify_assignee(post, assignee, assigned_by, remarks: str) -> None:
         title="A case was assigned to you",
         body=f'{assigned_by.full_name or assigned_by.email} assigned "{post.title}" to you in the case queue.{note}',
         data={"post_id": str(post.id)},
+    )
+
+
+SCAN_ALERT_QUIET_PERIOD = timedelta(minutes=30)
+
+
+def notify_owner_sticker_scanned(item, scanned_by) -> None:
+    """Tell an item's owner its QR sticker was just scanned by someone else.
+
+    ``scanned_by`` is None for scans from a phone camera without signing in. The scanner is
+    never named, and repeat scans of the same sticker within the quiet period send nothing.
+    """
+    if scanned_by is not None and scanned_by.pk == item.owner_id:
+        return
+    recent = Notification.objects.filter(
+        recipient_id=item.owner_id,
+        data__item_id=str(item.id),
+        data__event="sticker_scanned",
+        created_at__gte=timezone.now() - SCAN_ALERT_QUIET_PERIOD,
+    )
+    if recent.exists():
+        return
+    create_notification(
+        recipient=item.owner,
+        notif_type=NotifType.GENERAL,
+        title=f'Your "{item.name}" QR sticker was scanned',
+        body=(
+            f'Someone just scanned the QR sticker on your "{item.name}". If they report finding it, '
+            "you'll be notified and the campus admin office will arrange the handover."
+        ),
+        data={"item_id": str(item.id), "event": "sticker_scanned"},
     )

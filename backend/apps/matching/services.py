@@ -7,14 +7,16 @@ Scores LOST vs FOUND post pairs across four dimensions:
   3. Location keyword overlap (weight: 0.20)
   4. Title and description text similarity (weight: 0.25)
 
-Pairs scoring at or above SiteSettings.match_threshold (default 0.75)
-become Suggested matches in the admin match queue.
+Only approved reports are matched, and pairs that can't be the same item (different
+category, found long before it was lost, more than 30 days apart) are skipped. The best
+three found reports per lost report scoring at or above SiteSettings.match_threshold
+(default 0.75) become Suggested matches, and the lost report's owner is told about each.
 """
 
 import logging
 import re
 from difflib import SequenceMatcher
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional, Tuple, Set, Dict, Any
 
 from django.db import transaction
@@ -203,108 +205,118 @@ def calculate_match_score(lost: Post, found: Post) -> Tuple[float, Dict[str, flo
     return total, breakdown
 
 
+# Each lost report keeps at most this many suggestions; its owner is told about each one
+TOP_MATCHES_PER_LOST_REPORT = 3
+MAX_DAYS_APART = 30
+# Times are typed in by people, so a found time a little before the lost time is allowed
+FOUND_BEFORE_LOST_GRACE = timedelta(days=1)
+
+
+def passes_hard_gates(lost: Post, found: Post) -> bool:
+    """Pairs that can't be the same item, however similar the wording."""
+    if lost.category_id != found.category_id and "other" not in (
+        getattr(lost.category, "slug", ""),
+        getattr(found.category, "slug", ""),
+    ):
+        return False
+    t1, t2 = lost.last_seen_time, found.last_seen_time
+    if t1 and t2:
+        if t2 < t1 - FOUND_BEFORE_LOST_GRACE:
+            return False  # found before it was lost
+        if abs((t2 - t1).days) > MAX_DAYS_APART:
+            return False
+    return True
+
+
 def run_matching(post_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Executes the automated matching algorithm across active posts.
-    
-    If post_id is provided, only pairs involving this post are evaluated.
-    Otherwise, all active LOST posts are compared against all active FOUND posts.
+    Suggests matches between approved lost and found reports.
 
-    Pairs scoring >= SiteSettings.match_threshold become Suggested matches.
-    Ensures idempotency (no duplicate match records created on subsequent runs).
+    For every lost report, found reports that pass the hard gates are scored and the
+    best TOP_MATCHES_PER_LOST_REPORT at or above SiteSettings.match_threshold become
+    Suggested matches in the admin queue. The lost report's owner is told once about
+    each ("This might be yours"). Re-running is safe: nothing is duplicated.
+
+    If post_id is given, only lost reports that could involve that post are ranked.
     """
+    from apps.notifications.events import notify_owner_possible_match
+
     settings = SiteSettings.get()
     threshold = settings.match_threshold
+    empty = {"scanned_pairs": 0, "matches_created": 0, "matches_updated": 0, "owners_notified": 0, "threshold_used": threshold}
 
-    active_statuses = [Post.Status.APPROVED, Post.Status.PENDING]
+    approved = Post.objects.filter(status=Post.Status.APPROVED).select_related("category", "author")
+    lost_posts = approved.filter(post_type=Post.PostType.LOST)
+    found_posts = list(approved.filter(post_type=Post.PostType.FOUND))
 
-    # Select candidates
     if post_id:
-        try:
-            target_post = Post.objects.select_related("category", "author").get(id=post_id)
-        except Post.DoesNotExist:
-            logger.warning(f"Post {post_id} does not exist for matching.")
-            return {"scanned_pairs": 0, "matches_created": 0, "matches_updated": 0}
-
+        target_post = approved.filter(id=post_id).first()
+        if target_post is None:
+            logger.info("Post %s is not approved (or doesn't exist); skipping matching.", post_id)
+            return empty
         if target_post.post_type == Post.PostType.LOST:
             lost_posts = [target_post]
-            found_posts = list(
-                Post.objects.filter(
-                    post_type=Post.PostType.FOUND,
-                    status__in=active_statuses,
-                ).exclude(author_id=target_post.author_id).select_related("category", "author")
-            )
         elif target_post.post_type == Post.PostType.FOUND:
-            found_posts = [target_post]
-            lost_posts = list(
-                Post.objects.filter(
-                    post_type=Post.PostType.LOST,
-                    status__in=active_statuses,
-                ).exclude(author_id=target_post.author_id).select_related("category", "author")
-            )
+            lost_posts = lost_posts.exclude(author_id=target_post.author_id)
         else:
-            return {"scanned_pairs": 0, "matches_created": 0, "matches_updated": 0}
-    else:
-        lost_posts = list(
-            Post.objects.filter(
-                post_type=Post.PostType.LOST,
-                status__in=active_statuses,
-            ).select_related("category", "author")
-        )
-        found_posts = list(
-            Post.objects.filter(
-                post_type=Post.PostType.FOUND,
-                status__in=active_statuses,
-            ).select_related("category", "author")
-        )
+            return empty
 
     scanned_pairs = 0
     matches_created = 0
     matches_updated = 0
+    owners_notified = 0
 
     for lost in lost_posts:
+        ranked = []
         for found in found_posts:
-            if lost.author_id == found.author_id:
+            if lost.author_id == found.author_id or not passes_hard_gates(lost, found):
                 continue
-
             scanned_pairs += 1
             score, breakdown = calculate_match_score(lost, found)
-
             if score >= threshold:
-                with transaction.atomic():
-                    match, created = Match.objects.get_or_create(
-                        lost_post=lost,
-                        found_post=found,
-                        defaults={
-                            "score": score,
-                            "status": Match.Status.SUGGESTED,
-                        },
-                    )
+                ranked.append((score, found, breakdown))
+        ranked.sort(key=lambda r: r[0], reverse=True)
 
-                    if created:
-                        matches_created += 1
-                        MatchAuditLog.objects.create(
-                            match=match,
-                            admin=None,
-                            action="MATCH_SUGGESTED",
-                            to_status=Match.Status.SUGGESTED,
-                            notes=(
-                                f"Automated engine suggestion (score={score:.2f} >= threshold {threshold:.2f}). "
-                                f"Breakdown: cat={breakdown['category']}, date={breakdown['date']}, "
-                                f"loc={breakdown['location']}, text={breakdown['text']}"
-                            ),
-                        )
-                    else:
-                        # Only update score if match is still in SUGGESTED state
-                        if match.status == Match.Status.SUGGESTED:
-                            if match.score != score:
-                                match.score = score
-                                match.save(update_fields=["score", "updated_at"])
-                                matches_updated += 1
+        for score, found, breakdown in ranked[:TOP_MATCHES_PER_LOST_REPORT]:
+            with transaction.atomic():
+                match, created = Match.objects.get_or_create(
+                    lost_post=lost,
+                    found_post=found,
+                    defaults={
+                        "score": score,
+                        "status": Match.Status.SUGGESTED,
+                    },
+                )
+
+                if created:
+                    matches_created += 1
+                    MatchAuditLog.objects.create(
+                        match=match,
+                        admin=None,
+                        action="MATCH_SUGGESTED",
+                        to_status=Match.Status.SUGGESTED,
+                        notes=(
+                            f"Automated engine suggestion (score={score:.2f} >= threshold {threshold:.2f}). "
+                            f"Breakdown: cat={breakdown['category']}, date={breakdown['date']}, "
+                            f"loc={breakdown['location']}, text={breakdown['text']}"
+                        ),
+                    )
+                elif match.status == Match.Status.SUGGESTED and match.score != score:
+                    # Only update score if match is still in SUGGESTED state
+                    match.score = score
+                    match.save(update_fields=["score", "updated_at"])
+                    matches_updated += 1
+
+            if match.owner_notified_at is None and match.status != Match.Status.DISMISSED:
+                notify_owner_possible_match(match)
+                match.owner_notified_at = timezone.now()
+                match.save(update_fields=["owner_notified_at"])
+                owners_notified += 1
 
     return {
         "scanned_pairs": scanned_pairs,
         "matches_created": matches_created,
         "matches_updated": matches_updated,
+        "owners_notified": owners_notified,
         "threshold_used": threshold,
     }

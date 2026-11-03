@@ -170,7 +170,9 @@ class TestEndToEndUserJourneys:
         assert resp_found.status_code == status.HTTP_201_CREATED
         found_post_id = resp_found.data["data"]["id"]
 
-        # Step 5: Matching Engine execution
+        # Step 5: Matching Engine execution — reports are matched only once an admin approves them
+        assert run_matching()["scanned_pairs"] == 0
+        Post.objects.filter(id__in=[lost_post_id, found_post_id]).update(status=Post.Status.APPROVED)
         match_result = run_matching()
         assert match_result.get("matches_created", 0) >= 1 or match_result.get("scanned_pairs", 0) >= 1
 

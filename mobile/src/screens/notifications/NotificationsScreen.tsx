@@ -8,10 +8,12 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { notificationsApi, NotificationItem } from "../../api/notifications";
 import { colors } from "../../theme/colors";
 
 export const NotificationsScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,6 +42,18 @@ export const NotificationsScreen: React.FC = () => {
       );
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const openNotification = (item: NotificationItem) => {
+    if (!item.is_read) handleMarkRead(item.id);
+    const data = item.data || {};
+    if (data.event === "possible_match") {
+      // Private found reports aren't linked; the feed is the next best place
+      if (data.found_post_id) navigation.navigate("ItemDetail", { postId: data.found_post_id });
+      else navigation.navigate("Main", { screen: "Feed" });
+    } else if (data.conversation_id) {
+      navigation.navigate("Chat", { conversationId: data.conversation_id });
     }
   };
 
@@ -85,7 +99,7 @@ export const NotificationsScreen: React.FC = () => {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <TouchableOpacity
-              onPress={() => !item.is_read && handleMarkRead(item.id)}
+              onPress={() => openNotification(item)}
               activeOpacity={0.7}
               style={[styles.itemCard, !item.is_read && styles.unreadCard]}
             >

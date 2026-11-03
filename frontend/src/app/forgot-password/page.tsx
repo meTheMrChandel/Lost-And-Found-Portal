@@ -7,6 +7,7 @@ import Link from "next/link";
 import AuthHeader from "@/components/AuthHeader";
 import SessionCheck from "@/components/SessionCheck";
 import { useRedirectIfSignedIn } from "@/lib/redirect";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -128,8 +129,7 @@ export default function ForgotPasswordPage() {
                 <label className="block text-xs font-semibold text-[#1C1C1E] uppercase tracking-wider mb-2">
                   New Password
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   minLength={8}
                   placeholder="At least 8 characters"

@@ -156,6 +156,21 @@ class AdminPostDetailSerializer(serializers.ModelSerializer):
     assigned_to_email = serializers.EmailField(source="assigned_to.email", read_only=True, default=None)
     audit_history = serializers.SerializerMethodField()
 
+    # The registered valuable a found report was started from (QR sticker scan), with its owner
+    registered_item = serializers.SerializerMethodField()
+
+    def get_registered_item(self, obj):
+        item = obj.registered_item
+        if item is None:
+            return None
+        return {
+            "id": str(item.id),
+            "name": item.name,
+            "owner_name": item.owner.full_name,
+            "owner_email": item.owner.email,
+            "owner_registration_number": item.owner.registration_number,
+        }
+
     class Meta:
         model = Post
         fields = [
@@ -178,6 +193,7 @@ class AdminPostDetailSerializer(serializers.ModelSerializer):
             "reviewed_at",
             "assigned_to",
             "assigned_to_email",
+            "registered_item",
             "images",
             "audit_history",
             "created_at",

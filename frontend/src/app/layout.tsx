@@ -22,7 +22,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-[#FAF7F2] text-[#1C1C1E]">
+      {/* Browser extensions (e.g. ColorZilla's cz-shortcut-listen) add attributes to <body>
+          before React hydrates. This only ignores <body>'s own attributes, not its children. */}
+      <body className="min-h-screen bg-[#FAF7F2] text-[#1C1C1E]" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

@@ -52,6 +52,7 @@ interface MatchItem {
   score: number;
   status: "suggested" | "confirmed" | "proof_pending" | "verified" | "handed_over" | "closed" | "dismissed";
   meeting_mode?: string;
+  owner_notified_at?: string | null;
   proof_questions?: ProofQuestion[];
   proof_verified_at?: string;
   handover_code_used?: boolean;
@@ -475,6 +476,15 @@ export default function AdminMatchesPage() {
                     <span className="text-xs font-mono text-[#6B7280]">
                       Match ID: {item.id.slice(0, 8)}
                     </span>
+
+                    {item.owner_notified_at && (
+                      <span
+                        className="text-[11px] text-[#6B7280]"
+                        title={new Date(item.owner_notified_at).toLocaleString()}
+                      >
+                        · Owner notified
+                      </span>
+                    )}
                   </div>
 
                   {/* Status Badge & Workflow Controls */}

@@ -25,6 +25,18 @@ class Conversation(models.Model):
         OWNER_ADMIN = "owner_admin", _("Owner ↔ Admin")
         FINDER_ADMIN = "finder_admin", _("Finder ↔ Admin")
         DIRECT = "direct", _("Direct (owner ↔ finder, admin-approved)")
+        STUDENT = "student", _("Student ↔ student")
+
+    class Origin(models.TextChoices):
+        # Someone holding the item scanned its sticker: opens straight away
+        QR_SCAN = "qr_scan", _("Started from a QR sticker scan")
+        # Started by typing a registration number: begins as a message request
+        REGISTRATION_SEARCH = "registration_search", _("Started by searching a registration number")
+
+    class RequestStatus(models.TextChoices):
+        PENDING = "pending", _("Waiting for the recipient to accept")
+        ACCEPTED = "accepted", _("Accepted")
+        DECLINED = "declined", _("Declined")
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     match = models.ForeignKey(
@@ -42,6 +54,27 @@ class Conversation(models.Model):
     )
     is_direct_approved = models.BooleanField(
         _("direct chat approved"), default=False
+    )
+    # Student ↔ student conversations only
+    origin = models.CharField(_("origin"), max_length=30, choices=Origin.choices, blank=True)
+    request_status = models.CharField(
+        _("request status"), max_length=20, choices=RequestStatus.choices, default=RequestStatus.ACCEPTED
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="started_conversations",
+    )
+    responded_at = models.DateTimeField(null=True, blank=True)
+    # The registered valuable a QR-started conversation is about
+    item = models.ForeignKey(
+        "items.RegisteredItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="conversations",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

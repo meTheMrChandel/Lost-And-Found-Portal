@@ -111,6 +111,7 @@ export const ReportFoundScreen: React.FC = () => {
       formData.append("custody_mode", custodyMode);
       formData.append("inform_admin_privately", isPrivateAdminOnly ? "true" : "false");
       formData.append("is_private_admin_only", isPrivateAdminOnly ? "true" : "false");
+      if (params?.qrUuid) formData.append("qr_uuid", params.qrUuid);
 
       selectedImages.forEach((img, idx) => {
         const uriParts = img.uri.split(".");
@@ -166,6 +167,14 @@ export const ReportFoundScreen: React.FC = () => {
           {error ? (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>⚠️ {error}</Text>
+            </View>
+          ) : null}
+
+          {params?.qrUuid ? (
+            <View style={styles.stickerBox}>
+              <Text style={styles.stickerText}>
+                This report is linked to the item's QR sticker. Its owner will be notified as soon as you submit.
+              </Text>
             </View>
           ) : null}
 
@@ -326,6 +335,17 @@ const styles = StyleSheet.create({
   },
   categoryScroll: {
     marginBottom: 16,
+  },
+  stickerBox: {
+    backgroundColor: colors.foundLight,
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  stickerText: {
+    color: colors.found,
+    fontSize: 12,
+    fontWeight: "600",
   },
   errorBox: {
     backgroundColor: colors.lostLight,

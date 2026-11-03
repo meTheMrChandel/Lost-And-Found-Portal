@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { nowForDateTimeInput } from "@/lib/datetime";
@@ -27,11 +27,15 @@ const CAMPUS_LOCATIONS = [
 
 function ReportFoundContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
+  // Set when the finder came from a QR sticker's scan page (/scan/<uuid>)
+  const qrUuid = searchParams.get("qr");
+  const presetCategory = searchParams.get("category")?.toLowerCase() ?? "";
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(() => searchParams.get("title") ?? "");
   const [description, setDescription] = useState("");
   const [lastSeenPlace, setLastSeenPlace] = useState("");
   // The date input only renders after auth resolves on the client, so reading
@@ -52,14 +56,18 @@ function ReportFoundContent() {
         if (res?.data) {
           setCategories(res.data);
           if (res.data.length > 0) {
-            setSelectedCategory(res.data[0].slug);
+            // The scan page passes the category's name; match it against slug or name
+            const preset = (res.data as Category[]).find(
+              (c) => c.slug === presetCategory || c.name.toLowerCase() === presetCategory
+            );
+            setSelectedCategory((preset ?? res.data[0]).slug);
           }
         }
       })
       .catch((err) => {
         console.error("Failed to load categories", err);
       });
-  }, []);
+  }, [presetCategory]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -111,6 +119,7 @@ function ReportFoundContent() {
       formData.append("last_seen_time", new Date(lastSeenTime).toISOString());
       formData.append("custody_location", custodyLocation);
       formData.append("inform_admin_privately", String(informAdminPrivately));
+      if (qrUuid) formData.append("qr_uuid", qrUuid);
 
       images.forEach((img) => {
         formData.append("images", img);
@@ -207,6 +216,12 @@ function ReportFoundContent() {
         {error && (
           <div className="p-4 rounded-2xl bg-[#D94F3B]/10 border border-[#D94F3B]/20 text-[#D94F3B] text-xs font-semibold mb-6">
             {error}
+          </div>
+        )}
+
+        {qrUuid && (
+          <div className="p-4 rounded-2xl bg-[#047857]/10 border border-[#047857]/20 text-[#047857] text-xs font-semibold mb-6">
+            This report is linked to the item&apos;s QR sticker. Its owner will be notified as soon as you submit.
           </div>
         )}
 

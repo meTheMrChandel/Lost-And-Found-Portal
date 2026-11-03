@@ -14,6 +14,8 @@ import { errorMessage } from "../../api/client";
 import { itemsApi, QRScanResult } from "../../api/items";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
+import { chatApi } from "../../api/chat";
+import { useAuth } from "../../context/AuthContext";
 import { colors } from "../../theme/colors";
 
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
@@ -26,6 +28,8 @@ export const QRScanScreen: React.FC = () => {
   const [scanned, setScanned] = useState<boolean>(false);
   const [scanning, setScanning] = useState<boolean>(false);
   const [scanResult, setScanResult] = useState<QRScanResult | null>(null);
+  const [openingChat, setOpeningChat] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const getCameraPermissions = async () => {
@@ -80,7 +84,22 @@ export const QRScanScreen: React.FC = () => {
     navigation.navigate("ReportFound", {
       title: `Found: ${scanResult.item_name}`,
       category: scanResult.category,
+      qrUuid: scanResult.qr_uuid,
     });
+  };
+
+  // The scanner has the item in hand, so the chat opens straight away (no request step)
+  const handleChatWithOwner = async () => {
+    if (!scanResult) return;
+    setOpeningChat(true);
+    try {
+      const conv = await chatApi.openQRConversation(scanResult.qr_uuid);
+      navigation.navigate("Chat", { conversationId: conv.id, title: scanResult.owner_name });
+    } catch (err: any) {
+      Alert.alert("Couldn't Open Chat", errorMessage(err, "Please try again."));
+    } finally {
+      setOpeningChat(false);
+    }
   };
 
   const scanAgain = () => {
@@ -183,6 +202,9 @@ export const QRScanScreen: React.FC = () => {
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>REGISTERED OWNER</Text>
               <Text style={styles.resultValue}>{scanResult.owner_name}</Text>
+              {scanResult.owner_registration_number ? (
+                <Text style={styles.resultSub}>{scanResult.owner_registration_number}</Text>
+              ) : null}
             </View>
 
             <View style={styles.resultRow}>
@@ -195,15 +217,35 @@ export const QRScanScreen: React.FC = () => {
 
             <View style={styles.privacyNotice}>
               <Text style={styles.privacyText}>
-                🔒 Zero-Knowledge Privacy: Owner's phone number, email, and student registration number are kept confidential.
+                {user
+                  ? "🔒 The owner's phone number and email stay private. You can message them here instead."
+                  : "🔒 The owner's phone number, email and registration number stay private. Sign in to message them."}
               </Text>
             </View>
 
-            <Button
-              title="🤝 I Found This Belonging"
-              onPress={handleReportFoundFromScan}
-              style={styles.actionBtn}
-            />
+            {scanResult.can_chat ? (
+              <Button
+                title="Chat with owner"
+                onPress={handleChatWithOwner}
+                loading={openingChat}
+                style={styles.actionBtn}
+              />
+            ) : !user ? (
+              <Button
+                title="Sign in to chat"
+                variant="outline"
+                onPress={() => navigation.navigate("Auth")}
+                style={styles.actionBtn}
+              />
+            ) : null}
+
+            {!scanResult.is_owner && (
+              <Button
+                title="🤝 I Found This Belonging"
+                onPress={handleReportFoundFromScan}
+                style={styles.actionBtn}
+              />
+            )}
 
             <Button
               title="Scan Another Code"
@@ -356,6 +398,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: colors.textPrimary,
+  },
+  resultSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 1,
   },
   privacyNotice: {
     backgroundColor: colors.oceanLight,

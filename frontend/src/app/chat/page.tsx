@@ -13,13 +13,17 @@ import SessionCheck from "@/components/SessionCheck";
 interface Participant {
   id: string;
   full_name: string;
-  email: string;
+  email?: string;
   registration_number: string;
 }
 
 interface Conversation {
   id: string;
-  conversation_type: "owner_admin" | "finder_admin" | "direct";
+  conversation_type: "owner_admin" | "finder_admin" | "direct" | "student";
+  origin?: "qr_scan" | "registration_search" | "";
+  request_status?: "pending" | "accepted" | "declined";
+  requested_by?: string | null;
+  item?: { id: string; name: string; owner_id: string } | null;
   match_id?: string;
   match?: {
     id: string;
@@ -36,6 +40,13 @@ interface Conversation {
     sender_name: string;
   };
   created_at: string;
+}
+
+interface FoundStudent {
+  id: string;
+  full_name: string;
+  registration_number: string;
+  existing_conversation_id: string | null;
 }
 
 interface Message {
@@ -62,6 +73,13 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  // "New chat" by registration number
+  const [composing, setComposing] = useState(false);
+  const [regNo, setRegNo] = useState("");
+  const [found, setFound] = useState<FoundStudent | null>(null);
+  const [firstMessage, setFirstMessage] = useState("");
+  const [composeError, setComposeError] = useState("");
+  const [composeBusy, setComposeBusy] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -81,7 +99,9 @@ export default function ChatPage() {
       .then((res) => {
         const items = unwrapList(res);
         setConversations(items);
-        setActiveConv((prev) => prev ?? items[0] ?? null);
+        // /chat?c=<id> opens that conversation (links from the scan page and notifications)
+        const wanted = new URLSearchParams(window.location.search).get("c");
+        setActiveConv((prev) => prev ?? items.find((c) => c.id === wanted) ?? items[0] ?? null);
       })
       .catch((err) => console.error("Failed to load conversations", err))
       .finally(() => setLoadingConvs(false));
@@ -140,6 +160,10 @@ export default function ChatPage() {
       socket.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
+          if (payload.type === "error" && payload.error) {
+            setErrorMsg(payload.error);
+            return;
+          }
           if (payload.type === "chat_message" && payload.message) {
             const newMsg: Message = {
               id: payload.message.id,
@@ -232,10 +256,86 @@ export default function ChatPage() {
           setMessages((prev) => [...prev, sent]);
         }
       }
+      if (activeConv.request_status === "pending" && activeConv.requested_by !== user?.id) {
+        updateConv({ ...activeConv, request_status: "accepted" });
+      }
     } catch (err) {
       setErrorMsg(getErrorMessage(err, "Failed to send message."));
     } finally {
       setSending(false);
+    }
+  };
+
+  const updateConv = (conv: Conversation) => {
+    setActiveConv(conv);
+    setConversations((prev) =>
+      prev.some((c) => c.id === conv.id) ? prev.map((c) => (c.id === conv.id ? conv : c)) : [conv, ...prev]
+    );
+  };
+
+  const startCompose = () => {
+    setComposing(true);
+    setRegNo("");
+    setFound(null);
+    setFirstMessage("");
+    setComposeError("");
+  };
+
+  const handleFindStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regNo.trim()) return;
+    setComposeBusy(true);
+    setComposeError("");
+    setFound(null);
+    try {
+      const res = await apiClient<{ data: FoundStudent }>(
+        `/chat/students/lookup/?registration_number=${encodeURIComponent(regNo.trim())}`
+      );
+      setFound(res.data);
+    } catch (err) {
+      setComposeError(getErrorMessage(err, "Couldn't look that up. Try again."));
+    } finally {
+      setComposeBusy(false);
+    }
+  };
+
+  const handleSendRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!found || !firstMessage.trim()) return;
+    setComposeBusy(true);
+    setComposeError("");
+    try {
+      const res = await apiClient<{ data: Conversation }>("/chat/requests/", {
+        method: "POST",
+        data: { registration_number: found.registration_number, message: firstMessage.trim() },
+      });
+      setComposing(false);
+      updateConv(res.data);
+    } catch (err) {
+      setComposeError(getErrorMessage(err, "Couldn't send the request."));
+    } finally {
+      setComposeBusy(false);
+    }
+  };
+
+  const openExisting = (id: string) => {
+    const conv = conversations.find((c) => c.id === id);
+    setComposing(false);
+    if (conv) setActiveConv(conv);
+  };
+
+  const handleRespond = async (action: "accept" | "decline") => {
+    if (!activeConv) return;
+    setErrorMsg("");
+    try {
+      const res = await apiClient<{ data: Conversation; message?: string }>(
+        `/chat/requests/${activeConv.id}/respond/`,
+        { method: "POST", data: { action } }
+      );
+      updateConv(res.data);
+      setSuccessMsg(res.message || "Done.");
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Couldn't answer the request."));
     }
   };
 
@@ -260,7 +360,7 @@ export default function ChatPage() {
     try {
       const res = await apiClient<{ message?: string }>("/chat/block/", {
         method: "POST",
-        data: { blocked_user_id: participantId, reason: "Inappropriate communication" },
+        data: { user_id: participantId, reason: "Inappropriate communication" },
       });
       alert(res.message || "Block status updated.");
     } catch (err) {
@@ -274,8 +374,11 @@ export default function ChatPage() {
     return { id: "system-admin", full_name: "Admin Moderator", email: "admin@iitrpr.ac.in", registration_number: "" };
   };
 
-  const getConvTypeLabel = (type: string) => {
-    switch (type) {
+  const getConvTypeLabel = (conv: Conversation) => {
+    if (conv.conversation_type === "student") {
+      return conv.origin === "qr_scan" ? "From a QR sticker" : "Student chat";
+    }
+    switch (conv.conversation_type) {
       case "owner_admin":
         return "Owner ↔ Admin Mediated";
       case "finder_admin":
@@ -283,9 +386,19 @@ export default function ChatPage() {
       case "direct":
         return "Direct (Owner ↔ Finder)";
       default:
-        return type;
+        return conv.conversation_type;
     }
   };
+
+  // The requester of a pending request has used their one message
+  const waitingForAccept =
+    activeConv?.request_status === "pending" &&
+    activeConv.requested_by === user?.id &&
+    messages.some((m) => m.is_me || m.sender_id === user?.id);
+  const inputLocked =
+    (activeConv?.conversation_type === "direct" && !activeConv.is_direct_approved) ||
+    activeConv?.request_status === "declined" ||
+    waitingForAccept;
 
   if (authLoading) return <SessionCheck />;
   if (!user) {
@@ -340,9 +453,12 @@ export default function ChatPage() {
           <div className="w-full md:w-80 lg:w-96 border-r border-[#EFEAE0] flex flex-col bg-[#FAF7F2]/50">
             <div className="p-4 border-b border-[#EFEAE0] flex items-center justify-between">
               <h2 className="font-serif text-lg font-bold text-[#1C1C1E]">Messages</h2>
-              <span className="text-xs bg-[#EFEAE0] px-2.5 py-1 rounded-full text-stone-600 font-medium">
-                {conversations.length} Active
-              </span>
+              <button
+                onClick={startCompose}
+                className="text-xs font-semibold text-[#047857] hover:underline underline-offset-2"
+              >
+                + New chat
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto divide-y divide-[#EFEAE0]">
@@ -353,7 +469,8 @@ export default function ChatPage() {
                   <p className="text-3xl mb-2">💬</p>
                   <p className="font-semibold text-gray-600 mb-1">No chats yet</p>
                   <p className="text-[11px] text-gray-400">
-                    Chats are initiated when potential matches are verified or mediator actions are needed.
+                    Chats start when an admin mediates a match, when you scan someone&apos;s QR sticker, or with
+                    &ldquo;New chat&rdquo; and a registration number.
                   </p>
                 </div>
               ) : (
@@ -363,7 +480,10 @@ export default function ChatPage() {
                   return (
                     <button
                       key={conv.id}
-                      onClick={() => setActiveConv(conv)}
+                      onClick={() => {
+                        setComposing(false);
+                        setActiveConv(conv);
+                      }}
                       className={`w-full text-left p-4 transition-all flex items-start gap-3 hover:bg-stone-50 ${
                         isSelected ? "bg-white border-l-4 border-l-[#047857] shadow-sm" : ""
                       }`}
@@ -383,15 +503,30 @@ export default function ChatPage() {
                           )}
                         </div>
                         <p className="text-[11px] text-[#047857] font-semibold truncate mb-1">
-                          {conv.match?.lost_item_name || "Case Mediation"}
+                          {conv.conversation_type === "student"
+                            ? conv.item
+                              ? `About ${conv.item.owner_id === user?.id ? "your " : ""}${conv.item.name}`
+                              : other.registration_number
+                            : conv.match?.lost_item_name || "Case Mediation"}
                         </p>
                         <p className="text-[11px] text-[#6B7280] truncate">
                           {conv.last_message ? conv.last_message.content : "No messages yet"}
                         </p>
                         <div className="mt-1 flex items-center gap-1.5">
                           <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-stone-200/60 text-stone-700">
-                            {conv.conversation_type === "direct" ? "Direct" : "Mediated"}
+                            {conv.conversation_type === "student"
+                              ? conv.origin === "qr_scan"
+                                ? "QR sticker"
+                                : "Student"
+                              : conv.conversation_type === "direct"
+                                ? "Direct"
+                                : "Mediated"}
                           </span>
+                          {conv.request_status === "pending" && (
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                              {conv.requested_by === user?.id ? "Request sent" : "Wants to chat"}
+                            </span>
+                          )}
                           {conv.conversation_type === "direct" && !conv.is_direct_approved && (
                             <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
                               Pending Approval
@@ -407,7 +542,84 @@ export default function ChatPage() {
           </div>
 
           {/* Right Area: Active Chat Thread */}
-          {activeConv ? (
+          {composing ? (
+            <div className="flex-1 flex flex-col bg-white p-6 overflow-y-auto">
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="font-serif text-lg font-bold text-[#1C1C1E]">New chat</h3>
+                <button onClick={() => setComposing(false)} className="text-xs text-[#6B7280] hover:text-[#1C1C1E]">
+                  Cancel
+                </button>
+              </div>
+              <p className="text-xs text-[#6B7280] mb-5 max-w-md leading-relaxed">
+                Enter the exact registration number. They get your first message as a request and can accept,
+                decline or block you. You can send more once they reply.
+              </p>
+
+              <form onSubmit={handleFindStudent} className="flex gap-2 max-w-md">
+                <input
+                  type="text"
+                  value={regNo}
+                  onChange={(e) => {
+                    setRegNo(e.target.value.toUpperCase());
+                    setFound(null);
+                  }}
+                  placeholder="e.g. 2024CSM1001"
+                  autoFocus
+                  className="flex-1 px-4 py-2.5 text-xs font-mono bg-[#FAF7F2] border border-[#EFEAE0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#047857] focus:bg-white"
+                />
+                <button
+                  type="submit"
+                  disabled={!regNo.trim() || composeBusy}
+                  className="px-4 py-2.5 border border-[#EFEAE0] bg-white hover:border-[#047857] disabled:opacity-40 text-xs font-semibold rounded-lg"
+                >
+                  Find
+                </button>
+              </form>
+
+              {composeError && <p className="mt-3 text-xs text-[#D94F3B] max-w-md">{composeError}</p>}
+
+              {found && (
+                <div className="mt-5 max-w-md border border-[#EFEAE0] rounded-xl p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-full bg-emerald-100 text-[#047857] flex items-center justify-center font-bold text-sm">
+                      {found.full_name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#1C1C1E]">{found.full_name}</p>
+                      <p className="text-[11px] font-mono text-[#6B7280]">{found.registration_number}</p>
+                    </div>
+                  </div>
+                  {found.existing_conversation_id &&
+                  conversations.some((c) => c.id === found.existing_conversation_id) ? (
+                    <button
+                      onClick={() => openExisting(found.existing_conversation_id as string)}
+                      className="text-xs font-semibold text-[#047857] hover:underline underline-offset-2"
+                    >
+                      You already have a conversation with them. Open it
+                    </button>
+                  ) : (
+                    <form onSubmit={handleSendRequest} className="space-y-2">
+                      <textarea
+                        value={firstMessage}
+                        onChange={(e) => setFirstMessage(e.target.value)}
+                        rows={3}
+                        maxLength={5000}
+                        placeholder="Say who you are and why you're writing, e.g. I think I found your ID card near the mess."
+                        className="w-full px-3 py-2 text-xs bg-[#FAF7F2] border border-[#EFEAE0] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#047857] focus:bg-white resize-none"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!firstMessage.trim() || composeBusy}
+                        className="px-4 py-2 bg-[#047857] hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-bold rounded-lg"
+                      >
+                        {composeBusy ? "Sending..." : "Send request"}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : activeConv ? (
             <div className="flex-1 flex flex-col bg-white">
               {/* Active Conversation Header */}
               <div className="p-4 border-b border-[#EFEAE0] flex items-center justify-between bg-[#FAF7F2]/30">
@@ -421,13 +633,21 @@ export default function ChatPage() {
                         {getOtherParticipant(activeConv).full_name}
                       </h3>
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-[#047857] border border-emerald-200">
-                        {getConvTypeLabel(activeConv.conversation_type)}
+                        {getConvTypeLabel(activeConv)}
                       </span>
                     </div>
                     <p className="text-xs text-[#6B7280]">
-                      {activeConv.match
-                        ? `Ref: ${activeConv.match.lost_item_name} ↔ ${activeConv.match.found_item_name}`
-                        : "Campus Lost and Found Mediation"}
+                      {activeConv.conversation_type === "student"
+                        ? [
+                            getOtherParticipant(activeConv).registration_number,
+                            activeConv.item &&
+                              `About ${activeConv.item.owner_id === user?.id ? "your " : ""}${activeConv.item.name}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")
+                        : activeConv.match
+                          ? `Ref: ${activeConv.match.lost_item_name} ↔ ${activeConv.match.found_item_name}`
+                          : "Campus Lost and Found Mediation"}
                     </p>
                   </div>
                 </div>
@@ -484,6 +704,48 @@ export default function ChatPage() {
                       To protect campus community members against off-platform scams or harassment, direct communication between owner and finder requires initial moderator approval. Messaging is locked until an administrator reviews this case.
                     </p>
                   </div>
+                </div>
+              )}
+
+              {/* Message requests */}
+              {activeConv.request_status === "pending" && activeConv.requested_by === user?.id && (
+                <div className="mx-4 mt-4 px-3 py-2.5 border border-[#EFEAE0] bg-[#FAF7F2] rounded-lg text-[11px] text-[#4B5563]">
+                  Waiting for {getOtherParticipant(activeConv).full_name} to accept your request. You can send
+                  more once they reply.
+                </div>
+              )}
+              {activeConv.request_status === "pending" && activeConv.requested_by !== user?.id && (
+                <div className="mx-4 mt-4 p-3 border border-amber-200 bg-amber-50 rounded-lg text-xs text-amber-900">
+                  <p className="mb-2">
+                    <strong>{getOtherParticipant(activeConv).full_name}</strong> (
+                    {getOtherParticipant(activeConv).registration_number}) wants to message you. They can&apos;t send
+                    more until you accept or reply.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleRespond("accept")}
+                      className="px-3 py-1.5 bg-[#047857] hover:bg-emerald-700 text-white text-xs font-semibold rounded-md"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => handleRespond("decline")}
+                      className="px-3 py-1.5 border border-[#EFEAE0] bg-white hover:border-stone-400 text-xs font-semibold rounded-md"
+                    >
+                      Decline
+                    </button>
+                    <button
+                      onClick={() => handleToggleBlock(getOtherParticipant(activeConv).id)}
+                      className="px-3 py-1.5 text-[#D94F3B] hover:underline text-xs font-medium"
+                    >
+                      Block
+                    </button>
+                  </div>
+                </div>
+              )}
+              {activeConv.request_status === "declined" && (
+                <div className="mx-4 mt-4 px-3 py-2.5 border border-[#EFEAE0] bg-[#FAF7F2] rounded-lg text-[11px] text-[#4B5563]">
+                  This message request was declined, so the conversation is closed.
                 </div>
               )}
 
@@ -546,23 +808,18 @@ export default function ChatPage() {
                     placeholder={
                       activeConv.conversation_type === "direct" && !activeConv.is_direct_approved
                         ? "Chat locked pending admin approval..."
-                        : "Type your message here..."
+                        : waitingForAccept
+                          ? "Waiting for them to accept..."
+                          : activeConv.request_status === "declined"
+                            ? "This request was declined"
+                            : "Type your message here..."
                     }
-                    disabled={
-                      (activeConv.conversation_type === "direct" &&
-                        !activeConv.is_direct_approved) ||
-                      sending
-                    }
+                    disabled={inputLocked || sending}
                     className="flex-1 px-4 py-2.5 text-xs bg-[#FAF7F2] border border-[#EFEAE0] rounded-full focus:outline-none focus:ring-2 focus:ring-[#047857] focus:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   />
                   <button
                     type="submit"
-                    disabled={
-                      !inputText.trim() ||
-                      (activeConv.conversation_type === "direct" &&
-                        !activeConv.is_direct_approved) ||
-                      sending
-                    }
+                    disabled={!inputText.trim() || inputLocked || sending}
                     className="px-5 py-2.5 bg-[#047857] hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-full shadow-sm transition-all flex items-center gap-1.5"
                   >
                     <span>Send</span>

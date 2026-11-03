@@ -249,6 +249,12 @@ class FoundPostCreateSerializer(serializers.ModelSerializer):
         default=False,
         help_text="If true, item is visible only to campus administrators.",
     )
+    qr_uuid = serializers.UUIDField(
+        write_only=True,
+        required=False,
+        allow_null=True,
+        help_text="The scanned QR sticker, when the report was started from one.",
+    )
 
     class Meta:
         model = Post
@@ -261,9 +267,30 @@ class FoundPostCreateSerializer(serializers.ModelSerializer):
             "last_seen_time",
             "custody_location",
             "inform_admin_privately",
+            "qr_uuid",
             "status",
             "created_at",
         ]
+
+    def validate_qr_uuid(self, qr_uuid):
+        if qr_uuid is None:
+            return None
+        from apps.items.models import RegisteredItem
+
+        item = RegisteredItem.objects.select_related("owner").filter(qr_uuid=qr_uuid).first()
+        if item is None:
+            raise serializers.ValidationError("This QR sticker isn't registered.")
+        if not item.is_active:
+            raise serializers.ValidationError("This QR sticker has been deactivated by its owner.")
+        return item
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # Swap the sticker id for the item it identifies, which is what the post stores
+        item = attrs.pop("qr_uuid", None)
+        if item is not None:
+            attrs["registered_item"] = item
+        return attrs
         read_only_fields = ["id", "status", "created_at"]
 
     def to_internal_value(self, data):

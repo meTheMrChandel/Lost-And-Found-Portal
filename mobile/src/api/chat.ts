@@ -3,13 +3,22 @@ import { apiClient } from "./client";
 export interface Participant {
   id: string;
   full_name: string;
-  email: string;
+  // Not sent for student-to-student conversations
+  email?: string;
   registration_number: string;
+}
+
+/** A student found by their exact registration number. */
+export interface StudentLookup {
+  id: string;
+  full_name: string;
+  registration_number: string;
+  existing_conversation_id: string | null;
 }
 
 export interface Conversation {
   id: string;
-  conversation_type: "owner_admin" | "finder_admin" | "direct";
+  conversation_type: "owner_admin" | "finder_admin" | "direct" | "student";
   match_id?: string;
   match?: {
     id: string;
@@ -19,6 +28,11 @@ export interface Conversation {
   };
   participants: Participant[];
   is_direct_approved: boolean;
+  // Student conversations: started from a sticker scan, or a message request by registration number
+  origin?: "qr_scan" | "registration_search" | "";
+  request_status?: "pending" | "accepted" | "declined";
+  requested_by?: string | null;
+  item?: { id: string; name: string; owner_id: string } | null;
   unread_count: number;
   last_message?: {
     content: string;
@@ -56,6 +70,35 @@ export const chatApi = {
     return Array.isArray(payload) ? payload : payload?.results || [];
   },
 
+  async getConversation(convId: string): Promise<Conversation> {
+    const res = await apiClient.get(`/chat/conversations/${convId}/`);
+    return res.data?.data || res.data;
+  },
+
+  async lookupStudent(registrationNumber: string): Promise<StudentLookup> {
+    const res = await apiClient.get("/chat/students/lookup/", {
+      params: { registration_number: registrationNumber },
+    });
+    return res.data?.data || res.data;
+  },
+
+  /** Starts a message request; returns the existing conversation if there already is one. */
+  async sendRequest(registrationNumber: string, message: string): Promise<Conversation> {
+    const res = await apiClient.post("/chat/requests/", { registration_number: registrationNumber, message });
+    return res.data?.data || res.data;
+  },
+
+  async respondToRequest(convId: string, action: "accept" | "decline"): Promise<Conversation> {
+    const res = await apiClient.post(`/chat/requests/${convId}/respond/`, { action });
+    return res.data?.data || res.data;
+  },
+
+  /** Chat with the owner of a scanned sticker; opens straight away. */
+  async openQRConversation(qrUuid: string, message?: string): Promise<Conversation> {
+    const res = await apiClient.post("/chat/qr/", { qr_uuid: qrUuid, message });
+    return res.data?.data || res.data;
+  },
+
   async getMessages(convId: string, since?: string): Promise<ChatMessage[]> {
     const params = since ? { since } : undefined;
     const res = await apiClient.get(`/chat/conversations/${convId}/messages/`, { params });
@@ -73,11 +116,8 @@ export const chatApi = {
     return res.data;
   },
 
-  async toggleBlock(blockedUserId: string, reason?: string): Promise<any> {
-    const res = await apiClient.post("/chat/block/", {
-      blocked_user_id: blockedUserId,
-      reason: reason || "Inappropriate behavior",
-    });
+  async toggleBlock(userId: string): Promise<{ is_blocked: boolean; message: string }> {
+    const res = await apiClient.post("/chat/block/", { user_id: userId });
     return res.data;
   },
 };

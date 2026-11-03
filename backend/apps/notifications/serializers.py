@@ -46,11 +46,13 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "notif_type", "title", "body", "data", "created_at"]
 
     def get_action_url(self, obj: Notification):
+        data = obj.data or {}
+        if data.get("event") == "possible_match" and data.get("found_post_id"):
+            return f"/feed?post={data['found_post_id']}"
         url = ACTION_URLS.get(obj.notif_type)
         if url is not None:
             return url
 
-        data = obj.data or {}
         if "abuse_report_id" in data:
             return "/admin/abuse-reports"
         if data.get("post_id"):

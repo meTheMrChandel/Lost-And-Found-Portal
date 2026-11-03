@@ -5,6 +5,7 @@ import { useState, Suspense } from "react";
 import { apiClient, getErrorMessage } from "@/lib/api";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import PasswordInput from "@/components/PasswordInput";
 
 function AcceptInviteContent() {
   const searchParams = useSearchParams();
@@ -121,8 +122,7 @@ function AcceptInviteContent() {
           <label className="block text-xs font-semibold text-[#1C1C1E] uppercase tracking-wider mb-1">
             Set Secure Password
           </label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             placeholder="At least 8 characters"

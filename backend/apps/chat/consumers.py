@@ -22,6 +22,7 @@ from apps.chat.serializers import MessageCreateSerializer
 from apps.chat.services import (
     conversation_group,
     message_event_payload,
+    accept_request_on_reply,
     notify_recipients,
     send_block_reason,
 )
@@ -160,6 +161,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             sender=self.user,
             content=content,
         )
+        accept_request_on_reply(msg.conversation, self.user)
         notify_recipients(msg)
         return message_event_payload(msg)
 

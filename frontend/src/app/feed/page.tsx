@@ -40,6 +40,17 @@ function FeedContent() {
   // Selected item modal
   const [activePost, setActivePost] = useState<Post | null>(null);
 
+  // /feed?post=<id> opens that report (the "This might be yours" notification links here)
+  const linkedPostId = searchParams.get("post");
+  useEffect(() => {
+    if (!linkedPostId) return;
+    apiClient<{ data?: Post } & Post>(`/posts/${linkedPostId}/`)
+      .then((res) => setActivePost(res.data ?? res))
+      .catch(() => {
+        // Gone from the feed (resolved or hidden): just show the feed
+      });
+  }, [linkedPostId]);
+
   // Abuse report modal
   const [reportingPost, setReportingPost] = useState<Post | null>(null);
   const [abuseReason, setAbuseReason] = useState<string>("spam");

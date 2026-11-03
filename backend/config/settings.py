@@ -31,6 +31,8 @@ if DEBUG:
 
 # ─── Application Definition ───────────────────────────────────────────────────
 DJANGO_APPS = [
+    # First, so `manage.py runserver` serves WebSockets (live chat) as well as HTTP
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -173,6 +175,7 @@ REST_FRAMEWORK = {
         "login": "10/minute",
         "post_create": "20/hour",
         "chat_message": "60/minute",
+        "chat_lookup": "30/hour",
     },
 }
 
@@ -266,14 +269,32 @@ CELERY_BEAT_SCHEDULE = {
 
 # ─── Channels (WebSocket) ────────────────────────────────────────────────────
 REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL],
+
+
+def _redis_reachable(url: str) -> bool:
+    from urllib.parse import urlparse
+    import socket
+
+    parsed = urlparse(url)
+    try:
+        with socket.create_connection((parsed.hostname or "localhost", parsed.port or 6379), timeout=0.3):
+            return True
+    except OSError:
+        return False
+
+
+if DEBUG and not _redis_reachable(REDIS_URL):
+    # Local development without Redis: one runserver process, so an in-memory layer is enough
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
         },
-    },
-}
+    }
 
 # ─── Mobile app versions (GET /api/v1/app-config/) ───────────────────────────
 # Raise MIN to force everyone off an old build; raise LATEST to suggest an update
@@ -304,7 +325,8 @@ OTP_MAX_ATTEMPTS = config("OTP_MAX_ATTEMPTS", default=3, cast=int)
 OTP_RESEND_COOLDOWN_SECONDS = config("OTP_RESEND_COOLDOWN_SECONDS", default=60, cast=int)
 
 # ─── Django-axes (brute-force protection) ────────────────────────────────────
-AXES_FAILURE_LIMIT = 5
+# Ten wrong passwords lock sign-in for the cool-off period below
+AXES_FAILURE_LIMIT = 10
 AXES_LOCK_OUT_AT_FAILURE = True
 AXES_COOLOFF_TIME = timedelta(minutes=30)
 AXES_RESET_ON_SUCCESS = True

@@ -113,6 +113,20 @@ export const ProfileScreen: React.FC = () => {
 
         <TouchableOpacity
           style={styles.menuItem}
+          onPress={() => navigation.navigate("Messages")}
+        >
+          <View style={styles.menuIconBox}>
+            <Text style={styles.menuEmoji}>✉️</Text>
+          </View>
+          <View style={styles.menuTextCol}>
+            <Text style={styles.menuLabel}>Messages</Text>
+            <Text style={styles.menuDesc}>Your chats, and message a student by registration number</Text>
+          </View>
+          <Text style={styles.arrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
           onPress={() => navigation.navigate("Notifications")}
         >
           <View style={styles.menuIconBox}>

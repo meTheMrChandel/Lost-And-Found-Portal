@@ -7,6 +7,7 @@ import Link from "next/link";
 import AuthHeader from "@/components/AuthHeader";
 import SessionCheck from "@/components/SessionCheck";
 import { useRedirectIfSignedIn } from "@/lib/redirect";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -231,8 +232,7 @@ export default function RegisterPage() {
                   <label className="block text-xs font-semibold text-[#1C1C1E] uppercase tracking-wider mb-1">
                     Password
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     required
                     minLength={8}
                     placeholder="Min 8 characters"

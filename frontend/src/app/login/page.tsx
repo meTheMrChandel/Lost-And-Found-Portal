@@ -8,6 +8,7 @@ import { getErrorMessage } from "@/lib/api";
 import { safeRedirect, useRedirectIfSignedIn } from "@/lib/redirect";
 import AuthHeader from "@/components/AuthHeader";
 import SessionCheck from "@/components/SessionCheck";
+import PasswordInput from "@/components/PasswordInput";
 
 // Notices other pages hand over via the query string after a redirect here
 const NOTICES: Record<string, string> = {
@@ -100,8 +101,7 @@ function LoginForm() {
                   Forgot password?
                 </Link>
               </div>
-              <input
-                type="password"
+              <PasswordInput
                 required
                 placeholder="Enter your password"
                 value={password}

@@ -22,6 +22,8 @@ from apps.notifications.events import (
     notify_admins_abuse_report,
     notify_admins_new_report,
     notify_author_auto_hidden,
+    notify_owner_item_found,
+    notify_reporter_received,
 )
 from apps.posts.lifecycle import new_expiry_date
 from apps.posts.models import Category, Post, PostImage, AbuseReport, SiteSettings
@@ -144,6 +146,7 @@ class LostPostCreateView(APIView):
             _process_uploaded_images(post, images)
 
         notify_admins_new_report(post)
+        notify_reporter_received(post)
 
         response_serializer = LostPostDetailSerializer(post, context={"request": request})
         return Response(
@@ -387,6 +390,10 @@ class FoundPostCreateView(APIView):
             _process_uploaded_images(post, images)
 
         notify_admins_new_report(post)
+        # From someone else's sticker only the owner is told; the scanner gets no notification
+        if post.registered_item is None or post.registered_item.owner_id == post.author_id:
+            notify_reporter_received(post)
+        notify_owner_item_found(post)
 
         response_serializer = LostPostDetailSerializer(post, context={"request": request})
         return Response(

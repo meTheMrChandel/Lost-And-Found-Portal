@@ -2,7 +2,10 @@
 
 import { useEffect, useState, use, Suspense } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import { apiClient, getErrorMessage } from "@/lib/api";
+import { loginUrl } from "@/lib/redirect";
 import Logo from "@/components/Logo";
 
 interface ScanData {
@@ -11,6 +14,10 @@ interface ScanData {
   owner_name: string;
   qr_uuid: string;
   is_active: boolean;
+  is_owner?: boolean;
+  can_chat?: boolean;
+  // Only sent to signed-in students scanning someone else's sticker
+  owner_registration_number?: string;
 }
 
 function ScanContent({ params }: { params: Promise<{ uuid: string }> }) {
@@ -21,6 +28,22 @@ function ScanContent({ params }: { params: Promise<{ uuid: string }> }) {
   const [loading, setLoading] = useState(true);
   const [deactivatedMsg, setDeactivatedMsg] = useState("");
   const [notFound, setNotFound] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [opening, setOpening] = useState(false);
+  const [chatError, setChatError] = useState("");
+
+  const openChat = async () => {
+    setOpening(true);
+    setChatError("");
+    try {
+      const res = await apiClient<{ data: { id: string } }>("/chat/qr/", { method: "POST", data: { qr_uuid: qrUuid } });
+      router.push(`/chat?c=${res.data.id}`);
+    } catch (err) {
+      setChatError(getErrorMessage(err, "Couldn't open the chat. Try again."));
+      setOpening(false);
+    }
+  };
 
   useEffect(() => {
     async function loadScanData() {
@@ -43,10 +66,10 @@ function ScanContent({ params }: { params: Promise<{ uuid: string }> }) {
       }
     }
 
-    if (qrUuid) {
+    if (qrUuid && !authLoading) {
       loadScanData();
     }
-  }, [qrUuid]);
+  }, [qrUuid, authLoading, user?.id]);
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-[#1C1C1E] flex flex-col justify-between">
@@ -131,8 +154,10 @@ function ScanContent({ params }: { params: Promise<{ uuid: string }> }) {
                 </strong>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#6B7280]">Campus ID:</span>
-                <span className="font-mono text-[#047857] font-bold">IIT Ropar Student</span>
+                <span className="text-[#6B7280]">{scanData.owner_registration_number ? "Registration no.:" : "Campus ID:"}</span>
+                <span className="font-mono text-[#047857] font-bold">
+                  {scanData.owner_registration_number || "IIT Ropar Student"}
+                </span>
               </div>
             </div>
 
@@ -143,14 +168,34 @@ function ScanContent({ params }: { params: Promise<{ uuid: string }> }) {
                 <span>Zero-Knowledge Privacy Shield</span>
               </div>
               <p className="leading-relaxed text-[#4B5563]">
-                To safeguard student security, phone numbers, email addresses, and serial numbers are protected and never disclosed on public scans.
+                To safeguard student security, phone numbers, email addresses, and serial numbers are protected and never disclosed on public scans. Signed-in students see the owner&apos;s registration number and can message them here.
               </p>
             </div>
 
             {/* Found Action Buttons */}
             <div className="space-y-2.5 pt-2">
+              {scanData.is_owner ? (
+                <p className="text-center text-[11px] text-[#6B7280]">This is your own sticker.</p>
+              ) : scanData.can_chat ? (
+                <button
+                  onClick={openChat}
+                  disabled={opening}
+                  className="w-full py-3 bg-white border border-[#047857] text-[#047857] hover:bg-emerald-50 disabled:opacity-60 text-xs font-bold rounded-xl transition"
+                >
+                  {opening ? "Opening chat..." : `💬 Chat with ${scanData.owner_name.split(" ")[0]}`}
+                </button>
+              ) : !user ? (
+                <Link
+                  href={loginUrl(`/scan/${qrUuid}`)}
+                  className="w-full py-3 bg-white border border-[#EFEAE0] text-[#1C1C1E] hover:border-[#047857] text-xs font-semibold rounded-xl transition flex items-center justify-center"
+                >
+                  Sign in to chat with the owner
+                </Link>
+              ) : null}
+              {chatError && <p className="text-center text-[11px] text-[#D94F3B]">{chatError}</p>}
+
               <Link
-                href={`/report/found?title=${encodeURIComponent("Found: " + scanData.item_name)}&category=${encodeURIComponent(scanData.category.toLowerCase())}`}
+                href={`/report/found?title=${encodeURIComponent("Found: " + scanData.item_name)}&category=${encodeURIComponent(scanData.category.toLowerCase())}&qr=${scanData.qr_uuid}`}
                 className="w-full py-3 bg-[#047857] hover:bg-[#065F46] text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center justify-center gap-2"
               >
                 <span>📢 I Found This Belonging</span>

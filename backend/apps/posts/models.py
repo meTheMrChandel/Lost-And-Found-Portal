@@ -198,6 +198,14 @@ class Post(models.Model):
         blank=True,
         related_name="reviewed_posts",
     )
+    # Set when a finder started this found report by scanning the item's QR sticker
+    registered_item = models.ForeignKey(
+        "items.RegisteredItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="found_reports",
+    )
     # The admin responsible for following this case up (plan, Phase 4: "assign to another admin")
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL,

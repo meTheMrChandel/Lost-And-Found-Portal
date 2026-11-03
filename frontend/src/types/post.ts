@@ -59,6 +59,14 @@ export interface Post {
   reviewed_by_email?: string;
   assigned_to?: string | null;
   assigned_to_email?: string | null;
+  /** Found reports started from a QR sticker: the registered item and its owner */
+  registered_item?: {
+    id: string;
+    name: string;
+    owner_name: string;
+    owner_email: string;
+    owner_registration_number: string;
+  } | null;
   reviewed_at?: string;
   audit_history?: Array<{
     id: string;

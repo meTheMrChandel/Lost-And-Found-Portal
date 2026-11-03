@@ -9,19 +9,26 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
-import { chatApi, ChatMessage } from "../../api/chat";
+import { chatApi, ChatMessage, Conversation } from "../../api/chat";
 import { errorMessage, storage, websocketUrl } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
+import { Button } from "../../components/Button";
 import { colors } from "../../theme/colors";
+import { conversationTitle, otherParticipant } from "./conversationLabel";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Chat">;
 
-export const ChatScreen: React.FC<Props> = ({ route }) => {
+export const ChatScreen: React.FC<Props> = ({ route, navigation }) => {
   const { conversationId, title } = route.params;
   const { user } = useAuth();
+
+  // Who's on the other side, and where a student conversation stands
+  const [conv, setConv] = useState<Conversation | null>(null);
+  const [responding, setResponding] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
@@ -106,6 +113,7 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
             },
           ]);
           if (!isMe) socket.send(JSON.stringify({ action: "mark_read" }));
+          markAcceptedIfReply(m.sender_id);
         } else if (payload.type === "read_receipt" && payload.reader_id !== userIdRef.current) {
           setMessages((prev) => prev.map((m) => (m.is_me || m.sender_id === userIdRef.current ? { ...m, is_read: true } : m)));
         } else if (payload.type === "error" && payload.error) {
@@ -125,6 +133,15 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
       };
     };
 
+    chatApi
+      .getConversation(conversationId)
+      .then((c) => {
+        if (closedByUs) return;
+        setConv(c);
+        // Opened from a notification: name the other student in the header
+        if (!title) navigation.setOptions({ title: conversationTitle(c, userIdRef.current) });
+      })
+      .catch(() => {});
     sync().then(connect);
 
     return () => {
@@ -135,6 +152,45 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
       lastSyncRef.current = null;
     };
   }, [conversationId]);
+
+  // The recipient writing back means the request was accepted
+  const markAcceptedIfReply = (senderId: string) => {
+    setConv((c) =>
+      c && c.request_status === "pending" && senderId !== c.requested_by ? { ...c, request_status: "accepted" } : c
+    );
+  };
+
+  const respond = async (action: "accept" | "decline") => {
+    setResponding(true);
+    setError("");
+    try {
+      setConv(await chatApi.respondToRequest(conversationId, action));
+    } catch (err: any) {
+      setError(errorMessage(err, "Couldn't answer the request."));
+    } finally {
+      setResponding(false);
+    }
+  };
+
+  const block = () => {
+    const other = conv && otherParticipant(conv, user?.id);
+    if (!other) return;
+    Alert.alert(`Block ${other.full_name}?`, "They won't be able to message you again.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Block",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await chatApi.toggleBlock(other.id);
+            navigation.goBack();
+          } catch (err: any) {
+            setError(errorMessage(err, "Couldn't block them."));
+          }
+        },
+      },
+    ]);
+  };
 
   const handleSend = async () => {
     if (!inputText.trim() || sending) return;
@@ -154,6 +210,7 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
     try {
       const newMsg = await chatApi.sendMessage(conversationId, textToSend);
       addMessages([newMsg]);
+      if (user) markAcceptedIfReply(user.id);
       flatListRef.current?.scrollToEnd({ animated: true });
     } catch (err: any) {
       setInputText(textToSend);
@@ -184,6 +241,14 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
     );
   };
 
+  const isStudentChat = conv?.conversation_type === "student";
+  const other = conv ? otherParticipant(conv, user?.id) : undefined;
+  const pending = conv?.request_status === "pending";
+  const iAskedForIt = !!conv && conv.requested_by === user?.id;
+  const declined = isStudentChat && conv?.request_status === "declined";
+  // The requester's one message is already sent; the recipient answers with the buttons or by replying
+  const canType = !declined && !(isStudentChat && pending && iAskedForIt);
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -191,11 +256,55 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       {/* Header Notification Banner */}
-      <View style={styles.banner}>
-        <Text style={styles.bannerText}>
-          🛡️ Case Coordination • Handover verification protected by Campus Admin
-        </Text>
-      </View>
+      {!isStudentChat ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>
+            🛡️ Case Coordination • Handover verification protected by Campus Admin
+          </Text>
+        </View>
+      ) : conv?.item ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>
+            {conv.item.owner_id === user?.id ? `About your ${conv.item.name}` : `About ${conv.item.name}`}
+            {" · started from its QR sticker"}
+          </Text>
+        </View>
+      ) : null}
+
+      {isStudentChat && pending && iAskedForIt && (
+        <View style={styles.requestNote}>
+          <Text style={styles.requestText}>
+            Waiting for {other?.full_name || "them"} to accept. You can send more once they reply.
+          </Text>
+        </View>
+      )}
+
+      {isStudentChat && pending && !iAskedForIt && (
+        <View style={styles.requestNote}>
+          <Text style={styles.requestText}>
+            {other?.full_name || "This student"}
+            {other?.registration_number ? ` (${other.registration_number})` : ""} wants to message you. Replying
+            also accepts.
+          </Text>
+          <View style={styles.requestActions}>
+            <Button title="Accept" onPress={() => respond("accept")} loading={responding} style={styles.requestBtn} />
+            <Button
+              title="Decline"
+              variant="outline"
+              onPress={() => respond("decline")}
+              disabled={responding}
+              style={styles.requestBtn}
+            />
+            <Button
+              title="Block"
+              variant="ghost"
+              onPress={block}
+              textStyle={{ color: colors.lost }}
+              style={styles.requestBtn}
+            />
+          </View>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.center}>
@@ -213,7 +322,11 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyEmoji}>🕊️</Text>
-              <Text style={styles.emptyText}>No messages yet. Send a greeting to initiate handover coordination.</Text>
+              <Text style={styles.emptyText}>
+                {isStudentChat
+                  ? "No messages yet. Say where and when you can hand it over."
+                  : "No messages yet. Send a greeting to initiate handover coordination."}
+              </Text>
             </View>
           }
         />
@@ -221,28 +334,36 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+      {declined && (
+        <Text style={styles.closedNote}>
+          {iAskedForIt ? "They declined your message request." : "You declined this message request."}
+        </Text>
+      )}
+
       {/* Input Box */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Type message..."
-          placeholderTextColor={colors.textMuted}
-          value={inputText}
-          onChangeText={setInputText}
-          multiline
-        />
-        <TouchableOpacity
-          onPress={handleSend}
-          disabled={!inputText.trim() || sending}
-          style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color={colors.textWhite} />
-          ) : (
-            <Text style={styles.sendIcon}>➤</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      {canType && (
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Type message..."
+            placeholderTextColor={colors.textMuted}
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+          />
+          <TouchableOpacity
+            onPress={handleSend}
+            disabled={!inputText.trim() || sending}
+            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color={colors.textWhite} />
+            ) : (
+              <Text style={styles.sendIcon}>➤</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -264,6 +385,37 @@ const styles = StyleSheet.create({
     color: "#0369A1",
     fontWeight: "600",
     textAlign: "center",
+  },
+  requestNote: {
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  requestText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 17,
+  },
+  requestActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  requestBtn: {
+    flex: 1,
+    height: 38,
+    paddingHorizontal: 8,
+  },
+  closedNote: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: "center",
+    padding: 14,
+    backgroundColor: colors.card,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
   },
   center: {
     flex: 1,

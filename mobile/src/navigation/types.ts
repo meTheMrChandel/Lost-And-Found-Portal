@@ -11,7 +11,8 @@ export type MainTabParamList = {
   Feed: undefined;
   ReportLost: undefined;
   // Prefilled when a finder comes from a QR sticker scan
-  ReportFound: { title?: string; category?: string } | undefined;
+  // qrUuid: set when the report starts from a scanned sticker, so its owner can be notified
+  ReportFound: { title?: string; category?: string; qrUuid?: string } | undefined;
   // Set when the app is opened from a sticker link (lostandfound://scan/<uuid>)
   QRScan: { uuid?: string } | undefined;
   Valuables: undefined;
@@ -23,6 +24,7 @@ export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   ItemDetail: { postId: string };
   Chat: { conversationId: string; title?: string };
+  Messages: undefined;
   Notifications: undefined;
   Valuables: undefined;
   MyReports: undefined;

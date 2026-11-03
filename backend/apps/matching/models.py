@@ -98,6 +98,8 @@ class Match(models.Model):
         related_name="assigned_matches",
     )
 
+    # Set once the lost report's owner has been told this found item might be theirs
+    owner_notified_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
