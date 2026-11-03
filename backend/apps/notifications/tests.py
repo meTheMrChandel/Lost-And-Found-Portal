@@ -73,3 +73,37 @@ class TestNotificationsSystem:
         # Count is now 0
         res_count_after = api_client.get("/api/v1/notifications/unread-count/")
         assert res_count_after.data["unread_count"] == 0
+
+    def test_listing_includes_the_fields_the_clients_render(self, api_client, student_user):
+        """Web and mobile read notification_type, message and action_url."""
+        create_notification(
+            recipient=student_user,
+            notif_type=Notification.NotifType.POST_EXPIRING,
+            title='"Blue bottle" leaves the feed in 3 days',
+            body="Renew it with one click to keep it on the campus feed for another 30 days.",
+            data={"post_id": "fake-post-id"},
+            send_email_copy=False,
+        )
+        create_notification(
+            recipient=student_user,
+            notif_type=Notification.NotifType.GENERAL,
+            title="Campus notice",
+            body="The admin office is closed on Sunday.",
+            send_email_copy=False,
+        )
+
+        api_client.force_authenticate(user=student_user)
+        res = api_client.get("/api/v1/notifications/")
+        results = {item["title"]: item for item in res.data.get("results", res.data)}
+
+        expiring = results['"Blue bottle" leaves the feed in 3 days']
+        assert expiring["notification_type"] == "post_expiring"
+        assert expiring["message"] == "Renew it with one click to keep it on the campus feed for another 30 days."
+        assert expiring["action_url"] == "/my-reports"
+        # The original field names are still returned
+        assert expiring["notif_type"] == "post_expiring"
+        assert expiring["body"] == expiring["message"]
+
+        notice = results["Campus notice"]
+        assert notice["message"] == "The admin office is closed on Sunday."
+        assert notice["action_url"] is None
