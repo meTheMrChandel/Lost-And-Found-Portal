@@ -15,6 +15,8 @@ export default function AdminSettingsPage() {
   const [postExpiryDays, setPostExpiryDays] = useState<number>(30);
   const [otpExpirySeconds, setOtpExpirySeconds] = useState<number>(300);
   const [otpMaxAttempts, setOtpMaxAttempts] = useState<number>(5);
+  const [reviewSlaHours, setReviewSlaHours] = useState<number>(24);
+  const [abuseAutoHide, setAbuseAutoHide] = useState<number>(3);
 
   // Seed the form once from the saved settings; start in the loading state so
   // the default values are never shown (or edited) before the real ones arrive
@@ -27,6 +29,8 @@ export default function AdminSettingsPage() {
           setPostExpiryDays(res.data.post_expiry_days ?? 30);
           setOtpExpirySeconds(res.data.otp_expiry_seconds ?? 300);
           setOtpMaxAttempts(res.data.otp_max_attempts ?? 5);
+          setReviewSlaHours(res.data.admin_review_sla_hours ?? 24);
+          setAbuseAutoHide(res.data.abuse_auto_hide_threshold ?? 3);
         }
       })
       .catch((err) => setError(getErrorMessage(err, "Failed to load site configuration.")))
@@ -47,6 +51,8 @@ export default function AdminSettingsPage() {
           post_expiry_days: Number(postExpiryDays),
           otp_expiry_seconds: Number(otpExpirySeconds),
           otp_max_attempts: Number(otpMaxAttempts),
+          admin_review_sla_hours: Number(reviewSlaHours),
+          abuse_auto_hide_threshold: Number(abuseAutoHide),
         },
       });
 
@@ -182,6 +188,52 @@ export default function AdminSettingsPage() {
               required
               value={otpMaxAttempts}
               onChange={(e) => setOtpMaxAttempts(parseInt(e.target.value) || 5)}
+              className="w-full px-4 py-2.5 rounded-xl bg-[#FAF7F2] border border-[#E2DDD2] text-xs font-mono focus:ring-2 focus:ring-[#047857] outline-none"
+            />
+          </div>
+
+          <hr className="border-[#EFEAE0]" />
+
+          {/* Review SLA */}
+          <div>
+            <label className="block text-xs font-bold text-[#1C1C1E] uppercase tracking-wider mb-1">
+              Review SLA (Hours)
+            </label>
+            <p className="text-[11px] text-[#6B7280] mb-2">
+              Pending reports older than this are marked overdue, and admins are alerted once about each one.
+            </p>
+            <input
+              type="number"
+              min="1"
+              max="168"
+              required
+              value={reviewSlaHours}
+              onChange={(e) => setReviewSlaHours(parseInt(e.target.value) || 24)}
+              className="w-full px-4 py-2.5 rounded-xl bg-[#FAF7F2] border border-[#E2DDD2] text-xs font-mono focus:ring-2 focus:ring-[#047857] outline-none"
+            />
+          </div>
+
+          <hr className="border-[#EFEAE0]" />
+
+          {/* Abuse auto-hide */}
+          <div>
+            <label className="block text-xs font-bold text-[#1C1C1E] uppercase tracking-wider mb-1">
+              Abuse Reports Before Auto-Hide
+            </label>
+            <p className="text-[11px] text-[#6B7280] mb-2">
+              A post is hidden until reviewed once this many different users report it. Set 0 to turn auto-hide off.
+            </p>
+            <input
+              type="number"
+              min="0"
+              max="20"
+              required
+              value={abuseAutoHide}
+              // 0 is a real value here (off), so don't fall back to the default for it
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                setAbuseAutoHide(Number.isNaN(value) ? 0 : value);
+              }}
               className="w-full px-4 py-2.5 rounded-xl bg-[#FAF7F2] border border-[#E2DDD2] text-xs font-mono focus:ring-2 focus:ring-[#047857] outline-none"
             />
           </div>

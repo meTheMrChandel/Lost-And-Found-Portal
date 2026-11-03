@@ -5,8 +5,17 @@ import { useSearchParams } from "next/navigation";
 import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { Category, Post, PostStatus } from "@/types/post";
+import Image from "next/image";
 
-function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: string; initialSlaBreached: boolean }) {
+function CaseQueue({
+  initialStatus,
+  initialSlaBreached,
+  initialPostId,
+}: {
+  initialStatus: string;
+  initialSlaBreached: boolean;
+  initialPostId: string | null;
+}) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [actionError, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -18,6 +27,7 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
   const [searchQuery, setSearchQuery] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [slaBreachedOnly, setSlaBreachedOnly] = useState(initialSlaBreached);
+  const [assignedToMe, setAssignedToMe] = useState(false);
 
   // Review modal
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -35,8 +45,17 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
     if (typeFilter) params.append("post_type", typeFilter);
     if (appliedSearch) params.append("search", appliedSearch);
     if (slaBreachedOnly) params.append("sla_breached", "true");
+    if (assignedToMe) params.append("assigned_to", "me");
     return params.toString();
-  }, [statusFilter, categoryFilter, typeFilter, appliedSearch, slaBreachedOnly]);
+  }, [statusFilter, categoryFilter, typeFilter, appliedSearch, slaBreachedOnly, assignedToMe]);
+
+  // Admins a case can be handed to, for the Assign picker
+  const { data: staffRes } = useApiQuery<{ data?: { id: string; email: string; full_name: string }[] }>(
+    "/adminpanel/users/?staff=true",
+    "Failed to load admins."
+  );
+  const staff = staffRes?.data ?? [];
+  const [assignTo, setAssignTo] = useState("");
 
   const {
     data: queue,
@@ -63,6 +82,25 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
       .catch((err) => console.error("Failed to load categories", err));
   }, []);
 
+  // Links such as Abuse Reports' "Open case" pass ?post=<id> to open that case directly
+  useEffect(() => {
+    if (!initialPostId) return;
+    let cancelled = false;
+    apiClient(`/adminpanel/posts/${initialPostId}/`)
+      .then((res) => {
+        if (!cancelled && res?.data) {
+          setSelectedPost(res.data);
+          setNewCategorySlug(res.data.category);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(getErrorMessage(err, "Failed to load case details."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPostId]);
+
   const openCaseDetail = async (postId: string) => {
     setReviewAction(null);
     setReviewRemarks("");
@@ -85,6 +123,11 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
       return;
     }
 
+    if (action === "ASSIGN" && !assignTo) {
+      alert("Please choose the admin to assign this case to.");
+      return;
+    }
+
     if (action === "CHANGE_CATEGORY" && (!newCategorySlug || newCategorySlug === selectedPost.category)) {
       alert("Please select a new category to apply.");
       return;
@@ -99,6 +142,9 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
       };
       if (action === "CHANGE_CATEGORY") {
         payload.new_category = newCategorySlug;
+      }
+      if (action === "ASSIGN") {
+        payload.assign_to = assignTo;
       }
 
       const res = await apiClient(`/adminpanel/posts/${selectedPost.id}/review/`, {
@@ -236,6 +282,17 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
         </button>
 
         <button
+          onClick={() => setAssignedToMe(!assignedToMe)}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            assignedToMe
+              ? "bg-[#1C1C1E] text-white border-[#1C1C1E]"
+              : "bg-[#FAF7F2] text-[#6B7280] border-[#E2DDD2] hover:text-[#1C1C1E]"
+          }`}
+        >
+          Assigned to me
+        </button>
+
+        <button
           onClick={refreshQueue}
           className="px-4 py-2 rounded-xl bg-[#1C1C1E] hover:bg-black text-white text-xs font-bold transition-all cursor-pointer"
         >
@@ -307,9 +364,12 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
                     <td className="py-3.5 px-2 font-medium text-[#1C1C1E]">
                       <div className="flex items-center gap-2">
                         {post.images && post.images.length > 0 && (
-                          <img
+                          <Image
                             src={mediaUrl(post.images[0].image)}
                             alt=""
+                            width={32}
+                            height={32}
+                            unoptimized
                             className="w-8 h-8 rounded-lg object-cover border border-[#E2DDD2]"
                           />
                         )}
@@ -324,6 +384,9 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
                     <td className="py-3.5 px-2 text-[#6B7280]">
                       <div className="font-medium text-[#1C1C1E]">{post.author_name}</div>
                       <div className="font-mono text-[10px]">{post.author_registration_number}</div>
+                      {post.assigned_to_email && (
+                        <div className="text-[10px] mt-0.5">Assigned: {post.assigned_to_email.split("@")[0]}</div>
+                      )}
                     </td>
                     <td className="py-3.5 px-2 text-[#6B7280] max-w-xs truncate">
                       {post.last_seen_place}
@@ -438,10 +501,12 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
                       rel="noreferrer"
                       className="group relative w-28 h-28 rounded-2xl overflow-hidden border border-[#E2DDD2] flex-shrink-0"
                     >
-                      <img
+                      <Image
                         src={mediaUrl(img.image)}
                         alt="evidence"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        fill
+                        unoptimized
+                        className="object-cover group-hover:scale-105 transition-transform"
                       />
                       <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[9px] bg-black/60 text-white font-mono">
                         Zoom 🔍
@@ -642,6 +707,48 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
                 </div>
               )}
 
+              {reviewAction === "ASSIGN" && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-[11px] font-semibold text-[#1C1C1E]">
+                    Assign this case to:
+                  </label>
+                  <select
+                    value={assignTo}
+                    onChange={(e) => setAssignTo(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#FAF7F2] border border-[#E2DDD2] text-xs outline-none"
+                  >
+                    <option value="">Choose an admin…</option>
+                    {staff.map((admin) => (
+                      <option key={admin.id} value={admin.id}>
+                        {admin.full_name || admin.email} ({admin.email})
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Optional note for the admin..."
+                    value={reviewRemarks}
+                    onChange={(e) => setReviewRemarks(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#FAF7F2] border border-[#E2DDD2] text-xs outline-none"
+                  />
+                  <div className="flex justify-end gap-2 mt-1">
+                    <button
+                      onClick={() => setReviewAction(null)}
+                      className="px-3 py-1.5 text-xs text-[#6B7280]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => executeReviewAction("ASSIGN")}
+                      disabled={actionLoading}
+                      className="px-4 py-1.5 rounded-xl bg-[#1C1C1E] text-white text-xs font-bold"
+                    >
+                      {actionLoading ? "Saving..." : "Assign Case"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Main Button Row */}
               {!reviewAction && (
                 <div className="flex flex-wrap gap-2.5">
@@ -677,6 +784,17 @@ function CaseQueue({ initialStatus, initialSlaBreached }: { initialStatus: strin
                     Edit Category
                   </button>
 
+                  <button
+                    onClick={() => {
+                      setAssignTo(selectedPost.assigned_to ?? "");
+                      setReviewAction("ASSIGN");
+                    }}
+                    disabled={actionLoading}
+                    className="px-3.5 py-2.5 rounded-xl bg-[#FAF7F2] hover:bg-[#EFEAE0] text-[#1C1C1E] text-xs font-semibold border border-[#E2DDD2] transition-all cursor-pointer"
+                  >
+                    {selectedPost.assigned_to_email ? `Assigned: ${selectedPost.assigned_to_email.split("@")[0]}` : "Assign..."}
+                  </button>
+
                   {selectedPost.status === "APPROVED" && (
                     <button
                       onClick={() => executeReviewAction("HIDE")}
@@ -705,6 +823,7 @@ function CaseQueueFromUrl() {
       key={searchParams.toString()}
       initialStatus={searchParams.get("status")?.toUpperCase() || "ALL"}
       initialSlaBreached={searchParams.get("sla_breached") === "true"}
+      initialPostId={searchParams.get("post")}
     />
   );
 }

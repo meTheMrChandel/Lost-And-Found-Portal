@@ -36,7 +36,7 @@ export function RecoveryRateCard({ posts }: { posts: AdminStats["posts"] }) {
   );
 }
 
-export function SlaGaugeCard({ posts }: { posts: AdminStats["posts"] }) {
+export function SlaGaugeCard({ posts, slaHours }: { posts: AdminStats["posts"]; slaHours: number }) {
   // Counted by separate queries, so overdue can briefly exceed pending between the two
   const overdue = Math.min(posts.sla_breached, posts.pending);
   const onTime = posts.pending - overdue;
@@ -53,7 +53,7 @@ export function SlaGaugeCard({ posts }: { posts: AdminStats["posts"] }) {
           role="img"
           aria-label={
             posts.pending > 0
-              ? `${onTimeShare}% of pending reports are within the review window`
+              ? `${onTimeShare}% of pending reports are within the ${slaHours}-hour review window`
               : "No reports are waiting for review"
           }
         >
@@ -69,7 +69,7 @@ export function SlaGaugeCard({ posts }: { posts: AdminStats["posts"] }) {
         </svg>
         {posts.pending > 0 ? (
           <div className="text-xs space-y-2">
-            <p className="font-semibold text-[#047857]">{onTime} within the review window</p>
+            <p className="font-semibold text-[#047857]">{onTime} within the {slaHours}h review window</p>
             {overdue > 0 ? (
               <Link href="/admin/cases?sla_breached=true" className="block font-semibold text-[#D94F3B] hover:underline">
                 {overdue} overdue →
@@ -123,5 +123,68 @@ export function CategoryMix({ categories }: { categories: AdminStats["category_b
         </p>
       )}
     </>
+  );
+}
+
+function formatHours(hours: number | null): string {
+  if (hours === null) return "—";
+  return hours < 48 ? `${hours} h` : `${Math.round((hours / 24) * 10) / 10} days`;
+}
+
+const shortDate = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+
+/** The numbers the beta week is judged on: activity per day, time to return, admin response time. */
+export function BetaTrendsCard({ trends }: { trends: AdminStats["trends"] }) {
+  const reportsPerDay = trends.daily.map((day) => day.lost + day.found);
+  const busiest = Math.max(1, ...reportsPerDay);
+  const totalReports = reportsPerDay.reduce((sum, n) => sum + n, 0);
+  const totalRegistrations = trends.daily.reduce((sum, day) => sum + day.registrations, 0);
+
+  return (
+    <div className="p-6 rounded-3xl bg-white border border-[#E2DDD2] shadow-sm">
+      <h2 className="font-serif text-lg font-bold text-[#1C1C1E] mb-4">Last 14 Days</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          <div className="flex items-end gap-1 h-24" aria-label="Reports per day">
+            {trends.daily.map((day, i) => (
+              <div
+                key={day.date}
+                title={`${shortDate(day.date)}: ${day.lost} lost, ${day.found} found, ${day.registrations} sign-ups`}
+                className="flex-1 rounded-t bg-[#047857]"
+                style={{ height: `${(reportsPerDay[i] / busiest) * 100}%`, minHeight: reportsPerDay[i] ? 4 : 0 }}
+              />
+            ))}
+          </div>
+          <div className="h-px bg-[#EFEAE0]" />
+          <div className="flex justify-between text-[10px] text-[#6B7280] mt-1">
+            <span>{shortDate(trends.daily[0].date)}</span>
+            <span>Today</span>
+          </div>
+        </div>
+        <div className="space-y-3 text-xs">
+          <div className="flex justify-between pb-2 border-b border-[#EFEAE0]">
+            <span className="text-[#6B7280]">Reports</span>
+            <span className="font-bold text-[#1C1C1E]">{totalReports}</span>
+          </div>
+          <div className="flex justify-between pb-2 border-b border-[#EFEAE0]">
+            <span className="text-[#6B7280]">New students</span>
+            <span className="font-bold text-[#1C1C1E]">{totalRegistrations}</span>
+          </div>
+          <div className="flex justify-between pb-2 border-b border-[#EFEAE0]">
+            <span className="text-[#6B7280]">Avg time to return</span>
+            <span className="font-bold text-[#1C1C1E]" title={`${trends.returns_measured} closed case(s)`}>
+              {formatHours(trends.avg_hours_to_return)}
+            </span>
+          </div>
+          <div className="flex justify-between pb-2 border-b border-[#EFEAE0]">
+            <span className="text-[#6B7280]">Avg first admin response</span>
+            <span className="font-bold text-[#1C1C1E]" title={`${trends.reviews_measured} reviewed report(s)`}>
+              {formatHours(trends.avg_hours_to_first_review)}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

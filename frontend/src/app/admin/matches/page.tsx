@@ -179,6 +179,7 @@ export default function AdminMatchesPage() {
   const handleOpenProofModal = (item: MatchItem) => {
     setProofModalMatch(item);
     setProofNotes("");
+    setError("");
     if (item.proof_questions && item.proof_questions.length > 0) {
       setProofQuestionsList(item.proof_questions);
     } else {
@@ -199,13 +200,19 @@ export default function AdminMatchesPage() {
 
   const handleSubmitProof = async () => {
     if (!proofModalMatch) return;
+    // The form starts with suggested questions; only the ones actually asked and answered are evidence
+    const answered = proofQuestionsList.filter((q) => q.question.trim() && q.answer.trim());
+    if (answered.length === 0) {
+      setError("Record the owner's answer to at least one question before saving.");
+      return;
+    }
     setSubmittingAction(true);
     setError("");
     try {
       await apiClient(`/matching/${proofModalMatch.id}/proof/`, {
         method: "POST",
         body: JSON.stringify({
-          questions: proofQuestionsList.filter((q) => q.question.trim()),
+          questions: answered,
           decision: proofDecision,
           notes: proofNotes.trim(),
         }),
@@ -240,10 +247,13 @@ export default function AdminMatchesPage() {
     setSubmittingAction(true);
     setError("");
     try {
-      const res = await apiClient(`/matching/${matchId}/handover-code/generate/`, { method: "POST" });
-      if (res?.data?.code) {
-        setGeneratedCode(res.data.code);
-        setSuccessMsg(`Handover code generated: ${res.data.code}`);
+      // The API returns { success, code, message }: the code is top level, not under data
+      const res = await apiClient<{ code?: string }>(`/matching/${matchId}/handover-code/generate/`, { method: "POST" });
+      if (res?.code) {
+        setGeneratedCode(res.code);
+        setSuccessMsg(`Handover code generated: ${res.code}`);
+      } else {
+        setError("The server didn't return a handover code. Please try again.");
       }
       refresh();
     } catch (err) {
@@ -869,6 +879,9 @@ export default function AdminMatchesPage() {
                 className="w-full px-3 py-1.5 bg-[#FAF7F2] border border-[#EFEAE0] rounded-xl text-xs"
               />
             </div>
+
+            {/* The page-level error banner sits behind this dialog, so repeat it here */}
+            {error && <p className="text-xs font-medium text-[#D94F3B]">{error}</p>}
 
             <div className="flex items-center justify-end gap-3 pt-2">
               <button

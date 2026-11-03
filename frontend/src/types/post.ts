@@ -57,6 +57,8 @@ export interface Post {
   author_email?: string;
   is_sla_breached?: boolean;
   reviewed_by_email?: string;
+  assigned_to?: string | null;
+  assigned_to_email?: string | null;
   reviewed_at?: string;
   audit_history?: Array<{
     id: string;
@@ -76,6 +78,7 @@ export interface AbuseReport {
   id: string;
   post: string;
   post_title?: string;
+  post_status?: PostStatus;
   reporter?: string;
   reporter_name?: string;
   reporter_email?: string;
@@ -121,4 +124,12 @@ export interface AdminStats {
     notes?: string;
     created_at: string;
   }>;
+  review_sla_hours: number;
+  trends: {
+    daily: Array<{ date: string; lost: number; found: number; registrations: number }>;
+    avg_hours_to_return: number | null;
+    returns_measured: number;
+    avg_hours_to_first_review: number | null;
+    reviews_measured: number;
+  };
 }

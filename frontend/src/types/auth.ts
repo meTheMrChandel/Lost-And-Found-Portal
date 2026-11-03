@@ -7,6 +7,7 @@ export interface User {
   program_year: string;
   hostel?: string;
   phone?: string;
+  photo?: string | null;
   role: "admin" | "user";
   is_staff: boolean;
   is_superuser?: boolean;
@@ -44,6 +45,8 @@ export interface SiteSettings {
   post_expiry_days: number;
   otp_expiry_seconds: number;
   otp_max_attempts: number;
+  admin_review_sla_hours: number;
+  abuse_auto_hide_threshold: number;
   updated_at: string;
 }
 

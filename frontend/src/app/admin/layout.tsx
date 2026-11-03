@@ -19,6 +19,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/users", label: "User Moderation" },
     { href: "/admin/invites", label: "Admin Invites" },
     { href: "/admin/audit-logs", label: "Audit Logs" },
+    { href: "/admin/feedback", label: "Feedback" },
     { href: "/admin/settings", label: "Site Configuration" },
   ];
 

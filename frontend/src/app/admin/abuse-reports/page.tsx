@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { apiClient, getErrorMessage } from "@/lib/api";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { AbuseReport } from "@/types/post";
@@ -22,6 +23,28 @@ export default function AdminAbuseReportsPage() {
   const refreshReports = () => {
     setError("");
     refresh();
+  };
+
+  // Hide or restore the reported post through the same review action the Case Queue uses
+  const handlePostAction = async (report: AbuseReport, action: "HIDE" | "APPROVE") => {
+    setResolvingId(report.id);
+    setMsg("");
+    setError("");
+    try {
+      await apiClient(`/adminpanel/posts/${report.post}/review/`, {
+        method: "POST",
+        data: {
+          action,
+          remarks: action === "HIDE" ? `Hidden after an abuse report (${report.reason}).` : "Restored after reviewing abuse reports.",
+        },
+      });
+      setMsg(action === "HIDE" ? "Post hidden from the campus feed." : "Post restored to the campus feed.");
+      refresh();
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to update the reported post."));
+    } finally {
+      setResolvingId(null);
+    }
   };
 
   const handleResolve = async (id: string) => {
@@ -100,8 +123,12 @@ export default function AdminAbuseReportsPage() {
                   <tr key={r.id} className="hover:bg-[#FAF7F2]/60 transition-colors">
                     <td className="py-3.5 px-2 font-medium text-[#1C1C1E]">
                       <span className="block font-bold">{r.post_title || "Target Post"}</span>
-                      <span className="text-[10px] text-[#6B7280] font-mono">
-                        ID: #{r.post?.slice(0, 8)}
+                      <span className="text-[10px] text-[#6B7280]">
+                        {r.post_status === "HIDDEN" ? "Hidden from feed" : r.post_status?.replace("_", " ").toLowerCase()}
+                        {" · "}
+                        <Link href={`/admin/cases?post=${r.post}`} className="font-semibold text-[#047857] hover:underline">
+                          Open case →
+                        </Link>
                       </span>
                     </td>
                     <td className="py-3.5 px-2">
@@ -136,6 +163,24 @@ export default function AdminAbuseReportsPage() {
                       })}
                     </td>
                     <td className="py-3.5 px-2 text-right">
+                      <div className="flex justify-end items-center gap-2">
+                      {r.post_status === "HIDDEN" ? (
+                        <button
+                          onClick={() => handlePostAction(r, "APPROVE")}
+                          disabled={resolvingId === r.id}
+                          className="px-3 py-1.5 rounded-xl bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          Restore
+                        </button>
+                      ) : r.post_status && r.post_status !== "REJECTED" ? (
+                        <button
+                          onClick={() => handlePostAction(r, "HIDE")}
+                          disabled={resolvingId === r.id}
+                          className="px-3 py-1.5 rounded-xl bg-white border border-[#D94F3B]/40 text-[#D94F3B] hover:bg-[#D94F3B]/10 text-[11px] font-bold transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          Hide Post
+                        </button>
+                      ) : null}
                       {!r.is_resolved ? (
                         <button
                           onClick={() => handleResolve(r.id)}
@@ -149,6 +194,7 @@ export default function AdminAbuseReportsPage() {
                           Resolved by {r.resolved_by_email?.split("@")[0] || "admin"}
                         </span>
                       )}
+                      </div>
                     </td>
                   </tr>
                 ))}
