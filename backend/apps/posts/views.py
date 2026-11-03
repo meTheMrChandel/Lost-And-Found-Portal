@@ -206,9 +206,13 @@ class OwnPostDetailView(APIView):
 
     permission_classes = [IsAuthenticated, IsNotBanned]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    post_type = None
-    update_serializer_class = None
-    report_label = "Report"
+
+    # Either URL reaches either kind of report, so the editable fields follow the report's
+    # own type: reward and hidden proof only on lost reports, custody details only on found ones
+    update_serializers = {
+        Post.PostType.LOST: LostPostUpdateSerializer,
+        Post.PostType.FOUND: FoundPostUpdateSerializer,
+    }
 
     def get_object(self, pk, user):
         try:
@@ -247,7 +251,7 @@ class OwnPostDetailView(APIView):
                 f"Cannot edit report in status '{post.get_status_display()}'."
             )
 
-        serializer = self.update_serializer_class(post, data=request.data, partial=True)
+        serializer = self.update_serializers[post.post_type](post, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
         # The author answering an info request sends the report back to the review queue
@@ -328,10 +332,6 @@ class LostPostDetailView(OwnPostDetailView):
     DELETE /api/v1/posts/lost/<id>/ — Withdraw report (Author or Admin).
     """
 
-    post_type = Post.PostType.LOST
-    update_serializer_class = LostPostUpdateSerializer
-    report_label = "Lost item report"
-
 
 @extend_schema_view(
     get=extend_schema(responses={200: LostPostDetailSerializer}),
@@ -343,10 +343,6 @@ class FoundPostDetailView(OwnPostDetailView):
     PATCH /api/v1/posts/found/<id>/ — Edit report (Author only, when PENDING or INFO_REQUESTED).
     DELETE /api/v1/posts/found/<id>/ — Withdraw report (Author or Admin).
     """
-
-    post_type = Post.PostType.FOUND
-    update_serializer_class = FoundPostUpdateSerializer
-    report_label = "Found item report"
 
 
 class FoundPostCreateView(APIView):

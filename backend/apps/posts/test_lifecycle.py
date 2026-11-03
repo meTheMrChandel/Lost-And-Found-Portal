@@ -513,3 +513,47 @@ class TestLifecycleStatistics:
             "post_expiry_days": 21,
             "renewal_reminder_days": 5,
         }
+
+
+@pytest.mark.django_db
+class TestEditRulesFollowTheReportType:
+    """Both /posts/lost/<id>/ and /posts/found/<id>/ reach any report; the fields must not depend on the URL."""
+
+    def test_found_report_edited_through_the_lost_url(self, client, owner, make_post):
+        found = make_post(status=Post.Status.PENDING, post_type=Post.PostType.FOUND, custody_location="finder")
+        client.force_authenticate(user=owner)
+        res = client.patch(
+            f"/api/v1/posts/lost/{found.id}/",
+            {"reward_amount": "500.00", "hidden_proof": "scratch on lid", "custody_location": "security_office"},
+            format="json",
+        )
+        assert res.status_code == 200
+
+        found.refresh_from_db()
+        assert found.reward_amount == 0
+        assert found.hidden_proof == ""
+        assert found.custody_location == "security_office"
+
+    def test_found_time_check_applies_through_the_lost_url(self, client, owner, make_post):
+        found = make_post(status=Post.Status.PENDING, post_type=Post.PostType.FOUND)
+        client.force_authenticate(user=owner)
+        res = client.patch(
+            f"/api/v1/posts/lost/{found.id}/",
+            {"last_seen_time": (timezone.now() + timedelta(days=1)).isoformat()},
+            format="json",
+        )
+        assert res.status_code == 400
+
+    def test_lost_report_edited_through_the_found_url(self, client, owner, make_post):
+        lost = make_post(status=Post.Status.PENDING)
+        client.force_authenticate(user=owner)
+        res = client.patch(
+            f"/api/v1/posts/found/{lost.id}/",
+            {"inform_admin_privately": True, "reward_amount": "50.00"},
+            format="json",
+        )
+        assert res.status_code == 200
+
+        lost.refresh_from_db()
+        assert lost.inform_admin_privately is False
+        assert lost.reward_amount == 50
