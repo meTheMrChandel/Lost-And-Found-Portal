@@ -463,3 +463,30 @@ class TestFoundReportOwnerEndpoints:
         assert post.status == Post.Status.INFO_REQUESTED
         assert post.description != "Now with photos"
         assert not PostAuditLog.objects.filter(action="RESUBMIT").exists()
+
+
+@pytest.mark.django_db
+class TestReturnedOnCaseClose:
+    def test_closing_a_case_logs_the_return_on_both_posts(self, client, owner, admin_user, make_post):
+        from apps.matching.models import Match
+
+        finder = User.objects.create_user(
+            email="lifecycle.finder@iitrpr.ac.in",
+            registration_number="2024CSM1054",
+            password="TestPassword123",
+            full_name="Lifecycle Finder",
+        )
+        lost = make_post()
+        found = make_post(post_type=Post.PostType.FOUND, author=finder, status=Post.Status.EXPIRED)
+        match = Match.objects.create(lost_post=lost, found_post=found, score=0.9, status=Match.Status.HANDED_OVER)
+
+        client.force_authenticate(user=admin_user)
+        res = client.post(f"/api/v1/matching/{match.id}/close/", {"reward_amount_settled": "100.00"})
+        assert res.status_code == 200
+
+        for post, previous in ((lost, "APPROVED"), (found, "EXPIRED")):
+            post.refresh_from_db()
+            assert post.status == Post.Status.RETURNED
+            log = PostAuditLog.objects.get(post=post, action="RETURN")
+            assert (log.previous_status, log.new_status, log.admin) == (previous, "RETURNED", admin_user)
+            assert str(match.id) in log.notes

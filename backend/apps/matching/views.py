@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsCampusAdmin, IsNotBanned
+from apps.adminpanel.models import PostAuditLog
 from apps.posts.models import Post
 from apps.matching.models import Match, MatchAuditLog
 from apps.matching.serializers import (
@@ -456,15 +457,19 @@ class AdminMatchCloseView(APIView):
             ]
         )
 
-        # Update Posts to RETURNED
-        lost_post = match.lost_post
-        found_post = match.found_post
-
-        lost_post.status = Post.Status.RETURNED
-        lost_post.save(update_fields=["status", "updated_at"])
-
-        found_post.status = Post.Status.RETURNED
-        found_post.save(update_fields=["status", "updated_at"])
+        # Update Posts to RETURNED, and record it in each post's own audit trail
+        for post in (match.lost_post, match.found_post):
+            previous_status = post.status
+            post.status = Post.Status.RETURNED
+            post.save(update_fields=["status", "updated_at"])
+            PostAuditLog.objects.create(
+                post=post,
+                admin=request.user,
+                action="RETURN",
+                previous_status=previous_status,
+                new_status=Post.Status.RETURNED,
+                notes=f"Item handed over and case {match.id} closed.",
+            )
 
         MatchAuditLog.objects.create(
             match=match,
