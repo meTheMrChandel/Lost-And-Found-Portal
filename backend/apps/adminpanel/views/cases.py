@@ -18,8 +18,61 @@ from apps.adminpanel.serializers import (
     AdminPostListSerializer,
     AdminPostReviewSerializer,
 )
+from apps.notifications.models import Notification
+from apps.notifications.services import create_notification
 from apps.posts.lifecycle import new_expiry_date, sla_cutoff
 from apps.posts.models import Category, Post
+
+
+def notify_review_decision(post, action, remarks=""):
+    """Tell the author what an admin decided about their report (in-app and email)."""
+    if post.author is None:
+        return
+
+    title = post.title
+    if action == "APPROVE":
+        listed_until = timezone.localtime(post.expires_at).strftime("%d %b %Y")
+        notice = (
+            Notification.NotifType.POST_APPROVED,
+            f'"{title}" is live on the campus feed',
+            f"An admin approved your report. It stays listed until {listed_until} unless you renew it.",
+        )
+    elif action == "REJECT":
+        notice = (
+            Notification.NotifType.POST_REJECTED,
+            f'"{title}" was not approved',
+            f"An admin reviewed your report and could not approve it. Reason: {remarks}",
+        )
+    elif action == "INFO_REQUESTED":
+        notice = (
+            Notification.NotifType.INFO_REQUESTED,
+            f'More information needed for "{title}"',
+            f"The admin asked: {remarks}\nUpdate your report with these details to send it back for review.",
+        )
+    elif action == "HIDE":
+        notice = (
+            Notification.NotifType.GENERAL,
+            f'"{title}" was hidden by an admin',
+            remarks or "It is no longer shown on the campus feed.",
+        )
+    elif action == "DELETE":
+        notice = (
+            Notification.NotifType.GENERAL,
+            f'"{title}" was removed by an admin',
+            remarks or "An admin removed this report from the portal.",
+        )
+    else:
+        # CHANGE_CATEGORY only re-files the report; the author does not need to act
+        return
+
+    notif_type, notif_title, body = notice
+    create_notification(
+        recipient=post.author,
+        notif_type=notif_type,
+        title=notif_title,
+        body=body,
+        data={"post_id": str(post.id), "action": action},
+    )
 
 
 class AdminPostQueueView(APIView):
@@ -238,11 +291,14 @@ class AdminPostReviewView(APIView):
                 new_status="DELETED",
                 notes=remarks or "Post deleted by admin.",
             )
+            notify_review_decision(post, action, remarks)
             post.delete()
             return Response(
                 {"success": True, "message": "Post was successfully deleted."},
                 status=status.HTTP_200_OK,
             )
+
+        notify_review_decision(post, action, remarks)
 
         updated_serializer = AdminPostDetailSerializer(post)
         return Response(

@@ -313,3 +313,53 @@ class TestResubmissionAfterInfoRequest:
 
         post.refresh_from_db()
         assert post.status == Post.Status.INFO_REQUESTED
+
+
+@pytest.mark.django_db
+class TestReviewDecisionNotifications:
+    def review(self, client, admin_user, post, **payload):
+        client.force_authenticate(user=admin_user)
+        res = client.post(f"/api/v1/adminpanel/posts/{post.id}/review/", payload)
+        assert res.status_code == 200
+        return res
+
+    def test_approval_tells_the_author_how_long_it_is_listed(self, client, owner, admin_user, make_post):
+        post = make_post(status=Post.Status.PENDING)
+        self.review(client, admin_user, post, action="APPROVE")
+
+        notice = owner.notifications.get(notif_type="post_approved")
+        assert notice.title == '"Blue Milton bottle" is live on the campus feed'
+        post.refresh_from_db()
+        assert timezone.localtime(post.expires_at).strftime("%d %b %Y") in notice.body
+        assert notice.data == {"post_id": str(post.id), "action": "APPROVE"}
+
+    def test_info_request_passes_on_the_admins_question(self, client, owner, admin_user, make_post):
+        post = make_post(status=Post.Status.PENDING)
+        self.review(client, admin_user, post, action="INFO_REQUESTED", remarks="Which hostel did you lose it in?")
+
+        notice = owner.notifications.get(notif_type="info_requested")
+        assert "Which hostel did you lose it in?" in notice.body
+
+    def test_rejection_includes_the_reason(self, client, owner, admin_user, make_post):
+        post = make_post(status=Post.Status.PENDING)
+        self.review(client, admin_user, post, action="REJECT", remarks="Duplicate of an earlier report.")
+
+        notice = owner.notifications.get(notif_type="post_rejected")
+        assert notice.body.endswith("Reason: Duplicate of an earlier report.")
+
+    def test_hide_and_delete_are_reported_to_the_author(self, client, owner, admin_user, make_post):
+        hidden = make_post()
+        removed = make_post()
+        self.review(client, admin_user, hidden, action="HIDE")
+        self.review(client, admin_user, removed, action="DELETE", remarks="Spam")
+
+        titles = set(owner.notifications.filter(notif_type="general").values_list("title", flat=True))
+        assert titles == {
+            '"Blue Milton bottle" was hidden by an admin',
+            '"Blue Milton bottle" was removed by an admin',
+        }
+
+    def test_category_change_does_not_notify(self, client, owner, admin_user, make_post):
+        post = make_post(status=Post.Status.PENDING)
+        self.review(client, admin_user, post, action="CHANGE_CATEGORY", new_category="umbrella")
+        assert not owner.notifications.exists()
