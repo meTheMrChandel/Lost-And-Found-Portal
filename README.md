@@ -150,8 +150,8 @@ npm run dev
 ## 📋 Post Lifecycle & Governance
 
 - **Status flow:** `PENDING` → admin review → `APPROVED` / `REJECTED` / `INFO_REQUESTED`. When the author edits an `INFO_REQUESTED` report it goes back to `PENDING` for another review. `APPROVED` posts later become `EXPIRED` (not renewed) or `RETURNED`; admins can also `HIDE` or delete a post.
-- **Owner endpoints:** `GET` / `PATCH` / `DELETE` on `/api/v1/posts/lost/<id>/` and `/api/v1/posts/found/<id>/`. The author can edit while `PENDING` or `INFO_REQUESTED` and can withdraw at any time; both report types follow the same rules. An edit and its photo uploads succeed or fail together.
-- **Review decisions notify the author** (in-app and email): approval (with the date the post stays listed until), rejection (with the reason), an info request (with the admin's question), and hiding or removal.
+- **Owner endpoints:** `GET` / `PATCH` / `DELETE` on `/api/v1/posts/lost/<id>/` and `/api/v1/posts/found/<id>/`; either path reaches either kind of report. The author can edit while `PENDING` or `INFO_REQUESTED` and can withdraw at any time. The editable fields follow the report's own type, whichever path is used: reward and hidden proof only on lost reports, custody location and the private-to-admin flag only on found reports. An edit and its photo uploads succeed or fail together.
+- **Review decisions notify the author** (in-app and email, from `apps/notifications/events.py`): approval (with the date the post stays listed until), rejection, an info request and hiding or removal, each with the admin's note.
 - **30-day expiry, from approval:** approving a post sets `expires_at` to `SiteSettings.post_expiry_days` (default 30) from the approval time.
 - **Periodic job (`apps/posts/lifecycle.py`):** `run_post_lifecycle()` runs every hour through Celery beat (`apps.posts.tasks.run_post_lifecycle`), or by hand with `python manage.py run_lifecycle`. Each run:
   - sends the owner one "expiring soon" notification when 5 days or fewer are left
@@ -162,7 +162,7 @@ npm run dev
 - **Review SLA:** the case queue's `?sla_breached=true` filter, the `is_sla_breached` flag and the dashboard's overdue count all use `admin_review_sla_hours`.
 - **Statistics (`/api/v1/adminpanel/statistics/`):** `posts.expired`, `posts.expiring_soon`, and a `lifecycle` block with `review_sla_hours`, `post_expiry_days` and `renewal_reminder_days`.
 - **Audit log (`PostAuditLog`):** every status change is recorded with the previous and new status, the actor (empty for automatic expiry), the time and notes: `APPROVE`, `REJECT`, `INFO_REQUESTED`, `RESUBMIT`, `HIDE`, `CHANGE_CATEGORY`, `RENEW`, `EXPIRE`, `RETURN` (case closed after handover), `WITHDRAW`, `DELETE`. Entries are append-only (edits and deletes raise `ImmutableAuditLogError`, and the Django admin view is read-only), and they outlive the post: `post_ref` and `post_title` keep which post an entry was about after it is deleted.
-- **Automated Tests:** `apps/posts/test_lifecycle.py` and `apps/adminpanel/test_audit_log.py` (143/143 tests passing across repository).
+- **Automated Tests:** `apps/posts/test_lifecycle.py` and `apps/adminpanel/test_audit_log.py` (202/202 tests passing across repository).
 
 ---
 
@@ -257,7 +257,7 @@ npm run dev
   - Unified notifications system for match alerts, handover updates, case resolutions, and chat messages.
   - Real-time unread badge counter (`/api/v1/notifications/unread-count/`).
   - Mark single (`/api/v1/notifications/<id>/read/`) or bulk (`/api/v1/notifications/mark-all-read/`) read actions.
-  - Each notification has `notification_type`, `title`, `message` and `action_url` (the web page to open, e.g. `/my-reports`), plus the original `notif_type`, `body` and `data` fields.
+  - Each notification has `notification_type`, `title`, `message` and `action_url` (the web page to open: `/my-reports` for notices about a student's own report, `/admin/cases` or `/admin/abuse-reports` for admin alerts, `/chat` for messages), plus the original `notif_type`, `body` and `data` fields.
 - **Frontend Chat & Notification Suite:**
   - `NotificationBell.tsx`: Interactive navigation dropdown with real-time unread count badge, notification list, and time ago formatting.
   - `/chat`: Campus messaging center with active thread sidebar, live message stream, admin approval workflow, user block toggle, and WebSocket connectivity.
