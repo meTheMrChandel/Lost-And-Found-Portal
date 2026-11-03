@@ -41,6 +41,15 @@ export interface ChatMessage {
 }
 
 export const chatApi = {
+  /**
+   * The student's own thread with the admin office. Chat is admin-mediated, so a post
+   * has no conversation of its own; the backend reuses the existing thread if there is one.
+   */
+  async openAdminConversation(): Promise<Conversation> {
+    const res = await apiClient.post("/chat/conversations/", { conversation_type: "owner_admin" });
+    return res.data?.data || res.data;
+  },
+
   async getConversations(): Promise<Conversation[]> {
     const res = await apiClient.get("/chat/conversations/");
     const payload = res.data?.data || res.data;

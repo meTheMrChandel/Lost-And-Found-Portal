@@ -23,7 +23,18 @@ const DEFAULT_API_BASE =
     ? `http://${expoHost}:8000/api/v1`
     : `http://${LAN_FALLBACK_HOST}:8000/api/v1`;
 
-export const API_URL = DEFAULT_API_BASE;
+// Release builds point at the deployed server, e.g. https://lostandfound.iitrpr.ac.in/api/v1
+const CONFIGURED_API_BASE = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, "");
+
+export const API_URL = CONFIGURED_API_BASE || DEFAULT_API_BASE;
+
+/** Origin of the API server (no /api/v1), used for media files and WebSockets. */
+export const API_ORIGIN = API_URL.replace(/\/api\/v\d+$/, "");
+
+/** WebSocket URL on the API server, e.g. wss://host/ws/chat/<id>/ for an https API. */
+export function websocketUrl(path: string): string {
+  return API_ORIGIN.replace(/^http/, "ws") + path;
+}
 
 // Platform-aware secure storage helper
 export const storage = {
@@ -191,19 +202,49 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // Format server error message
-    const data = error.response?.data;
-    let message = "Network request failed";
-    if (data) {
-      if (data.errors && typeof data.errors === "object") {
-        message = Object.values(data.errors).flat().join(" ");
-      } else if (data.message) {
-        message = data.message;
-      } else if (data.detail) {
-        message = data.detail;
-      }
-    }
-    error.formattedMessage = message;
+    error.formattedMessage = describeError(error);
     return Promise.reject(error);
   }
 );
+
+function fieldLabel(field: string): string {
+  return field.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+}
+
+/** Turns a failed request into a message for the user. */
+function describeError(error: any): string {
+  const response = error.response;
+  // No response at all: the server couldn't be reached
+  if (!response) return "Can't reach the server. Check your connection and try again.";
+
+  const data = response.data;
+  if (data && typeof data === "object") {
+    const errors = data.errors && typeof data.errors === "object" ? data.errors : {};
+    // SimpleJWT reports a bad token as {detail, code, messages} field errors
+    const tokenInvalid = Array.isArray(errors.code) && errors.code.includes("token_not_valid");
+    if (tokenInvalid || data.code === "token_not_valid") return "Your session has expired. Please sign in again.";
+
+    // The envelope always carries `errors`, often empty: only use it when it has entries
+    const fieldMessages = Object.entries(errors).flatMap(([field, messages]) =>
+      (Array.isArray(messages) ? messages : [messages]).map((m) => {
+        const text = String(m);
+        if (field === "non_field_errors" || field === "detail") return text;
+        const label = fieldLabel(field);
+        return text.toLowerCase().startsWith(label.toLowerCase()) ? text : `${label}: ${text}`;
+      })
+    );
+    if (fieldMessages.length > 0) return fieldMessages.join(" ");
+    if (data.message) return String(data.message);
+    if (data.detail) return String(data.detail);
+  }
+
+  if (response.status === 429) return "Too many attempts. Please wait a moment and try again.";
+  if (response.status >= 500) return "Something went wrong on the server. Please try again shortly.";
+  if (response.status === 404) return "We couldn't find that. It may have been removed.";
+  return `Request failed (${response.status}).`;
+}
+
+/** Message to show for a failed request, from the server when it sent one. */
+export function errorMessage(err: any, fallback: string): string {
+  return err?.formattedMessage || err?.message || fallback;
+}

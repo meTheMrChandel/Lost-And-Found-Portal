@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
-import { apiClient } from "../../api/client";
+import { apiClient, errorMessage } from "../../api/client";
+import { chatApi } from "../../api/chat";
 import { postsApi, Post } from "../../api/posts";
 import { useAuth } from "../../context/AuthContext";
 import { Badge } from "../../components/Badge";
@@ -26,6 +27,7 @@ export const ItemDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [reportingAbuse, setReportingAbuse] = useState<boolean>(false);
+  const [openingChat, setOpeningChat] = useState<boolean>(false);
 
   useEffect(() => {
     const loadPost = async () => {
@@ -166,8 +168,16 @@ export const ItemDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   );
                   return;
                 }
-                navigation.navigate("Chat", { conversationId: post.id, title: post.title });
+                setOpeningChat(true);
+                chatApi
+                  .openAdminConversation()
+                  .then((conv) =>
+                    navigation.navigate("Chat", { conversationId: conv.id, title: `Admin office · ${post.title}` })
+                  )
+                  .catch((err) => Alert.alert("Chat unavailable", errorMessage(err, "Could not open the chat.")))
+                  .finally(() => setOpeningChat(false));
               }}
+              loading={openingChat}
               style={styles.actionBtn}
             />
 

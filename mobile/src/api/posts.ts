@@ -1,4 +1,4 @@
-import { apiClient, API_URL } from "./client";
+import { apiClient, API_ORIGIN } from "./client";
 
 export interface Category {
   id: string;
@@ -39,16 +39,40 @@ export interface Post {
   created_at: string;
 }
 
+/** A row from My Reports, as the API sends it (post_type and status are uppercase). */
+export interface MyReport {
+  id: string;
+  title: string;
+  post_type: "LOST" | "FOUND";
+  category: string;
+  category_name?: string;
+  status: string;
+  last_seen_place: string;
+  last_seen_time: string;
+  reward_amount?: string | number;
+  admin_remarks?: string;
+  images: PostImageItem[];
+  created_at: string;
+  expires_at?: string | null;
+  description?: string;
+}
+
+function absoluteImages(raw: any[] | undefined): PostImageItem[] {
+  return (raw || []).map((img: any, idx: number) => {
+    let url = img.image_url || img.image || "";
+    if (url && url.startsWith("/") && !url.startsWith("//")) url = `${API_ORIGIN}${url}`;
+    return { id: img.id || `img_${idx}`, image_url: url, is_primary: idx === 0 };
+  });
+}
+
 export function normalizePost(raw: any): Post {
   const isLost = (raw.post_type || "").toLowerCase() === "lost";
   const postType: "lost" | "found" = isLost ? "lost" : "found";
 
-  const hostBase = API_URL.replace("/api/v1", "");
-
   const images: PostImageItem[] = (raw.images || []).map((img: any, idx: number) => {
     let rawUrl = img.image_url || img.image || (typeof img === "string" ? img : "");
     if (rawUrl && rawUrl.startsWith("/") && !rawUrl.startsWith("//")) {
-      rawUrl = `${hostBase}${rawUrl}`;
+      rawUrl = `${API_ORIGIN}${rawUrl}`;
     }
     return {
       id: img.id || `img_${idx}`,
@@ -130,10 +154,32 @@ export const postsApi = {
     return res.data;
   },
 
-  async getMyReports(): Promise<Post[]> {
+  async getMyReports(): Promise<MyReport[]> {
     const res = await apiClient.get("/posts/lost/my-reports/");
     const payload = res.data?.data || res.data;
-    return Array.isArray(payload) ? payload : payload?.results || [];
+    const rows: any[] = Array.isArray(payload) ? payload : payload?.results || [];
+    return rows.map((row) => ({ ...row, images: absoluteImages(row.images) }));
+  },
+
+  /** Full report for its author, including the description the list leaves out. */
+  async getMyReportDetail(postId: string): Promise<MyReport> {
+    const res = await apiClient.get(`/posts/lost/${postId}/`);
+    const row = res.data?.data || res.data;
+    return { ...row, images: absoluteImages(row.images) };
+  },
+
+  /** Editing a report while info is requested sends it back to admin review. */
+  async updateReport(
+    postId: string,
+    changes: { description: string; last_seen_place: string }
+  ): Promise<{ message?: string }> {
+    const res = await apiClient.patch(`/posts/lost/${postId}/`, changes);
+    return res.data;
+  },
+
+  async withdrawReport(postId: string): Promise<{ message?: string }> {
+    const res = await apiClient.delete(`/posts/lost/${postId}/`);
+    return res.data;
   },
 
   async reportAbuse(postId: string, reason: string): Promise<any> {
@@ -141,7 +187,7 @@ export const postsApi = {
     return res.data;
   },
 
-  async renewPost(postId: string): Promise<any> {
+  async renewPost(postId: string): Promise<{ success?: boolean; message?: string }> {
     const res = await apiClient.post(`/posts/${postId}/renew/`);
     return res.data;
   },

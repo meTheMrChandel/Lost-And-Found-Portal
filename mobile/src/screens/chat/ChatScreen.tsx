@@ -12,7 +12,8 @@ import {
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
-import { chatApi, ChatMessage, Conversation } from "../../api/chat";
+import { chatApi, ChatMessage } from "../../api/chat";
+import { errorMessage, storage, websocketUrl } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import { colors } from "../../theme/colors";
 
@@ -26,53 +27,137 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [lastSync, setLastSync] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   const flatListRef = useRef<FlatList>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  // Newest message we hold, so a reconnect only fetches what was missed
+  const lastSyncRef = useRef<string | null>(null);
+  const userIdRef = useRef(user?.id);
+  userIdRef.current = user?.id;
 
-  // Load messages
-  const fetchMessages = async (sinceCursor?: string) => {
-    try {
-      const data = await chatApi.getMessages(conversationId, sinceCursor);
-      if (sinceCursor && data.length > 0) {
-        setMessages((prev) => [...prev, ...data]);
-      } else if (!sinceCursor) {
-        setMessages(data);
-      }
-      if (data.length > 0) {
-        setLastSync(data[data.length - 1].created_at);
-      }
-      await chatApi.markRead(conversationId);
-    } catch (e) {
-      console.error("Chat load error", e);
-    } finally {
-      setLoading(false);
-    }
+  const addMessages = (incoming: ChatMessage[]) => {
+    if (incoming.length === 0) return;
+    setMessages((prev) => {
+      const known = new Set(prev.map((m) => m.id));
+      const fresh = incoming.filter((m) => !known.has(m.id));
+      return fresh.length ? [...prev, ...fresh] : prev;
+    });
+    const newest = incoming[incoming.length - 1].created_at;
+    if (!lastSyncRef.current || newest > lastSyncRef.current) lastSyncRef.current = newest;
   };
 
   useEffect(() => {
-    fetchMessages();
-    // Poll every 5s for incremental sync via ?since= cursor
-    const interval = setInterval(() => {
-      if (lastSync) {
-        fetchMessages(lastSync);
+    let closedByUs = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryDelay = 2000;
+
+    // REST sync: everything on first load, then only messages since the last one we hold
+    const sync = async () => {
+      try {
+        const data = await chatApi.getMessages(conversationId, lastSyncRef.current || undefined);
+        if (closedByUs) return;
+        if (lastSyncRef.current) addMessages(data);
+        else {
+          setMessages(data);
+          if (data.length) lastSyncRef.current = data[data.length - 1].created_at;
+        }
+        await chatApi.markRead(conversationId);
+      } catch (err: any) {
+        if (!closedByUs) setError(errorMessage(err, "Couldn't load messages."));
+      } finally {
+        if (!closedByUs) setLoading(false);
       }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [conversationId, lastSync]);
+    };
+
+    const connect = async () => {
+      // Read the token each time: the REST sync may have refreshed it
+      const token = await storage.getItem("access_token");
+      if (closedByUs || !token) return;
+      const socket = new WebSocket(websocketUrl(`/ws/chat/${conversationId}/?token=${encodeURIComponent(token)}`));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        retryDelay = 2000;
+        setError("");
+        socket.send(JSON.stringify({ action: "mark_read" }));
+      };
+
+      socket.onmessage = (event) => {
+        let payload: any;
+        try {
+          payload = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (payload.type === "chat_message" && payload.message) {
+          const m = payload.message;
+          const isMe = m.sender_id === userIdRef.current;
+          addMessages([
+            {
+              id: m.id,
+              conversation: m.conversation_id || conversationId,
+              sender_id: m.sender_id,
+              sender: { id: m.sender_id, full_name: m.sender_name || "Campus User", email: "", registration_number: "" },
+              content: m.content,
+              is_read: !!m.is_read,
+              is_me: isMe,
+              created_at: m.created_at || new Date().toISOString(),
+            },
+          ]);
+          if (!isMe) socket.send(JSON.stringify({ action: "mark_read" }));
+        } else if (payload.type === "read_receipt" && payload.reader_id !== userIdRef.current) {
+          setMessages((prev) => prev.map((m) => (m.is_me || m.sender_id === userIdRef.current ? { ...m, is_read: true } : m)));
+        } else if (payload.type === "error" && payload.error) {
+          setError(String(payload.error));
+        }
+      };
+
+      socket.onclose = (event) => {
+        if (socketRef.current === socket) socketRef.current = null;
+        // 4403: not a participant of this conversation, retrying won't help
+        if (closedByUs || event.code === 4403) return;
+        retryTimer = setTimeout(async () => {
+          await sync(); // catch up on anything missed, refreshing the token if it expired
+          connect();
+        }, retryDelay);
+        retryDelay = Math.min(retryDelay * 2, 30000);
+      };
+    };
+
+    sync().then(connect);
+
+    return () => {
+      closedByUs = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      socketRef.current?.close();
+      socketRef.current = null;
+      lastSyncRef.current = null;
+    };
+  }, [conversationId]);
 
   const handleSend = async () => {
     if (!inputText.trim() || sending) return;
     const textToSend = inputText.trim();
     setInputText("");
-    setSending(true);
+    setError("");
 
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      // The server broadcasts it back to us, which adds it to the list
+      socket.send(JSON.stringify({ action: "send_message", content: textToSend }));
+      return;
+    }
+
+    // No live connection: fall back to REST
+    setSending(true);
     try {
       const newMsg = await chatApi.sendMessage(conversationId, textToSend);
-      setMessages((prev) => [...prev, newMsg]);
+      addMessages([newMsg]);
       flatListRef.current?.scrollToEnd({ animated: true });
     } catch (err: any) {
-      console.error(err);
+      setInputText(textToSend);
+      setError(errorMessage(err, "Message not sent. Please try again."));
     } finally {
       setSending(false);
     }
@@ -133,6 +218,8 @@ export const ChatScreen: React.FC<Props> = ({ route }) => {
           }
         />
       )}
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {/* Input Box */}
       <View style={styles.inputContainer}>
@@ -268,6 +355,14 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
     lineHeight: 18,
+  },
+  errorText: {
+    color: colors.lost,
+    fontSize: 12,
+    fontWeight: "600",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    backgroundColor: colors.lostLight,
   },
   inputContainer: {
     flexDirection: "row",

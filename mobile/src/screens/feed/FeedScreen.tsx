@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -14,9 +14,12 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
 import { postsApi, Post, Category } from "../../api/posts";
+import { errorMessage } from "../../api/client";
 import { CategoryChip } from "../../components/CategoryChip";
 import { Badge } from "../../components/Badge";
 import { colors } from "../../theme/colors";
+
+const SEARCH_DELAY_MS = 300;
 
 export const FeedScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -26,8 +29,18 @@ export const FeedScreen: React.FC = () => {
   const [selectedType, setSelectedType] = useState<"all" | "lost" | "found">("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  // The search actually sent, updated once typing pauses
+  const [appliedSearch, setAppliedSearch] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  // Only the newest request may update the list, so a slow older search can't overwrite it
+  const latestRequest = useRef(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAppliedSearch(searchQuery.trim()), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch categories
   useEffect(() => {
@@ -42,25 +55,31 @@ export const FeedScreen: React.FC = () => {
 
   // Fetch feed items
   const loadPosts = useCallback(async () => {
+    const requestId = ++latestRequest.current;
     try {
-      const params: any = { include_pending: true };
+      // Public feed shows approved reports only; the backend adds the user's own pending ones
+      const params: any = {};
       if (selectedType !== "all") {
         params.post_type = selectedType.toUpperCase();
         params.type = selectedType.toUpperCase();
       }
       if (selectedCategory !== "all") params.category = selectedCategory;
-      if (searchQuery.trim()) params.search = searchQuery.trim();
+      if (appliedSearch) params.search = appliedSearch;
 
       const data = await postsApi.getFeed(params);
+      if (requestId !== latestRequest.current) return;
       setPosts(data);
+      setError("");
     } catch (e: any) {
-      // Graceful feed fallback
-      setPosts([]);
+      if (requestId !== latestRequest.current) return;
+      setError(errorMessage(e, "Couldn't load the campus feed. Pull down to try again."));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (requestId === latestRequest.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [selectedType, selectedCategory, searchQuery]);
+  }, [selectedType, selectedCategory, appliedSearch]);
 
   useEffect(() => {
     setLoading(true);
@@ -133,7 +152,12 @@ export const FeedScreen: React.FC = () => {
           value={searchQuery}
           onChangeText={setSearchQuery}
           returnKeyType="search"
-          onSubmitEditing={loadPosts}
+          onSubmitEditing={() => {
+            // Search straight away instead of waiting for the pause
+            const query = searchQuery.trim();
+            if (query === appliedSearch) loadPosts();
+            else setAppliedSearch(query);
+          }}
         />
       </View>
 
@@ -180,8 +204,10 @@ export const FeedScreen: React.FC = () => {
         />
       </View>
 
-      {/* Feed List */}
-      {loading ? (
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      {/* Feed List; current results stay visible while a new search loads */}
+      {loading && posts.length === 0 && !error ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Fetching campus feed...</Text>
@@ -201,6 +227,7 @@ export const FeedScreen: React.FC = () => {
             />
           }
           ListEmptyComponent={
+            error ? undefined : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>🍃</Text>
               <Text style={styles.emptyTitle}>No Belongings Listed</Text>
@@ -208,6 +235,7 @@ export const FeedScreen: React.FC = () => {
                 No items match your active search or filters. Check back soon or submit a report.
               </Text>
             </View>
+            )
           }
         />
       )}
@@ -219,6 +247,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  errorText: {
+    color: colors.lost,
+    fontSize: 12,
+    fontWeight: "600",
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   searchContainer: {
     paddingHorizontal: 16,

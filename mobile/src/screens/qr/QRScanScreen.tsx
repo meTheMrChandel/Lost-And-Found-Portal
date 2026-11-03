@@ -8,14 +8,19 @@ import {
   Alert,
 } from "react-native";
 import { Camera, CameraView } from "expo-camera";
-import { useNavigation } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { MainTabParamList } from "../../navigation/types";
+import { errorMessage } from "../../api/client";
 import { itemsApi, QRScanResult } from "../../api/items";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
 import { colors } from "../../theme/colors";
 
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
 export const QRScanScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { params } = useRoute<RouteProp<MainTabParamList, "QRScan">>();
 
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState<boolean>(false);
@@ -30,22 +35,17 @@ export const QRScanScreen: React.FC = () => {
     getCameraPermissions();
   }, []);
 
-  const handleBarcodeScanned = async ({ data }: { data: string }) => {
-    if (scanned || scanning) return;
-    setScanned(true);
+  const lookup = async (uuid: string) => {
     setScanning(true);
-
     try {
-      // Extract UUID from QR URL (e.g. https://.../scan/f47ac10b-58cc-4372-a567-0e02b2c3d479)
-      const parts = data.split("/");
-      const uuid = parts[parts.length - 1];
-
-      const result = await itemsApi.scanQR(uuid);
-      setScanResult(result);
+      setScanResult(await itemsApi.scanQR(uuid));
     } catch (err: any) {
+      const notFound = err?.response?.status === 404;
       Alert.alert(
-        "Invalid Sticker",
-        "Could not verify this QR code as an active IIT Ropar valuable sticker.",
+        notFound ? "Invalid Sticker" : "Couldn't Check Sticker",
+        notFound
+          ? "Could not verify this QR code as an active IIT Ropar valuable sticker."
+          : errorMessage(err, "Please check your connection and try again."),
         [{ text: "Scan Again", onPress: () => setScanned(false) }]
       );
     } finally {
@@ -53,12 +53,66 @@ export const QRScanScreen: React.FC = () => {
     }
   };
 
-  const handleReportFoundFromScan = () => {
-    if (!scanResult) return;
-    navigation.navigate("ReportFound");
+  // Opened from a sticker link: look the tag up directly, no camera needed
+  useEffect(() => {
+    if (params?.uuid) {
+      setScanned(true);
+      lookup(params.uuid);
+    }
+  }, [params?.uuid]);
+
+  const handleBarcodeScanned = async ({ data }: { data: string }) => {
+    if (scanned || scanning) return;
+    setScanned(true);
+    // The sticker encodes a URL ending in /scan/<uuid> (a trailing slash or query is fine)
+    const uuid = data.match(UUID_PATTERN)?.[0];
+    if (!uuid) {
+      Alert.alert("Not a Campus Sticker", "This QR code isn't an IIT Ropar Lost & Found sticker.", [
+        { text: "Scan Again", onPress: () => setScanned(false) },
+      ]);
+      return;
+    }
+    await lookup(uuid);
   };
 
-  if (hasPermission === null) {
+  const handleReportFoundFromScan = () => {
+    if (!scanResult) return;
+    navigation.navigate("ReportFound", {
+      title: `Found: ${scanResult.item_name}`,
+      category: scanResult.category,
+    });
+  };
+
+  const scanAgain = () => {
+    setScanResult(null);
+    setScanned(false);
+    navigation.setParams({ uuid: undefined });
+  };
+
+  if (scanning && !scanResult) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.text}>Checking sticker...</Text>
+      </View>
+    );
+  }
+
+  if (scanResult && !scanResult.is_active) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.emoji}>🏷️</Text>
+        <Text style={styles.title}>Sticker Not Active</Text>
+        <Text style={styles.subtitle}>
+          This sticker has been deactivated by its owner. If you found the item, please hand it in at the
+          Security Office or Admin Office.
+        </Text>
+        <Button title="Scan Another Code" variant="outline" onPress={scanAgain} style={{ marginTop: 16 }} />
+      </View>
+    );
+  }
+
+  if (hasPermission === null && !scanResult) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -67,7 +121,7 @@ export const QRScanScreen: React.FC = () => {
     );
   }
 
-  if (hasPermission === false) {
+  if (hasPermission === false && !scanResult) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.emoji}>📷</Text>
@@ -154,10 +208,7 @@ export const QRScanScreen: React.FC = () => {
             <Button
               title="Scan Another Code"
               variant="outline"
-              onPress={() => {
-                setScanResult(null);
-                setScanned(false);
-              }}
+              onPress={scanAgain}
             />
           </View>
         </View>

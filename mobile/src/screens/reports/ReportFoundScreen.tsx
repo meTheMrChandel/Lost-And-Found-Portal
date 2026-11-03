@@ -11,7 +11,8 @@ import {
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { useNavigation } from "@react-navigation/native";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { MainTabParamList } from "../../navigation/types";
 import { useAuth } from "../../context/AuthContext";
 import { postsApi, Category } from "../../api/posts";
 import { Input } from "../../components/Input";
@@ -21,6 +22,7 @@ import { colors } from "../../theme/colors";
 
 export const ReportFoundScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { params } = useRoute<RouteProp<MainTabParamList, "ReportFound">>();
   const { user } = useAuth();
 
   const [title, setTitle] = useState("");
@@ -41,6 +43,18 @@ export const ReportFoundScreen: React.FC = () => {
       if (cats.length > 0) setSelectedCategory(cats[0].slug);
     }).catch(console.error);
   }, []);
+
+  // Coming from a QR scan: start with the scanned item's name and category
+  useEffect(() => {
+    if (params?.title) setTitle(params.title);
+  }, [params?.title]);
+
+  useEffect(() => {
+    if (!params?.category || categories.length === 0) return;
+    const wanted = params.category.toLowerCase();
+    const match = categories.find((c) => c.slug.toLowerCase() === wanted || c.name.toLowerCase() === wanted);
+    if (match) setSelectedCategory(match.slug);
+  }, [params?.category, categories]);
 
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
