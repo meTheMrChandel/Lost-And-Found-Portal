@@ -330,6 +330,8 @@ class TestReviewDecisionNotifications:
         notice = owner.notifications.get(notif_type="post_approved")
         assert notice.title == "Your report is live"
         assert '"Blue Milton bottle"' in notice.body
+        post.refresh_from_db()
+        assert f"listed until {timezone.localtime(post.expires_at):%d %b %Y}" in notice.body
         assert notice.data == {"post_id": str(post.id), "action": "APPROVE"}
 
     def test_info_request_passes_on_the_admins_question(self, client, owner, admin_user, make_post):
@@ -355,8 +357,10 @@ class TestReviewDecisionNotifications:
         titles = set(owner.notifications.filter(notif_type="general").values_list("title", flat=True))
         assert titles == {
             "Your report was hidden",
-            '"Blue Milton bottle" was removed by an admin',
+            "Your report was removed",
         }
+        # One notice per decision, not one from each notification helper
+        assert owner.notifications.count() == 2
 
     def test_category_change_does_not_notify(self, client, owner, admin_user, make_post):
         post = make_post(status=Post.Status.PENDING)

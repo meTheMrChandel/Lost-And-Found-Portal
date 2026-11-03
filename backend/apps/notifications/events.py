@@ -5,6 +5,8 @@ Each function is called once by the view that performs the change, so every even
 produces exactly one notification per recipient.
 """
 
+from django.utils import timezone
+
 from apps.accounts.models import User
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
@@ -30,11 +32,17 @@ def notify_admins_new_report(post) -> None:
 def notify_author_of_review(post, action: str, remarks: str) -> None:
     """Tell the author what an admin decided about their report."""
     reason = f"\n\nAdmin note: {remarks}" if remarks else ""
+    # Approval starts the expiry timer, so say how long the post stays up
+    listed_until = (
+        f" It stays listed until {timezone.localtime(post.expires_at):%d %b %Y} unless you renew it."
+        if post.expires_at
+        else ""
+    )
     messages = {
         "APPROVE": (
             NotifType.POST_APPROVED,
             "Your report is live",
-            f'"{post.title}" was approved and is now on the campus feed.{reason}',
+            f'"{post.title}" was approved and is now on the campus feed.{listed_until}{reason}',
         ),
         "REJECT": (
             NotifType.POST_REJECTED,
@@ -51,6 +59,12 @@ def notify_author_of_review(post, action: str, remarks: str) -> None:
             NotifType.GENERAL,
             "Your report was hidden",
             f'"{post.title}" was hidden from the campus feed by an admin.{reason}',
+        ),
+        # Sent before the post is deleted, so it can still name the report
+        "DELETE": (
+            NotifType.GENERAL,
+            "Your report was removed",
+            f'"{post.title}" was removed from the portal by an admin.{reason}',
         ),
     }
     if action not in messages or post.author is None:
