@@ -4,6 +4,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -e
+# Fail the backup if pg_dump fails, not just if gzip does
+set -o pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-./backups/database}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -17,8 +19,9 @@ mkdir -p "${BACKUP_DIR}"
 
 echo "==> Starting database backup for '${POSTGRES_DB}' at $(date)..."
 
-# Dump and gzip directly from postgres container
-docker exec -t "${CONTAINER_NAME}" pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" | gzip > "${BACKUP_FILE}"
+# Dump and gzip directly from postgres container. No -t: a TTY rewrites line endings in the
+# dump and fails under cron. --clean --if-exists lets a restore replace existing tables.
+docker exec "${CONTAINER_NAME}" pg_dump --clean --if-exists --no-owner -U "${POSTGRES_USER}" "${POSTGRES_DB}" | gzip > "${BACKUP_FILE}"
 
 BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
 echo "==> Backup completed successfully: ${BACKUP_FILE} (Size: ${BACKUP_SIZE})"

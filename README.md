@@ -74,7 +74,7 @@ python manage.py seed_data
 python manage.py runserver
 ```
 - API Base: `http://127.0.0.1:8000/api/v1/`
-- Admin Panel: `http://127.0.0.1:8000/admin/`
+- Django Admin: `http://127.0.0.1:8000/django-admin/` (the staff portal is the web app's `/admin`)
 - Swagger UI Documentation: `http://127.0.0.1:8000/api/v1/docs/`
 - ReDoc: `http://127.0.0.1:8000/api/v1/redoc/`
 

@@ -72,10 +72,10 @@ Edit `.env.production` using `nano` or `vim`:
 nano .env.production
 ```
 Key values to set:
-- `SECRET_KEY`: Generate a 64-character random string (`openssl rand -hex 32`).
-- `ALLOWED_HOSTS`: Set to your domain (e.g. `lostandfound.iitrpr.ac.in`).
-- `POSTGRES_PASSWORD`: Strong password for database container.
-- `EMAIL_HOST_USER` & `EMAIL_HOST_PASSWORD`: Institute SMTP gateway credentials.
+- `SECRET_KEY`: a long random string (`python -c "import secrets; print(secrets.token_urlsafe(64))"`).
+- `ALLOWED_HOSTS`, `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`: your domain (e.g. `lostandfound.iitrpr.ac.in`).
+- `POSTGRES_PASSWORD` and `DATABASE_PASSWORD`: the same strong password (the database and Django both read this file).
+- `EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`: institute SMTP gateway credentials. **Registration is impossible without these**, because sign-up depends on the emailed OTP. Send yourself a test with `docker compose -f docker-compose.prod.yml exec backend python manage.py sendtestemail you@iitrpr.ac.in` after step 4.
 
 ### 3. Provision Free SSL/TLS Certificates (Let's Encrypt / Certbot)
 For campus domain with public DNS:
@@ -83,9 +83,14 @@ For campus domain with public DNS:
 sudo apt-get update && sudo apt-get install -y certbot
 sudo certbot certonly --standalone -d lostandfound.iitrpr.ac.in
 ```
-Certificates will be generated in `/etc/letsencrypt/live/lostandfound.iitrpr.ac.in/`.
+Certificates will be generated in `/etc/letsencrypt/live/lostandfound.iitrpr.ac.in/`. Run this **before** step 4: nginx serves only HTTPS and will not start without the certificate. If your domain differs, change the two `ssl_certificate` paths in `docker/nginx/nginx.conf`.
 
-Mount certificates in `docker-compose.prod.yml` or configure Nginx SSL termination.
+`docker-compose.prod.yml` mounts `/etc/letsencrypt` and `/var/www/certbot` into nginx. Certificates last 90 days; renew through the running nginx with a root cron job:
+```bash
+sudo mkdir -p /var/www/certbot
+# crontab -e
+0 3 * * * certbot renew --webroot -w /var/www/certbot --deploy-hook "docker exec lostandfound_prod_nginx nginx -s reload" >> /var/log/certbot_renew.log 2>&1
+```
 
 ### 4. Build and Start the Production Containers
 ```bash
@@ -105,6 +110,8 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py seed_dat
 # Create your initial Administrative Superuser
 docker compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
 ```
+
+Staff use the web admin portal at `https://<domain>/admin`. Django's own admin site lives at `https://<domain>/django-admin/`.
 
 ---
 
@@ -129,6 +136,16 @@ Backups are archived in `backups/database/lostandfound_backup_YYYYMMDD_HHMMSS.sq
 ### Restoring from Backup
 ```bash
 ./scripts/restore_db.sh backups/database/lostandfound_backup_20261027_020000.sql.gz
+```
+Backups are made with `--clean --if-exists`, so a restore replaces the existing tables. The restore runs in a single transaction and stops at the first error: if anything fails, the script exits non-zero and the database is left exactly as it was.
+
+### Rehearse a Restore into Staging
+Do this before the beta and after any schema change, so you know the backups actually work:
+```bash
+# Restore last night's production backup into the staging database container
+DB_CONTAINER=lostandfound_staging_db ./scripts/restore_db.sh backups/database/<latest>.sql.gz
+# Spot-check that the data arrived
+docker exec lostandfound_staging_db psql -U postgres -d lostandfound -c "select count(*) from accounts_user;"
 ```
 
 ---

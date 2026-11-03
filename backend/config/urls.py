@@ -9,16 +9,19 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
-from config.views import landing_page_view
+from config.views import AppConfigView, HealthView, landing_page_view
 
 urlpatterns = [
     # Root landing page (http://127.0.0.1:8000/)
     path("", landing_page_view, name="landing-page"),
 
     # Django admin
-    path("admin/", admin.site.urls),
+    # Not /admin/: that path belongs to the web app's admin portal (see docker/nginx/nginx.conf)
+    path("django-admin/", admin.site.urls),
 
     # API v1
+    path("api/v1/health/", HealthView.as_view(), name="health"),
+    path("api/v1/app-config/", AppConfigView.as_view(), name="app-config"),
     path("api/v1/auth/", include("apps.accounts.urls.auth")),
     path("api/v1/users/", include("apps.accounts.urls.users")),
     path("api/v1/posts/", include("apps.posts.urls")),
@@ -26,6 +29,7 @@ urlpatterns = [
     path("api/v1/items/", include("apps.items.urls")),
     path("api/v1/chat/", include("apps.chat.urls")),
     path("api/v1/notifications/", include("apps.notifications.urls")),
+    path("api/v1/feedback/", include("apps.feedback.urls")),
     path("api/v1/admin/", include("apps.adminpanel.urls")),
     path("api/v1/adminpanel/", include("apps.adminpanel.urls")),
 

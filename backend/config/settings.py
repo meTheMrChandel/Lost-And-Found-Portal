@@ -20,6 +20,10 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*", cast=Csv())
 if "testserver" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append("testserver")
+# The container health check calls the backend directly on localhost (docker-compose.prod.yml)
+for _host in ["localhost", "127.0.0.1"]:
+    if _host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host)
 if DEBUG:
     for h in ["*", "10.0.2.2", "127.0.0.1", "localhost"]:
         if h not in ALLOWED_HOSTS:
@@ -55,6 +59,7 @@ LOCAL_APPS = [
     "apps.chat",
     "apps.notifications",
     "apps.adminpanel",
+    "apps.feedback",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -220,6 +225,23 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
+# nginx terminates TLS and passes the original scheme on (docker/nginx/nginx.conf)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# Origins allowed to submit forms over HTTPS, e.g. the Django admin login
+CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
+    # Health checks from inside the container arrive over plain HTTP
+    SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/$"]
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # Short at first so a misconfigured domain recovers quickly; raise to 31536000 once HTTPS is proven
+    SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=3600, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # Preloading needs a manual submission to browser vendors, so it stays a deliberate choice
+    SILENCED_SYSTEM_CHECKS = ["security.W021"]
+
 # ─── Celery ───────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
@@ -235,22 +257,39 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.posts.tasks.run_post_lifecycle",
         "schedule": crontab(minute=0),
     },
+    # Score new lost/found pairs into the admin match queue; re-runs never duplicate a pair
+    "matching-engine-every-15-minutes": {
+        "task": "apps.matching.tasks.run_matching_engine",
+        "schedule": crontab(minute="*/15"),
+    },
 }
 
 # ─── Channels (WebSocket) ────────────────────────────────────────────────────
+REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [config("REDIS_URL", default="redis://localhost:6379/0")],
+            "hosts": [REDIS_URL],
         },
     },
 }
 
+# ─── Mobile app versions (GET /api/v1/app-config/) ───────────────────────────
+# Raise MIN to force everyone off an old build; raise LATEST to suggest an update
+MOBILE_MIN_SUPPORTED_VERSION = config("MOBILE_MIN_SUPPORTED_VERSION", default="1.0.0")
+MOBILE_LATEST_VERSION = config("MOBILE_LATEST_VERSION", default="1.0.0")
+MOBILE_UPDATE_URL = config("MOBILE_UPDATE_URL", default="")
+
 # ─── Email ────────────────────────────────────────────────────────────────────
+# Console in development; real SMTP in production, where OTP emails must actually arrive
 EMAIL_BACKEND = config(
     "EMAIL_BACKEND",
-    default="django.core.mail.backends.console.EmailBackend",
+    default=(
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    ),
 )
 EMAIL_HOST = config("EMAIL_HOST", default="localhost")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
@@ -301,3 +340,17 @@ ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
 # Post auto-expiry
 POST_EXPIRY_DAYS = 30
+
+# ─── Error monitoring (Sentry) ────────────────────────────────────────────────
+# Off unless SENTRY_DSN is set; sentry-sdk is only installed from requirements/prod.txt
+SENTRY_DSN = config("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=config("SENTRY_ENVIRONMENT", default="production"),
+        traces_sample_rate=config("SENTRY_TRACES_SAMPLE_RATE", default=0.1, cast=float),
+        # Reports are about students; keep their emails and IPs out of error reports
+        send_default_pii=False,
+    )

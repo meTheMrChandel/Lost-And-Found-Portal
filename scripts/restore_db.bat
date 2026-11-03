@@ -26,7 +26,8 @@ if /i not "%CONFIRM%"=="Y" (
 )
 
 echo ==> Restoring database from %BACKUP_FILE%...
-docker exec -i %CONTAINER_NAME% psql -U %POSTGRES_USER% -d %POSTGRES_DB% < "%BACKUP_FILE%"
+REM Stop at the first error and roll back, so a failed restore is reported as one
+docker exec -i %CONTAINER_NAME% psql -v ON_ERROR_STOP=1 --single-transaction -U %POSTGRES_USER% -d %POSTGRES_DB% < "%BACKUP_FILE%"
 
 if %ERRORLEVEL% EQU 0 (
     echo ==> Database restore completed successfully!

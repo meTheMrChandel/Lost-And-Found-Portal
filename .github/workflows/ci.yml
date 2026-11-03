@@ -107,7 +107,8 @@ jobs:
 
       - name: Django system check
         env:
-          SECRET_KEY: ci-secret-key-1234567890-test-key
+          # Long enough to pass security.W009, which the deploy check now enforces
+          SECRET_KEY: ci-deploy-check-key-not-secret-9f3b7c1e5a2d8046b1c7e9f0a3d5b2c8
           DEBUG: "False"
           DATABASE_ENGINE: django.db.backends.postgresql
           DATABASE_NAME: lostandfound_test
@@ -122,7 +123,8 @@ jobs:
           STORAGE_BACKEND: local
           FRONTEND_URL: http://localhost:3000
           CORS_ALLOWED_ORIGINS: http://localhost:3000
-        run: python manage.py check --deploy --fail-level WARNING || true
+        # Security checks only: drf-spectacular's schema hints are warnings too but not deploy blockers
+        run: python manage.py check --deploy --tag security --fail-level WARNING
 
   # ── Frontend ─────────────────────────────────────────────────────────────────
   frontend:

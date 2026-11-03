@@ -18,7 +18,8 @@ set POSTGRES_USER=postgres
 set POSTGRES_DB=lostandfound
 
 echo ==> Starting database backup for '%POSTGRES_DB%'...
-docker exec -t %CONTAINER_NAME% pg_dump -U %POSTGRES_USER% %POSTGRES_DB% > "%BACKUP_FILE%"
+REM No -t: a TTY rewrites line endings in the dump. --clean lets a restore replace existing tables.
+docker exec %CONTAINER_NAME% pg_dump --clean --if-exists --no-owner -U %POSTGRES_USER% %POSTGRES_DB% > "%BACKUP_FILE%"
 
 if %ERRORLEVEL% EQU 0 (
     echo ==> Database backup created successfully: %BACKUP_FILE%
