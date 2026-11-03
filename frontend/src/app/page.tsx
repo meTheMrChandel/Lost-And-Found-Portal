@@ -205,6 +205,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[#6B7280] gap-4">
           <p>© 2026 IIT Ropar Lost & Found Portal. CS509 PG Software Lab.</p>
           <div className="flex gap-6">
+            <Link href="/feedback?from=/" className="font-semibold text-[#047857] hover:underline">
+              Send feedback
+            </Link>
             <span>Admin Supervision</span>
             <span>Zero-Knowledge Scans</span>
             <span>Secured Verification</span>

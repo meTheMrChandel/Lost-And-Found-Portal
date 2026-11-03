@@ -27,7 +27,7 @@ export default function RecentActivity() {
   useEffect(() => {
     const fetchRecent = async () => {
       try {
-        const res = await apiClient("/posts/feed/?ordering=-created_at&include_pending=true");
+        const res = await apiClient("/posts/feed/?ordering=-created_at");
         if (res?.data) {
           setPosts(res.data.slice(0, MAX_POSTS));
         }

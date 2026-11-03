@@ -11,6 +11,7 @@ import Logo from "@/components/Logo";
 import InfoReplyForm from "@/components/InfoReplyForm";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import HeaderAccount from "@/components/HeaderAccount";
+import Image from "next/image";
 
 function MyReportsContent() {
   const { user, loading: authLoading } = useAuth();
@@ -265,11 +266,13 @@ function MyReportsContent() {
 
                   {/* Thumbnail if any */}
                   {report.images && report.images.length > 0 && (
-                    <div className="w-full h-40 rounded-2xl overflow-hidden mb-4 bg-[#FAF7F2] border border-[#EFEAE0]">
-                      <img
+                    <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4 bg-[#FAF7F2] border border-[#EFEAE0]">
+                      <Image
                         src={mediaUrl(report.images[0].image)}
                         alt={report.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        fill
+                        unoptimized
+                        className="object-cover group-hover:scale-105 transition-transform"
                       />
                     </div>
                   )}
@@ -354,10 +357,13 @@ function MyReportsContent() {
             {selectedReport.images && selectedReport.images.length > 0 && (
               <div className="flex gap-2 overflow-x-auto py-2">
                 {selectedReport.images.map((img) => (
-                  <img
+                  <Image
                     key={img.id}
                     src={mediaUrl(img.image)}
                     alt="attachment"
+                    width={96}
+                    height={96}
+                    unoptimized
                     className="w-24 h-24 object-cover rounded-xl border border-[#E2DDD2]"
                   />
                 ))}
@@ -402,22 +408,17 @@ function MyReportsContent() {
             )}
 
             {/* Answer an admin's request for more information */}
-            {selectedReport.status === "INFO_REQUESTED" &&
-              (selectedReport.post_type === "LOST" ? (
-                <InfoReplyForm
-                  key={selectedReport.id}
-                  postId={selectedReport.id}
-                  onSent={(message) => {
-                    setActionMsg(message);
-                    setSelectedReport(null);
-                    refresh();
-                  }}
-                />
-              ) : (
-                <p className="text-xs text-[#6B7280]">
-                  Found reports can&apos;t be edited online yet. Please give these details to the admin office.
-                </p>
-              ))}
+            {selectedReport.status === "INFO_REQUESTED" && (
+              <InfoReplyForm
+                key={selectedReport.id}
+                postId={selectedReport.id}
+                onSent={(message) => {
+                  setActionMsg(message);
+                  setSelectedReport(null);
+                  refresh();
+                }}
+              />
+            )}
 
             {/* Actions for Pending or Info Requested */}
             <div className="pt-4 border-t border-[#EFEAE0] flex justify-between items-center">

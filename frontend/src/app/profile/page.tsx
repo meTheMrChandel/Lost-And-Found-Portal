@@ -4,7 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { apiClient, getErrorMessage } from "@/lib/api";
+import { apiClient, getErrorMessage, mediaUrl } from "@/lib/api";
+import Image from "next/image";
 import { loginUrl } from "@/lib/redirect";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { User } from "@/types/auth";
@@ -32,6 +33,7 @@ export default function ProfilePage() {
   }
 
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   // Set on purpose-logout so the "not signed in" redirect below doesn't send us to /login
@@ -59,6 +61,30 @@ export default function ProfilePage() {
       setError(getErrorMessage(err, "Failed to update profile."));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Profile photo must be 5MB or smaller.");
+      return;
+    }
+    setUploadingPhoto(true);
+    setError("");
+    setMsg("");
+    try {
+      const form = new FormData();
+      form.append("photo", file);
+      const res = await apiClient<{ data?: User; message?: string }>("/users/me/", { method: "PATCH", data: form });
+      if (res.data) setUser(res.data);
+      setMsg("Profile photo updated.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to upload photo."));
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -109,6 +135,34 @@ export default function ProfilePage() {
               {msg}
             </div>
           )}
+
+          {/* Profile photo */}
+          <div className="flex items-center gap-4 mb-6">
+            {user.photo ? (
+              <Image
+                src={mediaUrl(user.photo)}
+                alt="Profile photo"
+                width={64}
+                height={64}
+                unoptimized
+                className="w-16 h-16 rounded-full object-cover border border-[#E2DDD2]"
+              />
+            ) : (
+              <span className="w-16 h-16 rounded-full bg-[#1C1C1E] text-white flex items-center justify-center text-xl font-semibold">
+                {(user.full_name || user.email).charAt(0).toUpperCase()}
+              </span>
+            )}
+            <label className="px-4 py-2 rounded-full bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-xs font-semibold text-[#1C1C1E] cursor-pointer transition-colors">
+              {uploadingPhoto ? "Uploading..." : user.photo ? "Change photo" : "Add photo"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handlePhotoChange}
+                disabled={uploadingPhoto}
+                className="hidden"
+              />
+            </label>
+          </div>
 
           <form onSubmit={handleUpdate} className="flex flex-col gap-5">
             {/* Read-Only Account Identity */}

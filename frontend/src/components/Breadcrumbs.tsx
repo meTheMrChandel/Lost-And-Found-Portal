@@ -20,6 +20,7 @@ const LABELS: Record<string, string> = {
   invites: "Admin Invites",
   "audit-logs": "Audit Logs",
   settings: "Site Configuration",
+  feedback: "Feedback",
 };
 
 // In the URL but not a page of their own, so shown without a link

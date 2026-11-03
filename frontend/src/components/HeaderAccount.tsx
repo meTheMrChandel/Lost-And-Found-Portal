@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { loginUrl } from "@/lib/redirect";
+import { mediaUrl } from "@/lib/api";
+import Image from "next/image";
 
 /** Right end of a page header: who is signed in, or a Log In button for guests. */
 export default function HeaderAccount() {
@@ -30,9 +32,20 @@ export default function HeaderAccount() {
       title={`Signed in as ${user.email}`}
       className="flex items-center gap-2 text-xs font-semibold text-[#1C1C1E] hover:text-[#047857]"
     >
-      <span className="w-7 h-7 rounded-full bg-[#1C1C1E] text-white flex items-center justify-center text-[11px]">
-        {name.charAt(0).toUpperCase()}
-      </span>
+      {user.photo ? (
+        <Image
+          src={mediaUrl(user.photo)}
+          alt=""
+          width={28}
+          height={28}
+          unoptimized
+          className="w-7 h-7 rounded-full object-cover"
+        />
+      ) : (
+        <span className="w-7 h-7 rounded-full bg-[#1C1C1E] text-white flex items-center justify-center text-[11px]">
+          {name.charAt(0).toUpperCase()}
+        </span>
+      )}
       <span className="hidden sm:inline">{name.split(" ")[0]}</span>
     </Link>
   );

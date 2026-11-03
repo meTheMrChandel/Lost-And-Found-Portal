@@ -10,8 +10,15 @@ import { useAuth } from "@/context/AuthContext";
 import Logo from "@/components/Logo";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import HeaderAccount from "@/components/HeaderAccount";
+import Image from "next/image";
 
 const SEARCH_DELAY_MS = 300;
+const PAGE_SIZE = 12;
+
+interface FeedPage {
+  data?: Post[];
+  pagination?: { page: number; page_size: number; total: number; has_next: boolean };
+}
 
 function FeedContent() {
   const searchParams = useSearchParams();
@@ -47,7 +54,6 @@ function FeedContent() {
     if (selectedCategory !== "ALL") params.append("category", selectedCategory);
     if (appliedSearch) params.append("search", appliedSearch);
     if (ordering) params.append("ordering", ordering);
-    params.append("include_pending", "true");
     return params.toString();
   }, [selectedType, selectedCategory, appliedSearch, ordering]);
 
@@ -56,8 +62,34 @@ function FeedContent() {
     loading,
     error,
     refresh,
-  } = useApiQuery<{ data?: Post[] }>(`/posts/feed/?${feedQuery}`, "Failed to load campus feed.");
-  const posts = feed?.data ?? [];
+  } = useApiQuery<FeedPage>(`/posts/feed/?${feedQuery}&page_size=${PAGE_SIZE}&page=1`, "Failed to load campus feed.");
+
+  // Pages after the first, appended by "Load more". Dropped whenever the first page is
+  // replaced (new filters, search or refresh), so stale results are never mixed in.
+  const [morePages, setMorePages] = useState<{ base: FeedPage | undefined; pages: FeedPage[] }>({ base: undefined, pages: [] });
+  if (morePages.base !== feed) {
+    setMorePages({ base: feed, pages: [] });
+  }
+  const loaded = morePages.base === feed ? morePages.pages : [];
+  const posts = [...(feed?.data ?? []), ...loaded.flatMap((p) => p.data ?? [])];
+  const lastPage = loaded.length > 0 ? loaded[loaded.length - 1] : feed;
+  const hasMore = lastPage?.pagination?.has_next ?? false;
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState("");
+
+  const loadMore = () => {
+    if (!lastPage?.pagination) return;
+    const base = feed;
+    setLoadingMore(true);
+    setLoadMoreError("");
+    apiClient<FeedPage>(`/posts/feed/?${feedQuery}&page_size=${PAGE_SIZE}&page=${lastPage.pagination.page + 1}`)
+      .then((page) =>
+        // Ignore the page if the filters changed while it was loading
+        setMorePages((prev) => (prev.base === base ? { base, pages: [...prev.pages, page] } : prev))
+      )
+      .catch((err) => setLoadMoreError(getErrorMessage(err, "Failed to load more items.")))
+      .finally(() => setLoadingMore(false));
+  };
 
   const applySearch = () => {
     setAppliedSearch(searchQuery.trim());
@@ -295,10 +327,12 @@ function FeedContent() {
                   {/* Photo or placeholder */}
                   <div className="w-full h-44 bg-[#FAF7F2] relative overflow-hidden flex items-center justify-center border-b border-[#EFEAE0]">
                     {post.images && post.images.length > 0 ? (
-                      <img
+                      <Image
                         src={mediaUrl(post.images[0].image)}
                         alt={post.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fill
+                        unoptimized
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
                       <div className="text-3xl text-[#6B7280]/40 font-serif">
@@ -364,6 +398,19 @@ function FeedContent() {
             ))}
           </div>
         )}
+
+        {hasMore && (
+          <div className="flex flex-col items-center gap-2">
+            {loadMoreError && <p className="text-xs font-medium text-[#D94F3B]">{loadMoreError}</p>}
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="px-6 py-2.5 rounded-full bg-white border border-[#E2DDD2] hover:bg-[#FAF7F2] text-xs font-semibold text-[#1C1C1E] shadow-sm transition-all cursor-pointer disabled:opacity-50"
+            >
+              {loadingMore ? "Loading..." : `Load more (${posts.length} of ${lastPage?.pagination?.total})`}
+            </button>
+          </div>
+        )}
       </main>
 
       {/* Item Detail Modal */}
@@ -398,10 +445,13 @@ function FeedContent() {
             {activePost.images && activePost.images.length > 0 && (
               <div className="flex gap-2 overflow-x-auto py-1">
                 {activePost.images.map((img) => (
-                  <img
+                  <Image
                     key={img.id}
                     src={mediaUrl(img.image)}
                     alt=""
+                    width={112}
+                    height={112}
+                    unoptimized
                     className="w-28 h-28 object-cover rounded-2xl border border-[#E2DDD2]"
                   />
                 ))}
@@ -558,6 +608,9 @@ function FeedContent() {
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[#6B7280] gap-4">
           <p>© 2026 IIT Ropar Lost & Found Portal. CS509 PG Software Lab.</p>
           <div className="flex gap-6">
+            <Link href="/feedback?from=/feed" className="font-semibold text-[#047857] hover:underline">
+              Send feedback
+            </Link>
             <span>Admin Supervision</span>
             <span>Zero-Knowledge Scans</span>
             <span>Secured Verification</span>

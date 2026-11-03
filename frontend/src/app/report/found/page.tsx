@@ -10,6 +10,7 @@ import { Category } from "@/types/post";
 import Logo from "@/components/Logo";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import HeaderAccount from "@/components/HeaderAccount";
+import Image from "next/image";
 
 const CAMPUS_LOCATIONS = [
   "Central Library",
@@ -413,10 +414,12 @@ function ReportFoundContent() {
                     key={idx}
                     className="relative w-24 h-24 rounded-2xl border border-[#E2DDD2] overflow-hidden group shadow-sm bg-[#FAF7F2]"
                   >
-                    <img
+                    <Image
                       src={src}
                       alt={`Preview ${idx + 1}`}
-                      className="w-full h-full object-cover"
+                      fill
+                      unoptimized
+                      className="object-cover"
                     />
                     <button
                       type="button"

@@ -61,7 +61,7 @@ function ReplyFields({ post, onSent }: { post: Post; onSent: (message: string) =
   );
 }
 
-/** Lets the author of a lost report answer an admin's request for more information. */
+/** Lets the author of a report answer an admin's request for more information. */
 export default function InfoReplyForm({ postId, onSent }: { postId: string; onSent: (message: string) => void }) {
   // The My Reports list leaves out the description, so load the full report first
   const { data, error } = useApiQuery<{ data?: Post }>(`/posts/lost/${postId}/`, "Failed to load this report.");
