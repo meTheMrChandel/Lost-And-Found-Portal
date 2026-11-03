@@ -26,6 +26,7 @@ from apps.matching.serializers import (
     MatchProofRecordSerializer,
 )
 from apps.matching.services import run_matching
+from apps.notifications.events import notify_case_closed, notify_handover_ready, notify_match_confirmed
 
 
 class AdminMatchListView(generics.ListAPIView):
@@ -129,6 +130,7 @@ class AdminMatchActionView(APIView):
                 to_status=Match.Status.CONFIRMED,
                 notes=notes or "Admin confirmed suggested match pair.",
             )
+            notify_match_confirmed(match)
 
         elif action == "DISMISS":
             match.status = Match.Status.DISMISSED
@@ -348,6 +350,7 @@ class AdminGenerateHandoverCodeView(APIView):
             to_status=match.status,
             notes="Admin generated one-time handover verification code.",
         )
+        notify_handover_ready(match)
 
         return Response(
             {
@@ -482,6 +485,7 @@ class AdminMatchCloseView(APIView):
                 f"Posts marked RETURNED. {notes}"
             ).strip(),
         )
+        notify_case_closed(match)
 
         return Response(
             {

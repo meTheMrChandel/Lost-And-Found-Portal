@@ -735,3 +735,32 @@ class TestPhase6VerificationAndHandover:
         assert lost.status == Post.Status.RETURNED
         assert found.status == Post.Status.RETURNED
         assert MatchAuditLog.objects.filter(match=match, action="CASE_CLOSED").exists()
+
+
+@pytest.mark.django_db
+def test_nested_proof_errors_are_readable(admin_user):
+    """A blank answer inside the questions list comes back as plain text, not a Python repr."""
+    from rest_framework.test import APIClient
+
+    from apps.matching.models import Match
+    from apps.posts.models import Category, Post
+    from django.core.management import call_command
+    from django.utils import timezone
+
+    call_command("seed_data")
+    category = Category.objects.get(slug="bottle")
+    make = lambda t: Post.objects.create(
+        author=admin_user, post_type=t, category=category, title="Bottle", description="d",
+        last_seen_place="p", last_seen_time=timezone.now(), status=Post.Status.APPROVED,
+    )
+    match = Match.objects.create(lost_post=make(Post.PostType.LOST), found_post=make(Post.PostType.FOUND), status=Match.Status.CONFIRMED)
+    client = APIClient()
+    client.force_authenticate(admin_user)
+    res = client.post(
+        f"/api/v1/matching/{match.id}/proof/",
+        {"questions": [{"question": "Colour?", "answer": "Blue"}, {"question": "Serial?", "answer": ""}]},
+        format="json",
+    )
+    assert res.status_code == 400
+    assert res.data["errors"]["questions"] == ["Answer: This field may not be blank."]
+    assert "ErrorDetail" not in str(res.data)
