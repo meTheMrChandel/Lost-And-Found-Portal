@@ -4,6 +4,7 @@ posts/views.py — API views for Category listing, Lost Post reporting, and My R
 
 import uuid
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
@@ -13,7 +14,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 
 from apps.accounts.permissions import IsNotBanned, IsOwnerOrAdmin
 from apps.adminpanel.models import PostAuditLog
@@ -26,6 +27,7 @@ from apps.posts.serializers import (
     LostPostListSerializer,
     LostPostUpdateSerializer,
     FoundPostCreateSerializer,
+    FoundPostUpdateSerializer,
     PublicFeedPostSerializer,
     AbuseReportCreateSerializer,
 )
@@ -187,43 +189,45 @@ class MyReportsListView(APIView):
         return Response({"success": True, "data": serializer.data}, status=status.HTTP_200_OK)
 
 
-class LostPostDetailView(APIView):
+class OwnPostDetailView(APIView):
     """
-    GET /api/v1/posts/lost/<id>/ — View lost item report details.
-    PATCH /api/v1/posts/lost/<id>/ — Edit report (Author only, when PENDING or INFO_REQUESTED).
-    DELETE /api/v1/posts/lost/<id>/ — Withdraw report (Author or Admin).
+    View, edit or withdraw one report. Shared by the lost and found report endpoints;
+    subclasses set post_type, update_serializer_class and report_label.
+
+    GET    — the author and admins see everything; others only an approved, public post.
+    PATCH  — the author (or an admin) edits while PENDING or INFO_REQUESTED. The author
+             editing an INFO_REQUESTED report sends it back to PENDING for review.
+    DELETE — the author withdraws, or an admin deletes; either is written to the audit log.
     """
 
     permission_classes = [IsAuthenticated, IsNotBanned]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    post_type = None
+    update_serializer_class = None
+    report_label = "Report"
 
     def get_object(self, pk, user):
         try:
             post = (
                 Post.objects.select_related("category", "author")
                 .prefetch_related("images")
-                .get(pk=pk, post_type=Post.PostType.LOST)
+                .get(pk=pk, post_type=self.post_type)
             )
         except Post.DoesNotExist:
             raise ValidationError("Post does not exist.")
 
         # Access check: Author, Admin, or Approved public post
         if post.author != user and not (user.is_staff or user.is_superuser):
-            if post.status != Post.Status.APPROVED or post.category.is_sensitive:
+            if post.status != Post.Status.APPROVED or post.category.is_sensitive or post.inform_admin_privately:
                 raise PermissionDenied("You do not have permission to view this report.")
 
         return post
 
-    @extend_schema(responses={200: LostPostDetailSerializer})
     def get(self, request, pk):
         post = self.get_object(pk, request.user)
         serializer = LostPostDetailSerializer(post, context={"request": request})
         return Response({"success": True, "data": serializer.data}, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        request=LostPostUpdateSerializer,
-        responses={200: LostPostDetailSerializer},
-    )
     def patch(self, request, pk):
         post = self.get_object(pk, request.user)
 
@@ -238,33 +242,36 @@ class LostPostDetailView(APIView):
                 f"Cannot edit report in status '{post.get_status_display()}'."
             )
 
-        serializer = LostPostUpdateSerializer(post, data=request.data, partial=True)
+        serializer = self.update_serializer_class(post, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
         # The author answering an info request sends the report back to the review queue
         resubmitted = post.status == Post.Status.INFO_REQUESTED and post.author == request.user
-        if resubmitted:
-            updated_post = serializer.save(status=Post.Status.PENDING, sla_alert_sent_at=None)
-            PostAuditLog.objects.create(
-                post=updated_post,
-                admin=request.user,
-                action="RESUBMIT",
-                previous_status=Post.Status.INFO_REQUESTED,
-                new_status=Post.Status.PENDING,
-                notes="Author updated the report in reply to the admin's request for more information.",
-            )
-        else:
-            updated_post = serializer.save()
 
-        # Handle optional new image attachments
-        new_images = request.FILES.getlist("images")
-        if new_images:
-            existing_count = post.images.count()
-            if existing_count + len(new_images) > MAX_IMAGES_ALLOWED:
-                raise ValidationError(
-                    f"Post already has {existing_count} photos. Total cannot exceed {MAX_IMAGES_ALLOWED}."
+        # One transaction, so a rejected photo also undoes the edit and the re-submission
+        with transaction.atomic():
+            if resubmitted:
+                updated_post = serializer.save(status=Post.Status.PENDING, sla_alert_sent_at=None)
+                PostAuditLog.objects.create(
+                    post=updated_post,
+                    admin=request.user,
+                    action="RESUBMIT",
+                    previous_status=Post.Status.INFO_REQUESTED,
+                    new_status=Post.Status.PENDING,
+                    notes="Author updated the report in reply to the admin's request for more information.",
                 )
-            _process_uploaded_images(post, new_images)
+            else:
+                updated_post = serializer.save()
+
+            # Handle optional new image attachments
+            new_images = request.FILES.getlist("images")
+            if new_images:
+                existing_count = post.images.count()
+                if existing_count + len(new_images) > MAX_IMAGES_ALLOWED:
+                    raise ValidationError(
+                        f"Post already has {existing_count} photos. Total cannot exceed {MAX_IMAGES_ALLOWED}."
+                    )
+                _process_uploaded_images(post, new_images)
 
         response_serializer = LostPostDetailSerializer(
             updated_post, context={"request": request}
@@ -275,7 +282,7 @@ class LostPostDetailView(APIView):
                 "message": (
                     "Report updated and sent back for admin review."
                     if resubmitted
-                    else "Lost item report updated successfully."
+                    else f"{self.report_label} updated successfully."
                 ),
                 "data": response_serializer.data,
             },
@@ -303,6 +310,38 @@ class LostPostDetailView(APIView):
             {"success": True, "message": "Report has been withdrawn and removed."},
             status=status.HTTP_200_OK,
         )
+
+
+@extend_schema_view(
+    get=extend_schema(responses={200: LostPostDetailSerializer}),
+    patch=extend_schema(request=LostPostUpdateSerializer, responses={200: LostPostDetailSerializer}),
+)
+class LostPostDetailView(OwnPostDetailView):
+    """
+    GET /api/v1/posts/lost/<id>/ — View lost item report details.
+    PATCH /api/v1/posts/lost/<id>/ — Edit report (Author only, when PENDING or INFO_REQUESTED).
+    DELETE /api/v1/posts/lost/<id>/ — Withdraw report (Author or Admin).
+    """
+
+    post_type = Post.PostType.LOST
+    update_serializer_class = LostPostUpdateSerializer
+    report_label = "Lost item report"
+
+
+@extend_schema_view(
+    get=extend_schema(responses={200: LostPostDetailSerializer}),
+    patch=extend_schema(request=FoundPostUpdateSerializer, responses={200: LostPostDetailSerializer}),
+)
+class FoundPostDetailView(OwnPostDetailView):
+    """
+    GET /api/v1/posts/found/<id>/ — View found item report details.
+    PATCH /api/v1/posts/found/<id>/ — Edit report (Author only, when PENDING or INFO_REQUESTED).
+    DELETE /api/v1/posts/found/<id>/ — Withdraw report (Author or Admin).
+    """
+
+    post_type = Post.PostType.FOUND
+    update_serializer_class = FoundPostUpdateSerializer
+    report_label = "Found item report"
 
 
 class FoundPostCreateView(APIView):

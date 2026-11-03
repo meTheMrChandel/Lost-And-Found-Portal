@@ -149,6 +149,8 @@ class LostPostDetailSerializer(serializers.ModelSerializer):
             "last_seen_time",
             "hidden_proof",
             "reward_amount",
+            "custody_location",
+            "inform_admin_privately",
             "status",
             "admin_remarks",
             "images",
@@ -202,6 +204,31 @@ class LostPostUpdateSerializer(serializers.ModelSerializer):
                 f"Cannot modify post while in '{instance.get_status_display()}' status."
             )
         return attrs
+
+
+class FoundPostUpdateSerializer(LostPostUpdateSerializer):
+    """
+    Serializer for the finder editing their found post.
+    Same edit rules as a lost post: only while PENDING or INFO_REQUESTED.
+    """
+
+    custody_location = serializers.ChoiceField(choices=Post.CustodyLocation.choices, required=False)
+
+    class Meta(LostPostUpdateSerializer.Meta):
+        fields = [
+            "title",
+            "category",
+            "description",
+            "last_seen_place",
+            "last_seen_time",
+            "custody_location",
+            "inform_admin_privately",
+        ]
+
+    def validate_last_seen_time(self, value):
+        if value > timezone.now() + timedelta(minutes=5):
+            raise serializers.ValidationError("Found date and time cannot be in the future.")
+        return value
 
 
 class FoundPostCreateSerializer(serializers.ModelSerializer):

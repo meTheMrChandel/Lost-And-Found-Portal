@@ -6,6 +6,7 @@ from django.urls import path
 from apps.posts.views import (
     CategoryListView,
     FoundPostCreateView,
+    FoundPostDetailView,
     LostPostCreateView,
     LostPostDetailView,
     MyReportsListView,
@@ -30,6 +31,7 @@ urlpatterns = [
 
     # Found posts endpoints (User 2 flow - Phase 5)
     path("found/", FoundPostCreateView.as_view(), name="found-post-create"),
+    path("found/<uuid:pk>/", FoundPostDetailView.as_view(), name="found-post-detail"),
 
     # General user posts & item details
     path("my/", MyReportsListView.as_view(), name="my-posts"),

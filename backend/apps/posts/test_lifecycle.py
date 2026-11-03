@@ -363,3 +363,103 @@ class TestReviewDecisionNotifications:
         post = make_post(status=Post.Status.PENDING)
         self.review(client, admin_user, post, action="CHANGE_CATEGORY", new_category="umbrella")
         assert not owner.notifications.exists()
+
+
+@pytest.mark.django_db
+class TestFoundReportOwnerEndpoints:
+    """GET / PATCH / DELETE /api/v1/posts/found/<id>/ follow the same rules as lost reports."""
+
+    @pytest.fixture
+    def other_student(self, db):
+        return User.objects.create_user(
+            email="lifecycle.other@iitrpr.ac.in",
+            registration_number="2024CSM1053",
+            password="TestPassword123",
+            full_name="Other Student",
+        )
+
+    def make_found(self, make_post, status=Post.Status.PENDING, **fields):
+        return make_post(status=status, post_type=Post.PostType.FOUND, custody_location="finder", **fields)
+
+    def test_finder_sees_their_report_with_custody_details(self, client, owner, make_post):
+        post = self.make_found(make_post, inform_admin_privately=True)
+        client.force_authenticate(user=owner)
+        res = client.get(f"/api/v1/posts/found/{post.id}/")
+        assert res.status_code == 200
+        assert res.data["data"]["custody_location"] == "finder"
+        assert res.data["data"]["inform_admin_privately"] is True
+
+    def test_answering_an_info_request_sends_it_back_for_review(self, client, owner, admin_user, make_post):
+        post = self.make_found(make_post)
+        client.force_authenticate(user=admin_user)
+        client.post(
+            f"/api/v1/adminpanel/posts/{post.id}/review/",
+            {"action": "INFO_REQUESTED", "remarks": "Where is the bottle now?"},
+        )
+
+        client.force_authenticate(user=owner)
+        res = client.patch(
+            f"/api/v1/posts/found/{post.id}/", {"custody_location": "security_office"}, format="json"
+        )
+        assert res.status_code == 200
+        assert res.data["message"] == "Report updated and sent back for admin review."
+
+        post.refresh_from_db()
+        assert post.status == Post.Status.PENDING
+        assert post.custody_location == "security_office"
+        assert PostAuditLog.objects.filter(post=post, action="RESUBMIT").exists()
+
+    def test_finder_can_withdraw_their_report(self, client, owner, make_post):
+        post = self.make_found(make_post)
+        client.force_authenticate(user=owner)
+        res = client.delete(f"/api/v1/posts/found/{post.id}/")
+        assert res.status_code == 200
+        assert not Post.objects.filter(pk=post.id).exists()
+        assert PostAuditLog.objects.get(post_ref=post.id).action == "WITHDRAW"
+
+    def test_other_students_cannot_see_edit_or_withdraw_it(self, client, other_student, make_post):
+        private = self.make_found(make_post, status=Post.Status.APPROVED, inform_admin_privately=True)
+        pending = self.make_found(make_post)
+        client.force_authenticate(user=other_student)
+
+        assert client.get(f"/api/v1/posts/found/{private.id}/").status_code == 403
+        assert client.patch(f"/api/v1/posts/found/{pending.id}/", {"title": "x"}, format="json").status_code == 403
+        assert client.delete(f"/api/v1/posts/found/{pending.id}/").status_code == 403
+        assert Post.objects.filter(pk=pending.id, title="Blue Milton bottle").exists()
+
+    def test_lost_and_found_endpoints_only_serve_their_own_type(self, client, owner, make_post):
+        lost = make_post(status=Post.Status.PENDING)
+        found = self.make_found(make_post)
+        client.force_authenticate(user=owner)
+        assert client.get(f"/api/v1/posts/found/{lost.id}/").status_code == 400
+        assert client.get(f"/api/v1/posts/lost/{found.id}/").status_code == 400
+
+    def test_found_time_in_the_future_is_rejected(self, client, owner, make_post):
+        post = self.make_found(make_post)
+        client.force_authenticate(user=owner)
+        res = client.patch(
+            f"/api/v1/posts/found/{post.id}/",
+            {"last_seen_time": (timezone.now() + timedelta(days=1)).isoformat()},
+            format="json",
+        )
+        assert res.status_code == 400
+
+    def test_rejected_photos_undo_the_resubmission(self, client, owner, make_post):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        post = self.make_found(make_post, status=Post.Status.INFO_REQUESTED)
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+        photos = [SimpleUploadedFile(f"p{i}.png", png, content_type="image/png") for i in range(6)]
+
+        client.force_authenticate(user=owner)
+        res = client.patch(
+            f"/api/v1/posts/found/{post.id}/",
+            {"description": "Now with photos", "images": photos},
+            format="multipart",
+        )
+        assert res.status_code == 400
+
+        post.refresh_from_db()
+        assert post.status == Post.Status.INFO_REQUESTED
+        assert post.description != "Now with photos"
+        assert not PostAuditLog.objects.filter(action="RESUBMIT").exists()
