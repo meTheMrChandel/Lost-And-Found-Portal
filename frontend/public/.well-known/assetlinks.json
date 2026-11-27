@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "ac.in.iitrpr.lostandfound",
+      "sha256_cert_fingerprints": [
+        "29:87:91:92:A9:1F:01:15:B8:6B:F9:5C:76:F0:07:19:12:57:4A:E5:E6:BE:A6:40:16:6F:69:3A:59:F3:BA:B0"
+      ]
+    }
+  }
+]
