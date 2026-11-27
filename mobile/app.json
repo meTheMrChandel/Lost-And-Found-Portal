@@ -69,7 +69,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#FAF7F2"
         }
-      ]
+      ],
+      "./plugins/withReleaseSigning"
     ],
     "extra": {
       "apiUrl": "https://lost-and-found-portal-zx3h.onrender.com/api/v1",
