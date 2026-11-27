@@ -363,8 +363,16 @@ elif STORAGE_BACKEND == "cloudinary":
     # Listed after django.contrib.staticfiles so collectstatic stays Django's own
     INSTALLED_APPS += ["cloudinary_storage", "cloudinary"]
     DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-    # Read from the environment by the cloudinary SDK: cloudinary://<key>:<secret>@<cloud_name>
+    # cloudinary://<api_key>:<api_secret>@<cloud_name>, from the Cloudinary dashboard
     CLOUDINARY_URL = config("CLOUDINARY_URL")
+    # Passed on explicitly: django-cloudinary-storage only looks at real environment variables, not .env
+    _cloudinary_auth, _, _cloudinary_cloud = CLOUDINARY_URL.removeprefix("cloudinary://").partition("@")
+    _cloudinary_key, _, _cloudinary_secret = _cloudinary_auth.partition(":")
+    CLOUDINARY_STORAGE = {
+        "CLOUD_NAME": _cloudinary_cloud,
+        "API_KEY": _cloudinary_key,
+        "API_SECRET": _cloudinary_secret,
+    }
 
 # ─── Application constants ────────────────────────────────────────────────────
 IITRPR_EMAIL_DOMAIN = "iitrpr.ac.in"
