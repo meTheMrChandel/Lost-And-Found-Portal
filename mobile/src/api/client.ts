@@ -87,7 +87,9 @@ export const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 15000,
+  // The hosted server (Render free plan) sleeps when idle and takes up to about a minute to
+  // wake up, so allow for that instead of failing the first request after a quiet spell
+  timeout: 60000,
 });
 
 // Request interceptor to inject Bearer access token
@@ -223,8 +225,14 @@ function fieldLabel(field: string): string {
 /** Turns a failed request into a message for the user. */
 function describeError(error: any): string {
   const response = error.response;
-  // No response at all: the server couldn't be reached
-  if (!response) return "Can't reach the server. Check your connection and try again.";
+  if (!response) {
+    // The request was sent but the server never answered in time
+    if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+      return "The server is taking too long to answer. It may still be starting up; try again in a minute.";
+    }
+    // No response at all: the server couldn't be reached
+    return "Can't reach the server. Check your connection and try again.";
+  }
 
   const data = response.data;
   if (data && typeof data === "object") {

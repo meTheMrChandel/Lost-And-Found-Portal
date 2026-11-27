@@ -21,19 +21,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadSession = async () => {
       try {
         const token = await storage.getItem("access_token");
-        if (token) {
-          const profile = await authApi.getProfile();
-          setUser(profile);
-          await storage.setItem("user_data", JSON.stringify(profile));
-        }
-      } catch (e) {
-        // Cached profile fallback if offline
+        if (!token) return;
+
+        // Open straight away with the profile saved last time: the hosted server can take
+        // up to a minute to wake up, and the app should not wait on it
         const cachedUser = await storage.getItem("user_data");
         if (cachedUser) {
           try {
             setUser(JSON.parse(cachedUser));
+            setIsLoading(false);
           } catch {
-            // ignore
+            // ignore a corrupt cache and wait for the server instead
+          }
+        }
+
+        try {
+          const profile = await authApi.getProfile();
+          setUser(profile);
+          await storage.setItem("user_data", JSON.stringify(profile));
+        } catch {
+          // Offline or slow: keep the cached profile. But if the session could not be
+          // refreshed, the client has already removed the tokens, so sign out here too.
+          if (!(await storage.getItem("access_token"))) {
+            setUser(null);
+            await storage.removeItem("user_data");
           }
         }
       } finally {
