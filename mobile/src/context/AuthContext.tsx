@@ -76,6 +76,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     setIsLoading(true);
     try {
+      // Blacklist the refresh token on the server, as the website does; sign out locally regardless
+      const refresh = await storage.getItem("refresh_token");
+      if (refresh) {
+        await authApi.logout(refresh).catch(() => {});
+      }
       await storage.removeItem("access_token");
       await storage.removeItem("refresh_token");
       await storage.removeItem("user_data");

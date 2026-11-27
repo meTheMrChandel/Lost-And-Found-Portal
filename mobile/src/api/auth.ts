@@ -43,6 +43,11 @@ export const authApi = {
     return res.data;
   },
 
+  async logout(refresh: string) {
+    const res = await apiClient.post("/auth/logout/", { refresh });
+    return res.data;
+  },
+
   async getProfile(): Promise<UserProfile> {
     try {
       const res = await apiClient.get("/users/me/");

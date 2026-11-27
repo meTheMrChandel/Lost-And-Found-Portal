@@ -128,7 +128,9 @@ apiClient.interceptors.response.use(
       requestUrl.includes("/auth/token/refresh/") ||
       requestUrl.includes("/auth/refresh/") ||
       requestUrl.includes("/auth/request-otp/") ||
-      requestUrl.includes("/auth/verify-otp/");
+      requestUrl.includes("/auth/verify-otp/") ||
+      // Signing out with an expired token should not first rotate it
+      requestUrl.includes("/auth/logout/");
 
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
