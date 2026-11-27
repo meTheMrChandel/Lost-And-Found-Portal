@@ -1,6 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Text, Platform, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MainTabParamList } from "./types";
 import { FeedScreen } from "../screens/feed/FeedScreen";
 import { ReportLostScreen } from "../screens/reports/ReportLostScreen";
@@ -15,6 +16,10 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export const BottomTabNavigator: React.FC = () => {
   const { user } = useAuth();
+  // The app draws behind the system navigation bar, so lift the tabs above it
+  // (gesture pill or 3-button bar); keep the old spacing where there is no inset
+  const insets = useSafeAreaInsets();
+  const bottomSpace = Math.max(insets.bottom, Platform.OS === "ios" ? 28 : 10);
 
   return (
     <Tab.Navigator
@@ -33,8 +38,8 @@ export const BottomTabNavigator: React.FC = () => {
           backgroundColor: colors.card,
           borderTopWidth: 1,
           borderTopColor: colors.borderLight,
-          height: Platform.OS === "ios" ? 84 : 64,
-          paddingBottom: Platform.OS === "ios" ? 28 : 10,
+          height: 54 + bottomSpace,
+          paddingBottom: bottomSpace,
           paddingTop: 8,
         },
         tabBarActiveTintColor: colors.primary,
