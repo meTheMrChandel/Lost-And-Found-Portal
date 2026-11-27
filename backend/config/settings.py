@@ -20,6 +20,10 @@ DEBUG = config("DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*", cast=Csv())
 if "testserver" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append("testserver")
+# Render sets this to the service's public hostname (e.g. lostandfound-backend.onrender.com)
+_render_host = config("RENDER_EXTERNAL_HOSTNAME", default="")
+if _render_host and _render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_host)
 # The container health check calls the backend directly on localhost (docker-compose.prod.yml)
 for _host in ["localhost", "127.0.0.1"]:
     if _host not in ALLOWED_HOSTS:
@@ -70,6 +74,8 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # Serves collected static files (Django admin, API docs) when no nginx sits in front
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -317,6 +323,12 @@ EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+# Give up on an unreachable SMTP server instead of hanging the request (OTP is also logged)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=int)
+# Gmail API over HTTPS, for hosts that block SMTP (apps/notifications/email_backends.py)
+GMAIL_CLIENT_ID = config("GMAIL_CLIENT_ID", default="")
+GMAIL_CLIENT_SECRET = config("GMAIL_CLIENT_SECRET", default="")
+GMAIL_REFRESH_TOKEN = config("GMAIL_REFRESH_TOKEN", default="")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@iitrpr.ac.in")
 
 # ─── OTP Settings ─────────────────────────────────────────────────────────────
@@ -348,7 +360,10 @@ if STORAGE_BACKEND == "s3":
     AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME", default="ap-south-1")
     AWS_S3_FILE_OVERWRITE = False
 elif STORAGE_BACKEND == "cloudinary":
+    # Listed after django.contrib.staticfiles so collectstatic stays Django's own
+    INSTALLED_APPS += ["cloudinary_storage", "cloudinary"]
     DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+    # Read from the environment by the cloudinary SDK: cloudinary://<key>:<secret>@<cloud_name>
     CLOUDINARY_URL = config("CLOUDINARY_URL")
 
 # ─── Application constants ────────────────────────────────────────────────────

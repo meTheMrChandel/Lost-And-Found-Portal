@@ -25,7 +25,7 @@ def landing_page_view(request: HttpRequest) -> HttpResponse:
         "active_posts_count": active_posts_count,
         "resolved_matches_count": resolved_matches_count,
         "categories": categories,
-        "frontend_url": "http://localhost:3000",
+        "frontend_url": settings.FRONTEND_URL,
     }
     return render(request, "landing.html", context)
 

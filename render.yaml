@@ -1,0 +1,114 @@
+# Render Blueprint for the backend (Dashboard → New → Blueprint → pick this repo).
+# Free plan: demo use only. No Celery worker, so matching and post expiry don't run on a schedule,
+# and outbound SMTP is blocked, so email (OTP codes) is sent through the Gmail API instead.
+# The frontend is deployed separately on Vercel (root directory: frontend).
+
+databases:
+  - name: lostandfound-db
+    plan: free
+    region: singapore
+    databaseName: lostandfound
+    user: lostandfound
+
+services:
+  # Redis for live chat (Django Channels) and the Celery broker
+  - type: keyvalue
+    name: lostandfound-redis
+    plan: free
+    region: singapore
+    ipAllowList: [] # reachable only from services in this Render account
+
+  # Django ASGI backend (REST API + WebSockets)
+  - type: web
+    name: lostandfound-backend
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health/
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # Database
+      - key: DATABASE_ENGINE
+        value: django.db.backends.postgresql
+      - key: DATABASE_HOST
+        fromDatabase:
+          name: lostandfound-db
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: lostandfound-db
+          property: port
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: lostandfound-db
+          property: database
+      - key: DATABASE_USER
+        fromDatabase:
+          name: lostandfound-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: lostandfound-db
+          property: password
+
+      # Redis
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: lostandfound-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: lostandfound-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: lostandfound-redis
+          property: connectionString
+
+      # Frontend on Vercel. Fill these in once the Vercel URL is known, e.g.
+      #   ALLOWED_HOSTS         your-app.vercel.app   (live chat checks the page's origin against this)
+      #   FRONTEND_URL          https://your-app.vercel.app
+      #   CORS_ALLOWED_ORIGINS  https://your-app.vercel.app
+      #   CSRF_TRUSTED_ORIGINS  https://your-app.vercel.app
+      # The backend's own onrender.com hostname is added to ALLOWED_HOSTS automatically.
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+
+      # Email: SMTP is blocked on the free plan, so mail goes out through the Gmail API over HTTPS.
+      # Get the three GMAIL_* values with: python scripts/gmail_refresh_token.py client_secret.json
+      # DEFAULT_FROM_EMAIL must be that Gmail address, e.g. IIT Ropar Lost & Found <you@gmail.com>
+      # (OTP codes are still printed to the logs as a fallback.)
+      - key: EMAIL_BACKEND
+        value: apps.notifications.email_backends.GmailAPIBackend
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+
+      # Uploaded photos: Render's disk is wiped on every deploy, so keep them on Cloudinary.
+      # CLOUDINARY_URL is on the Cloudinary dashboard: cloudinary://<api_key>:<api_secret>@<cloud_name>
+      - key: STORAGE_BACKEND
+        value: cloudinary
+      - key: CLOUDINARY_URL
+        sync: false
