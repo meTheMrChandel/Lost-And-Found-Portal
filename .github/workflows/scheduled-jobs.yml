@@ -1,0 +1,63 @@
+# Twice-daily batch run of the backend's scheduled jobs, for hosts without Celery beat (Render free plan).
+# 09:00 and 21:00 IST, matching settings.BATCH_HOURS. GitHub may start scheduled runs a few minutes late.
+#
+# Setup (repo admin): Settings → Secrets and variables → Actions
+#   secret   CRON_SECRET   same value as the backend's CRON_SECRET env var
+#   variable BACKEND_URL   optional, defaults to the Render URL below
+# Run it by hand from the Actions tab with "Run workflow".
+name: Scheduled jobs
+
+on:
+  schedule:
+    - cron: "30 3,15 * * *" # GitHub uses UTC: 03:30 and 15:30 UTC = 09:00 and 21:00 IST
+  workflow_dispatch:
+
+concurrency:
+  group: scheduled-jobs
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BACKEND_URL: ${{ vars.BACKEND_URL || 'https://lost-and-found-portal-zx3h.onrender.com' }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Check configuration
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Add the CRON_SECRET repository secret (same value as on the backend)."
+            exit 1
+          fi
+
+      - name: Wake the backend
+        # The free Render service sleeps when idle; the first request can take about a minute
+        run: |
+          curl --silent --show-error --fail --max-time 120 --retry 5 --retry-delay 20 --retry-all-errors \
+            "$BACKEND_URL/api/v1/health/" > /dev/null
+
+      - name: Post lifecycle (reminders, auto-expiry, review alerts)
+        run: |
+          curl --silent --show-error --fail-with-body --max-time 300 --retry 3 --retry-delay 30 --retry-all-errors \
+            -X POST -H "X-Cron-Secret: $CRON_SECRET" -H "Content-Type: application/json" \
+            -d '{"step":"lifecycle"}' "$BACKEND_URL/api/v1/internal/run-scheduled-jobs/" | jq -c '.data.result'
+
+      - name: Matching, batch by batch
+        run: |
+          after=""
+          batch=1
+          while true; do
+            if [ -n "$after" ]; then body="{\"step\":\"matching\",\"after\":\"$after\"}"; else body='{"step":"matching"}'; fi
+            response=$(curl --silent --show-error --fail-with-body --max-time 300 --retry 3 --retry-delay 30 --retry-all-errors \
+              -X POST -H "X-Cron-Secret: $CRON_SECRET" -H "Content-Type: application/json" \
+              -d "$body" "$BACKEND_URL/api/v1/internal/run-scheduled-jobs/")
+            echo "batch $batch: $(echo "$response" | jq -c '.data.result | {lost_reports, scanned_pairs, matches_created, matches_updated, owners_notified}')"
+            after=$(echo "$response" | jq -r '.data.next_after // empty')
+            [ -z "$after" ] && break
+            delay=$(echo "$response" | jq -r '.data.delay_seconds // 30')
+            echo "waiting ${delay}s before the next batch"
+            sleep "$delay"
+            batch=$((batch + 1))
+          done
+          echo "matching finished after $batch batch(es)"

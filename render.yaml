@@ -1,6 +1,7 @@
 # Render Blueprint for the backend (Dashboard → New → Blueprint → pick this repo).
-# Free plan: demo use only. No Celery worker, so matching and post expiry don't run on a schedule,
-# and outbound SMTP is blocked, so email (OTP codes) is sent through the Gmail API instead.
+# Free plan: demo use only. There's no Celery worker or beat, so the twice-daily matching and
+# post-lifecycle run is triggered by .github/workflows/scheduled-jobs.yml through a protected endpoint
+# (CRON_SECRET below). Outbound SMTP is blocked, so email (OTP codes) is sent through the Gmail API.
 # The frontend is deployed separately on Vercel (root directory: frontend).
 
 databases:
@@ -108,6 +109,15 @@ services:
 
       # Uploaded photos: Render's disk is wiped on every deploy, so keep them on Cloudinary.
       # CLOUDINARY_URL is on the Cloudinary dashboard: cloudinary://<api_key>:<api_secret>@<cloud_name>
+      # Twice-daily batch run: the same CRON_SECRET goes into the GitHub repo's Actions secrets.
+      # Matching runs MATCHING_BATCH_SIZE lost reports per batch, BATCH_DELAY_SECONDS apart.
+      - key: CRON_SECRET
+        generateValue: true
+      - key: MATCHING_BATCH_SIZE
+        value: "25"
+      - key: BATCH_DELAY_SECONDS
+        value: "30"
+
       - key: STORAGE_BACKEND
         value: cloudinary
       - key: CLOUDINARY_URL

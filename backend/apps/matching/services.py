@@ -228,7 +228,11 @@ def passes_hard_gates(lost: Post, found: Post) -> bool:
     return True
 
 
-def run_matching(post_id: Optional[str] = None) -> Dict[str, Any]:
+def run_matching(
+    post_id: Optional[str] = None,
+    batch_size: Optional[int] = None,
+    after: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Suggests matches between approved lost and found reports.
 
@@ -238,6 +242,12 @@ def run_matching(post_id: Optional[str] = None) -> Dict[str, Any]:
     each ("This might be yours"). Re-running is safe: nothing is duplicated.
 
     If post_id is given, only lost reports that could involve that post are ranked.
+
+    Batch mode (batch_size given, no post_id): ranks at most batch_size lost reports, taken
+    in id order after the id in `after`, and returns that batch's last id as "next_after"
+    (None once every lost report has been handled). Each lost report is ranked on its own,
+    so splitting a run into batches gives the same matches as one full run. Reports approved
+    mid-run with an id before the cursor wait for the next run.
     """
     from apps.notifications.events import notify_owner_possible_match
 
@@ -248,6 +258,15 @@ def run_matching(post_id: Optional[str] = None) -> Dict[str, Any]:
     approved = Post.objects.filter(status=Post.Status.APPROVED).select_related("category", "author")
     lost_posts = approved.filter(post_type=Post.PostType.LOST)
     found_posts = list(approved.filter(post_type=Post.PostType.FOUND))
+
+    next_after = None
+    if batch_size and not post_id:
+        lost_posts = lost_posts.order_by("id")
+        if after:
+            lost_posts = lost_posts.filter(id__gt=after)
+        lost_posts = list(lost_posts[:batch_size])
+        if len(lost_posts) == batch_size:
+            next_after = str(lost_posts[-1].id)
 
     if post_id:
         target_post = approved.filter(id=post_id).first()
@@ -313,10 +332,14 @@ def run_matching(post_id: Optional[str] = None) -> Dict[str, Any]:
                 match.save(update_fields=["owner_notified_at"])
                 owners_notified += 1
 
-    return {
+    result = {
         "scanned_pairs": scanned_pairs,
         "matches_created": matches_created,
         "matches_updated": matches_updated,
         "owners_notified": owners_notified,
         "threshold_used": threshold,
     }
+    if batch_size and not post_id:
+        result["lost_reports"] = len(lost_posts)
+        result["next_after"] = next_after
+    return result

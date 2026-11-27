@@ -66,6 +66,61 @@ class HealthView(APIView):
         return Response({"status": "ok" if healthy else "degraded", "checks": checks}, status=200 if healthy else 503)
 
 
+class ScheduledJobsView(APIView):
+    """
+    POST /api/v1/internal/run-scheduled-jobs/ — one step of the twice-daily run, for hosts without
+    a Celery worker and beat (e.g. Render's free plan). Body:
+        {"step": "lifecycle"}                      renewal reminders, auto-expiry, review SLA alerts
+        {"step": "matching", "after": <cursor>}    one batch of MATCHING_BATCH_SIZE lost reports
+    The reply carries "next_after" (null when matching is done) and "delay_seconds", the pause the
+    caller should wait before asking for the next batch. Splitting the run keeps every request short
+    and spreads the load. Called by .github/workflows/scheduled-jobs.yml with the shared secret in
+    the X-Cron-Secret header; returns 404 while CRON_SECRET is unset.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = []
+
+    def post(self, request):
+        import hmac
+        import logging
+
+        from apps.matching.services import run_matching
+        from apps.posts.lifecycle import run_post_lifecycle
+
+        expected = settings.CRON_SECRET
+        if not expected:
+            return Response({"success": False, "message": "Not found."}, status=404)
+        given = request.headers.get("X-Cron-Secret", "")
+        if not hmac.compare_digest(given.encode(), expected.encode()):
+            return Response({"success": False, "message": "Invalid cron secret."}, status=403)
+
+        step = request.data.get("step")
+        logger = logging.getLogger(__name__)
+        if step == "lifecycle":
+            result = run_post_lifecycle()
+            data = {"step": step, "result": result, "next_after": None}
+        elif step == "matching":
+            after = request.data.get("after") or None
+            if after is not None:
+                import uuid
+
+                try:
+                    after = str(uuid.UUID(str(after)))
+                except ValueError:
+                    return Response({"success": False, "message": "after must be a report id."}, status=400)
+            result = run_matching(batch_size=settings.MATCHING_BATCH_SIZE, after=after)
+            data = {"step": step, "result": result, "next_after": result["next_after"]}
+        else:
+            return Response(
+                {"success": False, "message": 'step must be "lifecycle" or "matching".'}, status=400
+            )
+        data["delay_seconds"] = settings.BATCH_DELAY_SECONDS
+        logger.info("Scheduled step %s finished: %s", step, result)
+        return Response({"success": True, "data": data})
+
+
 class AppConfigView(APIView):
     """
     GET /api/v1/app-config/ — lets the mobile app force or suggest an update.

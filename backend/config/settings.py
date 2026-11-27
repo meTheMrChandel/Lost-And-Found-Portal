@@ -259,19 +259,30 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-# The DatabaseScheduler copies these into django_celery_beat's tables when beat starts
+# Both jobs run twice a day (times in TIME_ZONE, i.e. IST). The same hours are used by
+# .github/workflows/scheduled-jobs.yml, which triggers the run where no Celery beat runs (Render free plan).
+BATCH_HOURS = "9,21"
+# Matching is split into batches of this many lost reports, with a pause between batches
+# so a run never loads the server (or the database) with every pair at once
+MATCHING_BATCH_SIZE = config("MATCHING_BATCH_SIZE", default=25, cast=int)
+BATCH_DELAY_SECONDS = config("BATCH_DELAY_SECONDS", default=30, cast=int)
+# The DatabaseScheduler copies these into django_celery_beat's tables when beat starts. The entry names
+# are the original ones so existing beat databases update the schedule in place instead of keeping the old one.
 CELERY_BEAT_SCHEDULE = {
     # Renewal reminders, auto-expiry and review SLA alerts (apps/posts/lifecycle.py)
     "post-lifecycle-hourly": {
         "task": "apps.posts.tasks.run_post_lifecycle",
-        "schedule": crontab(minute=0),
+        "schedule": crontab(minute=0, hour=BATCH_HOURS),
     },
-    # Score new lost/found pairs into the admin match queue; re-runs never duplicate a pair
+    # Score lost/found pairs into the admin match queue, batch by batch; re-runs never duplicate a pair
     "matching-engine-every-15-minutes": {
-        "task": "apps.matching.tasks.run_matching_engine",
-        "schedule": crontab(minute="*/15"),
+        "task": "apps.matching.tasks.run_matching_batch",
+        "schedule": crontab(minute=0, hour=BATCH_HOURS),
     },
 }
+
+# Shared secret for POST /api/v1/internal/run-scheduled-jobs/ (header X-Cron-Secret); empty turns it off
+CRON_SECRET = config("CRON_SECRET", default="")
 
 # ─── Channels (WebSocket) ────────────────────────────────────────────────────
 REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
