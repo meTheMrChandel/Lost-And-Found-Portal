@@ -70,12 +70,7 @@ def send_otp_email(email: str, code: str, purpose: str) -> None:
         f"Best regards,\nIIT Ropar Lost & Found Team"
     )
 
-    print(f"\n==========================================")
-    print(f" [OTP DISPATCH] Email: {email} | Purpose: {purpose}")
-    print(f" >>> VERIFICATION CODE: {code} <<<")
-    print(f"==========================================\n")
-    logger.info("Generated OTP %s for %s (%s)", code, email, purpose)
-
+    # The code itself is never printed or logged; it only goes out in the email.
     try:
         send_mail(
             subject=subject,
@@ -84,9 +79,9 @@ def send_otp_email(email: str, code: str, purpose: str) -> None:
             recipient_list=[email],
             fail_silently=False,
         )
+        logger.info("Sent %s OTP email to %s", purpose, email)
     except Exception as exc:
-        logger.warning("SMTP email delivery to %s failed: %s", email, exc)
-        print(f"⚠️ SMTP delivery notice ({exc}). Use the printed code above: {code}")
+        logger.warning("OTP email delivery to %s (%s) failed: %s", email, purpose, exc)
 
 
 def verify_otp(email: str, code: str, purpose: str) -> tuple[bool, str]:

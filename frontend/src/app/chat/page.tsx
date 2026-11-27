@@ -60,7 +60,6 @@ interface Message {
   is_me: boolean;
   created_at: string;
 }
-
 export default function ChatPage() {
   const { user, loading: authLoading } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
