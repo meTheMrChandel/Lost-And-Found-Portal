@@ -14,14 +14,7 @@ const nextConfig: NextConfig = {
       validationLevel: "manual-warning",
     },
   },
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
+  // Tailwind is wired up in postcss.config.mjs, which both Turbopack (dev) and webpack (build) read
 };
 
 export default nextConfig;
