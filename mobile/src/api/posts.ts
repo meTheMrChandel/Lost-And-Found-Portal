@@ -57,7 +57,7 @@ export interface MyReport {
   description?: string;
 }
 
-function absoluteImages(raw: any[] | undefined): PostImageItem[] {
+export function absoluteImages(raw: any[] | undefined): PostImageItem[] {
   return (raw || []).map((img: any, idx: number) => {
     let url = img.image_url || img.image || "";
     if (url && url.startsWith("/") && !url.startsWith("//")) url = `${API_ORIGIN}${url}`;

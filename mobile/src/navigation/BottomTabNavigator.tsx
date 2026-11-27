@@ -7,11 +7,15 @@ import { ReportLostScreen } from "../screens/reports/ReportLostScreen";
 import { ReportFoundScreen } from "../screens/reports/ReportFoundScreen";
 import { QRScanScreen } from "../screens/qr/QRScanScreen";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
+import { AdminHomeScreen } from "../screens/admin/AdminHomeScreen";
+import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export const BottomTabNavigator: React.FC = () => {
+  const { user } = useAuth();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -86,6 +90,17 @@ export const BottomTabNavigator: React.FC = () => {
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 20 }}>👤</Text>,
         }}
       />
+      {user?.is_staff ? (
+        <Tab.Screen
+          name="Admin"
+          component={AdminHomeScreen}
+          options={{
+            title: "Admin Console",
+            tabBarLabel: "Admin",
+            tabBarIcon: () => <Text style={{ fontSize: 20 }}>🛡️</Text>,
+          }}
+        />
+      ) : null}
     </Tab.Navigator>
   );
 };

@@ -15,6 +15,16 @@ import { ValuablesScreen } from "../screens/qr/ValuablesScreen";
 import { MyReportsScreen } from "../screens/reports/MyReportsScreen";
 import { MyReportDetailScreen } from "../screens/reports/MyReportDetailScreen";
 import { FeedbackScreen } from "../screens/profile/FeedbackScreen";
+import { AdminCasesScreen } from "../screens/admin/AdminCasesScreen";
+import { AdminCaseDetailScreen } from "../screens/admin/AdminCaseDetailScreen";
+import { AdminMatchesScreen } from "../screens/admin/AdminMatchesScreen";
+import { AdminMatchDetailScreen } from "../screens/admin/AdminMatchDetailScreen";
+import { AdminAbuseReportsScreen } from "../screens/admin/AdminAbuseReportsScreen";
+import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
+import { AdminInvitesScreen } from "../screens/admin/AdminInvitesScreen";
+import { AdminAuditLogScreen } from "../screens/admin/AdminAuditLogScreen";
+import { AdminFeedbackScreen } from "../screens/admin/AdminFeedbackScreen";
+import { AdminSettingsScreen } from "../screens/admin/AdminSettingsScreen";
 import { WEB_URL } from "../api/client";
 import { colors } from "../theme/colors";
 
@@ -116,6 +126,18 @@ export const AppNavigator: React.FC = () => {
           component={FeedbackScreen}
           options={{ title: "Send Feedback" }}
         />
+
+        {/* Admin console, reached from the Admin tab (staff accounts only) */}
+        <Stack.Screen name="AdminCases" component={AdminCasesScreen} options={{ title: "Case Queue" }} />
+        <Stack.Screen name="AdminCaseDetail" component={AdminCaseDetailScreen} options={{ title: "Review Report" }} />
+        <Stack.Screen name="AdminMatches" component={AdminMatchesScreen} options={{ title: "Match Queue" }} />
+        <Stack.Screen name="AdminMatchDetail" component={AdminMatchDetailScreen} options={{ title: "Match & Handover" }} />
+        <Stack.Screen name="AdminAbuseReports" component={AdminAbuseReportsScreen} options={{ title: "Abuse Reports" }} />
+        <Stack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ title: "User Moderation" }} />
+        <Stack.Screen name="AdminInvites" component={AdminInvitesScreen} options={{ title: "Admin Invites" }} />
+        <Stack.Screen name="AdminAuditLog" component={AdminAuditLogScreen} options={{ title: "Audit Log" }} />
+        <Stack.Screen name="AdminFeedback" component={AdminFeedbackScreen} options={{ title: "Beta Feedback" }} />
+        <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} options={{ title: "Site Settings" }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
