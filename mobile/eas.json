@@ -17,13 +17,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://lostandfound.iitrpr.ac.in/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://lost-and-found-portal-zx3h.onrender.com/api/v1"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://lostandfound.iitrpr.ac.in/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://lost-and-found-portal-zx3h.onrender.com/api/v1"
       }
     }
   },

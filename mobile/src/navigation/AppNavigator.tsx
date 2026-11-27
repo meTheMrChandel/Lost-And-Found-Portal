@@ -15,15 +15,18 @@ import { ValuablesScreen } from "../screens/qr/ValuablesScreen";
 import { MyReportsScreen } from "../screens/reports/MyReportsScreen";
 import { MyReportDetailScreen } from "../screens/reports/MyReportDetailScreen";
 import { FeedbackScreen } from "../screens/profile/FeedbackScreen";
+import { WEB_URL } from "../api/client";
 import { colors } from "../theme/colors";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // Sticker links open the scan result: lostandfound://scan/<uuid>, the printed
+// <web app>/scan/<uuid> (the hosted Vercel site, see app.json extra.webUrl), the planned
 // https://lostandfound.iitrpr.ac.in/scan/<uuid>, and exp://.../--/scan/<uuid> in Expo Go
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [
     "lostandfound://",
+    ...(WEB_URL ? [WEB_URL] : []),
     "https://lostandfound.iitrpr.ac.in",
     ...(Constants.linkingUri ? [Constants.linkingUri] : []),
   ],

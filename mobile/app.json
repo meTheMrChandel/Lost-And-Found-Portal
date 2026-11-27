@@ -33,6 +33,11 @@
           "data": [
             {
               "scheme": "https",
+              "host": "lost-and-found-portal-self-omega.vercel.app",
+              "pathPrefix": "/scan/"
+            },
+            {
+              "scheme": "https",
               "host": "lostandfound.iitrpr.ac.in",
               "pathPrefix": "/scan/"
             }
@@ -65,6 +70,10 @@
           "backgroundColor": "#FAF7F2"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "apiUrl": "https://lost-and-found-portal-zx3h.onrender.com/api/v1",
+      "webUrl": "https://lost-and-found-portal-self-omega.vercel.app"
+    }
   }
 }

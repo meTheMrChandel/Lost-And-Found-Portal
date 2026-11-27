@@ -23,10 +23,17 @@ const DEFAULT_API_BASE =
     ? `http://${expoHost}:8000/api/v1`
     : `http://${LAN_FALLBACK_HOST}:8000/api/v1`;
 
-// Release builds point at the deployed server, e.g. https://lostandfound.iitrpr.ac.in/api/v1
-const CONFIGURED_API_BASE = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, "");
+// EXPO_PUBLIC_API_URL picks any server. Without it, release builds (an installed APK) use
+// the hosted server from app.json's extra.apiUrl and development builds the computer above.
+const HOSTED_API_BASE: string | undefined = Constants.expoConfig?.extra?.apiUrl;
+const CONFIGURED_API_BASE = (process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? "" : HOSTED_API_BASE || ""))
+  .trim()
+  .replace(/\/+$/, "");
 
 export const API_URL = CONFIGURED_API_BASE || DEFAULT_API_BASE;
+
+/** The hosted web app (Vercel), e.g. for links that only exist on the website. */
+export const WEB_URL: string = (Constants.expoConfig?.extra?.webUrl || "").replace(/\/+$/, "");
 
 /** Origin of the API server (no /api/v1), used for media files and WebSockets. */
 export const API_ORIGIN = API_URL.replace(/\/api\/v\d+$/, "");
