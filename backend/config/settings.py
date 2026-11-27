@@ -314,10 +314,14 @@ else:
     }
 
 # ─── Mobile app versions (GET /api/v1/app-config/) ───────────────────────────
-# Raise MIN to force everyone off an old build; raise LATEST to suggest an update
+# Raise MIN to force everyone off an old build; raise LATEST to suggest an update.
+# The Android APK is published as a GitHub release, so "Update" opens the newest one.
 MOBILE_MIN_SUPPORTED_VERSION = config("MOBILE_MIN_SUPPORTED_VERSION", default="1.0.0")
 MOBILE_LATEST_VERSION = config("MOBILE_LATEST_VERSION", default="1.0.0")
-MOBILE_UPDATE_URL = config("MOBILE_UPDATE_URL", default="")
+MOBILE_UPDATE_URL = config(
+    "MOBILE_UPDATE_URL",
+    default="https://github.com/meTheMrChandel/Lost-And-Found-Portal/releases/latest",
+)
 
 # ─── Email ────────────────────────────────────────────────────────────────────
 # Console in development; real SMTP in production, where OTP emails must actually arrive
