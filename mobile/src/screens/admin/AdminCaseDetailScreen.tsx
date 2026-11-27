@@ -26,6 +26,15 @@ import {
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, "AdminCaseDetail">;
 
+const DONE: Record<Exclude<ReviewAction, "DELETE">, string> = {
+  APPROVE: "Approved. It is on the campus feed and the student was notified.",
+  REJECT: "Rejected. The student was told why.",
+  INFO_REQUESTED: "Sent. The student was asked for more information.",
+  HIDE: "Hidden from the feed. The student was notified.",
+  CHANGE_CATEGORY: "Category changed.",
+  ASSIGN: "Case assigned.",
+};
+
 const CUSTODY: Record<string, string> = {
   finder: "With the finder",
   admin_office: "Admin office",
@@ -97,7 +106,7 @@ export const AdminCaseDetailScreen: React.FC = () => {
       setPost(result.post);
       setRemarks("");
       setPicker(null);
-      setSuccess(result.message);
+      setSuccess(DONE[action as Exclude<ReviewAction, "DELETE">] || result.message);
     } catch (err: any) {
       setError(errorMessage(err, "That action failed."));
     } finally {

@@ -69,6 +69,7 @@ export function ChipFilter<T extends string>({
   return (
     <FlatList
       horizontal
+      style={{ flexGrow: 0 }}
       showsHorizontalScrollIndicator={false}
       data={items}
       keyExtractor={(item) => item || "__all"}

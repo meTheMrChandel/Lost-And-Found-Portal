@@ -136,7 +136,17 @@ export const AdminMatchesScreen: React.FC = () => {
 
   return (
     <View style={ui.screen}>
-      <ChipFilter options={MATCH_STATUSES} value={status} onChange={setStatus} allLabel="All" />
+      <ChipFilter
+        options={MATCH_STATUSES}
+        value={status}
+        onChange={(value) => {
+          // Show the spinner, not the previous filter's results, until the new list arrives
+          if (value === status) return;
+          setLoading(true);
+          setStatus(value);
+        }}
+        allLabel="All"
+      />
       <View style={styles.toolbar}>
         <Text style={ui.muted}>{count} match(es)</Text>
         <ActionButton label={running ? "Running…" : "Run matching now"} tone="neutral" onPress={runEngine} disabled={running} />

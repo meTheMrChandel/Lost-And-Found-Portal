@@ -30,6 +30,13 @@ export const AdminCasesScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
+  // Changing a filter shows the spinner until the new list arrives, not the old results
+  const changeFilter = <T,>(current: T, setter: (value: T) => void) => (value: T) => {
+    if (value === current) return;
+    setLoading(true);
+    setter(value);
+  };
+
   // Search once the admin stops typing
   useEffect(() => {
     const timer = setTimeout(() => setAppliedSearch(search.trim()), SEARCH_DELAY_MS);
@@ -118,20 +125,20 @@ export const AdminCasesScreen: React.FC = () => {
         <ChipFilter
           options={POST_STATUSES}
           value={status}
-          onChange={setStatus}
+          onChange={changeFilter(status, setStatus)}
           allLabel="All statuses"
           label={(s) => statusBadge(s).label}
         />
       ) : null}
-      <ChipFilter options={TYPES} value={postType} onChange={setPostType} allLabel="Lost & found" />
+      <ChipFilter options={TYPES} value={postType} onChange={changeFilter(postType, setPostType)} allLabel="Lost & found" />
 
       <View style={styles.toggles}>
         <View style={styles.toggle}>
-          <Switch value={overdueOnly} onValueChange={setOverdueOnly} trackColor={{ true: colors.lost }} />
+          <Switch value={overdueOnly} onValueChange={changeFilter(overdueOnly, setOverdueOnly)} trackColor={{ true: colors.lost }} />
           <Text style={styles.toggleLabel}>Overdue reviews</Text>
         </View>
         <View style={styles.toggle}>
-          <Switch value={mineOnly} onValueChange={setMineOnly} trackColor={{ true: colors.primary }} />
+          <Switch value={mineOnly} onValueChange={changeFilter(mineOnly, setMineOnly)} trackColor={{ true: colors.primary }} />
           <Text style={styles.toggleLabel}>Assigned to me</Text>
         </View>
       </View>

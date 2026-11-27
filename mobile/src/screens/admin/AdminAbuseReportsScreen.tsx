@@ -88,7 +88,7 @@ export const AdminAbuseReportsScreen: React.FC = () => {
                 )
               }
             />
-          ) : item.post_status !== "REJECTED" ? (
+          ) : ["APPROVED", "PENDING", "INFO_REQUESTED"].includes(item.post_status) ? (
             <ActionButton
               label="Hide post"
               tone="warning"
