@@ -52,6 +52,14 @@ class RegisteredItem(models.Model):
         return f"{self.name} ({self.owner})"
 
     @property
+    def scan_url(self) -> str:
+        """
+        The link printed on the sticker. It points at the web app's /scan/<uuid> page,
+        which the Android app also opens, not at the API server, which has no such page.
+        """
+        return f"{settings.FRONTEND_URL.rstrip('/')}/scan/{self.qr_uuid}"
+
+    @property
     def public_qr_data(self) -> dict:
         """Fields shown on the public QR scan page."""
         return {

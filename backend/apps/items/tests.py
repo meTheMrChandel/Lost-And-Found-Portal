@@ -205,6 +205,19 @@ class TestPhase7QRSystem:
         assert "<svg" in res_json.data["svg"]
         assert str(item.qr_uuid) in res_json.data["scan_url"]
 
+    def test_sticker_links_point_at_the_web_app(self, api_client, student_user, category_bicycle, settings):
+        """Stickers are scanned with any phone camera, so they must open the web app's /scan/ page."""
+        settings.FRONTEND_URL = "https://lostandfound.example.app/"
+        item = RegisteredItem.objects.create(owner=student_user, category=category_bicycle, name="Hero Sprint cycle")
+        expected = f"https://lostandfound.example.app/scan/{item.qr_uuid}"
+
+        api_client.force_authenticate(user=student_user)
+        sticker = api_client.get(f"/api/v1/items/{item.id}/sticker/?format=json")
+        assert sticker.data["scan_url"] == expected
+        detail = api_client.get(f"/api/v1/items/{item.id}/")
+        payload = detail.data.get("data", detail.data)
+        assert payload["scan_url"] == expected
+
     def test_admin_registered_items_search_by_name_and_registration_number(
         self, api_client, admin_user, student_user, category_bicycle
     ):

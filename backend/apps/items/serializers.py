@@ -46,11 +46,7 @@ class RegisteredItemSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "qr_uuid", "deactivated_at", "created_at", "updated_at"]
 
     def get_scan_url(self, obj: RegisteredItem) -> str:
-        request = self.context.get("request")
-        path = f"/scan/{obj.qr_uuid}"
-        if request:
-            return request.build_absolute_uri(path)
-        return path
+        return obj.scan_url
 
 
 class RegisteredItemCreateSerializer(serializers.ModelSerializer):

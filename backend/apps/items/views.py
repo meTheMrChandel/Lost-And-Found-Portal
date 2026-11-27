@@ -123,8 +123,8 @@ class RegisteredItemQRStickerView(APIView):
         else:
             item = get_object_or_404(RegisteredItem, pk=pk, owner=user)
 
-        # Build scan link
-        scan_url = request.build_absolute_uri(f"/scan/{item.qr_uuid}")
+        # Build scan link (on the web app, not this API server)
+        scan_url = item.scan_url
 
         # Generate SVG QR Code
         factory = qrcode.image.svg.SvgPathImage
