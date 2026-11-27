@@ -248,19 +248,22 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
                 loading={loading}
                 style={styles.btn}
               />
-              <TouchableOpacity
-                style={{ marginTop: 10, padding: 8, backgroundColor: colors.ocean + "12", borderRadius: 8, alignItems: "center" }}
-                onPress={() => {
-                  setFullName("Rahul Sharma");
-                  setRegNo("2026AIM9999");
-                  setPassword("Student@123456");
-                  setError("");
-                }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: "600", color: colors.ocean }}>
-                  💡 Fill Demo Details (Rahul / 2026AIM9999 / Student@123456)
-                </Text>
-              </TouchableOpacity>
+              {/* Demo fill: development builds only, so no real account is created with a known password */}
+              {__DEV__ ? (
+                <TouchableOpacity
+                  style={{ marginTop: 10, padding: 8, backgroundColor: colors.ocean + "12", borderRadius: 8, alignItems: "center" }}
+                  onPress={() => {
+                    setFullName("Rahul Sharma");
+                    setRegNo("2026AIM9999");
+                    setPassword("Student@123456");
+                    setError("");
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: colors.ocean }}>
+                    💡 Fill Demo Details (Rahul / 2026AIM9999 / Student@123456)
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </>
           )}
 

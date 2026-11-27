@@ -116,32 +116,36 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.submitBtn}
           />
 
-          {/* Quick Demo Fill Helpers */}
-          <TouchableOpacity
-            style={styles.demoHelper}
-            onPress={() => {
-              setEmail("2026aim1023@iitrpr.ac.in");
-              setPassword("Student@123456");
-              setError("");
-            }}
-          >
-            <Text style={styles.demoHelperText}>
-              💡 Fill Student Demo (2026aim1023@iitrpr.ac.in)
-            </Text>
-          </TouchableOpacity>
+          {/* Quick demo fill helpers: development builds only, so no credentials ship in the APK */}
+          {__DEV__ ? (
+            <>
+              <TouchableOpacity
+                style={styles.demoHelper}
+                onPress={() => {
+                  setEmail("2026aim1023@iitrpr.ac.in");
+                  setPassword("Student@123456");
+                  setError("");
+                }}
+              >
+                <Text style={styles.demoHelperText}>
+                  💡 Fill Student Demo (2026aim1023@iitrpr.ac.in)
+                </Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.demoHelper, { marginTop: 6, backgroundColor: colors.ocean + "10" }]}
-            onPress={() => {
-              setEmail("admin@iitrpr.ac.in");
-              setPassword("Admin@123456");
-              setError("");
-            }}
-          >
-            <Text style={[styles.demoHelperText, { color: colors.ocean }]}>
-              🛡️ Fill Admin Demo (admin@iitrpr.ac.in)
-            </Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.demoHelper, { marginTop: 6, backgroundColor: colors.ocean + "10" }]}
+                onPress={() => {
+                  setEmail("admin@iitrpr.ac.in");
+                  setPassword("Admin@123456");
+                  setError("");
+                }}
+              >
+                <Text style={[styles.demoHelperText, { color: colors.ocean }]}>
+                  🛡️ Fill Admin Demo (admin@iitrpr.ac.in)
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
 
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>New to IIT Ropar Lost & Found? </Text>
