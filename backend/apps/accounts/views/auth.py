@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 from django.conf import settings
 
-from apps.accounts.models import User
+from apps.accounts.models import OTP, User
 from apps.accounts.serializers.auth import (
     RequestOTPSerializer,
     VerifyOTPSerializer,
