@@ -1,311 +1,278 @@
-import React, { useCallback, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { chatApi, Conversation, StudentLookup } from "../../api/chat";
+import React, { memo, useCallback, useMemo, useRef, useState } from "react";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { useFocusEffect, useNavigation, useScrollToTop } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../navigation/types";
+import { chatApi, Conversation } from "../../api/chat";
 import { errorMessage } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
-import { Button } from "../../components/Button";
-import { Input } from "../../components/Input";
+import { useActivity } from "../../context/ActivityContext";
+import {
+  Avatar,
+  Badge,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  PressableScale,
+  RowSkeleton,
+  ScreenHeader,
+  Text,
+  useToast,
+} from "../../ui";
+import { ChevronRight, LockKeyhole, MessageCircle, MessageSquarePlus, ShieldCheck } from "../../ui/icons";
 import { colors } from "../../theme/colors";
-import { conversationNote, conversationTitle } from "./conversationLabel";
+import { radii, SCREEN_PADDING } from "../../theme/tokens";
+import { listStamp } from "../../utils/format";
+import { conversationNote, conversationTitle, isAdminThread, lastActivity } from "./conversationLabel";
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+const ConversationRow = memo<{
+  conv: Conversation;
+  myId: string;
+  isStaff: boolean;
+  onPress: (conv: Conversation, title: string) => void;
+}>(({ conv, myId, isStaff, onPress }) => {
+  const title = conversationTitle(conv, myId, isStaff);
+  const unread = conv.unread_count > 0;
+  const waitingOnMe = conv.request_status === "pending" && conv.requested_by !== myId;
+  const adminThread = isAdminThread(conv) && !isStaff;
+  return (
+    <PressableScale onPress={() => onPress(conv, title)} scaleTo={0.985} style={styles.row} accessibilityRole="button">
+      <Avatar name={title} icon={adminThread ? ShieldCheck : undefined} size={50} />
+      <View style={styles.rowBody}>
+        <View style={styles.rowTop}>
+          <Text variant="headline" numberOfLines={1} style={{ flex: 1 }}>
+            {title}
+          </Text>
+          <Text variant="caption" color={unread ? "primary" : "textMuted"}>
+            {listStamp(lastActivity(conv))}
+          </Text>
+        </View>
+        <View style={styles.rowBottom}>
+          {waitingOnMe ? <Badge label="Request" tone="info" /> : null}
+          <Text
+            variant="footnote"
+            color={unread || waitingOnMe ? "textPrimary" : "textSecondary"}
+            numberOfLines={1}
+            style={[{ flex: 1 }, unread && { fontWeight: "600" }]}
+          >
+            {conversationNote(conv, myId)}
+          </Text>
+          {unread ? (
+            <View style={styles.unread}>
+              <Text style={styles.unreadText}>{conv.unread_count > 99 ? "99+" : conv.unread_count}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </PressableScale>
+  );
+});
+ConversationRow.displayName = "ConversationRow";
 
 export const ChatListScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<Nav>();
+  const toast = useToast();
   const { user } = useAuth();
+  const { refresh: refreshBadges } = useActivity();
+
+  const listRef = useRef<FlatList<Conversation>>(null);
+  useScrollToTop(listRef);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // New chat by registration number
-  const [regNo, setRegNo] = useState("");
-  const [found, setFound] = useState<StudentLookup | null>(null);
-  const [firstMessage, setFirstMessage] = useState("");
-  const [finding, setFinding] = useState(false);
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [openingAdmin, setOpeningAdmin] = useState(false);
+  const loaded = useRef(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setConversations(await chatApi.getConversations());
+      setError("");
+      loaded.current = true;
     } catch (err: any) {
-      setError(errorMessage(err, "Couldn't load your conversations."));
+      const message = errorMessage(err, "Couldn't load your messages.");
+      if (loaded.current) toast.show(message, "error");
+      else setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [toast]);
 
   useFocusEffect(
     useCallback(() => {
-      if (user) load();
-      else setLoading(false);
-    }, [user?.id])
+      if (user) {
+        load();
+        refreshBadges();
+      } else setLoading(false);
+    }, [user, load, refreshBadges]),
   );
 
-  const openConversation = (id: string, title?: string) => navigation.navigate("Chat", { conversationId: id, title });
+  const sorted = useMemo(
+    () => [...conversations].sort((a, b) => lastActivity(b).localeCompare(lastActivity(a))),
+    [conversations],
+  );
+  const hasAdminThread = conversations.some(isAdminThread);
 
-  const handleFind = async () => {
-    if (!regNo.trim()) return;
-    setFinding(true);
-    setError("");
-    setFound(null);
+  const open = useCallback(
+    (conv: Conversation, title: string) => navigation.navigate("Chat", { conversationId: conv.id, title }),
+    [navigation],
+  );
+
+  const openAdminOffice = async () => {
+    setOpeningAdmin(true);
     try {
-      setFound(await chatApi.lookupStudent(regNo.trim()));
+      const conv = await chatApi.openAdminConversation();
+      navigation.navigate("Chat", { conversationId: conv.id, title: "Admin office" });
     } catch (err: any) {
-      setError(
-        err?.response?.status === 404
-          ? "No student has that registration number. Check it and try again."
-          : errorMessage(err, "Couldn't look that up.")
-      );
+      toast.show(errorMessage(err, "Couldn't open the chat."), "error");
     } finally {
-      setFinding(false);
+      setOpeningAdmin(false);
     }
   };
 
-  const handleSendRequest = async () => {
-    if (!found || !firstMessage.trim()) return;
-    setSending(true);
-    setError("");
-    try {
-      const conv = await chatApi.sendRequest(found.registration_number, firstMessage.trim());
-      setRegNo("");
-      setFound(null);
-      setFirstMessage("");
-      openConversation(conv.id, found.full_name);
-    } catch (err: any) {
-      setError(errorMessage(err, "Couldn't send the request."));
-    } finally {
-      setSending(false);
-    }
-  };
+  const header = (
+    <ScreenHeader
+      title="Messages"
+      right={
+        user ? (
+          <IconButton
+            icon={MessageSquarePlus}
+            variant="tonal"
+            accessibilityLabel="New message"
+            onPress={() => navigation.navigate("NewMessage")}
+          />
+        ) : null
+      }
+    />
+  );
 
   if (!user) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.emptyTitle}>Sign in to see your messages</Text>
-        <Button title="Sign In" onPress={() => navigation.navigate("Auth")} style={{ marginTop: 14 }} />
+      <View style={styles.screen}>
+        {header}
+        <EmptyState
+          icon={LockKeyhole}
+          title="Sign in to see your messages"
+          body="Chat with the admin office about a claim, or with the owner of an item you found."
+          actionLabel="Sign in"
+          onAction={() => navigation.navigate("Auth")}
+          style={{ flex: 1 }}
+        />
       </View>
     );
   }
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            load();
-          }}
-          colors={[colors.primary]}
-        />
-      }
-    >
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>New chat</Text>
-        <Text style={styles.cardHint}>
-          Know who it belongs to? Enter their registration number. They get one message from you and can accept
-          or decline it.
-        </Text>
-        <Input
-          placeholder="e.g. 2024CSM1001"
-          value={regNo}
-          onChangeText={(t) => {
-            setRegNo(t);
-            setFound(null);
-          }}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          returnKeyType="search"
-          onSubmitEditing={handleFind}
-          containerStyle={{ marginBottom: 10 }}
-        />
-        {!found && (
-          <Button title="Find" variant="outline" onPress={handleFind} loading={finding} disabled={!regNo.trim()} />
-        )}
+  const adminShortcut =
+    !user.is_staff && !hasAdminThread && !loading ? (
+      <PressableScale onPress={openAdminOffice} disabled={openingAdmin} scaleTo={0.985} style={styles.shortcut}>
+        <Avatar name="Admin office" icon={ShieldCheck} size={44} />
+        <View style={{ flex: 1 }}>
+          <Text variant="headline">Message the admin office</Text>
+          <Text variant="footnote" color="textSecondary">
+            Ask about a claim, a hand-over or your report
+          </Text>
+        </View>
+        <ChevronRight size={18} color={colors.textMuted} />
+      </PressableScale>
+    ) : undefined;
 
-        {found && (
-          <View style={styles.foundBox}>
-            <Text style={styles.foundName}>{found.full_name}</Text>
-            <Text style={styles.foundReg}>{found.registration_number}</Text>
-            {found.existing_conversation_id ? (
-              <Button
-                title="Open your conversation"
-                onPress={() => openConversation(found.existing_conversation_id!, found.full_name)}
-                style={{ marginTop: 12 }}
+  return (
+    <View style={styles.screen}>
+      {header}
+      {loading ? (
+        <View style={{ paddingHorizontal: SCREEN_PADDING }}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <RowSkeleton key={i} />
+          ))}
+        </View>
+      ) : (
+        <FlatList
+          ref={listRef}
+          data={sorted}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ConversationRow conv={item} myId={user.id} isStaff={!!user.is_staff} onPress={open} />
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListHeaderComponent={adminShortcut}
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+                refreshBadges();
+              }}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+          ListEmptyComponent={
+            error ? (
+              <ErrorState
+                message={error}
+                onRetry={() => {
+                  setLoading(true);
+                  load();
+                }}
               />
             ) : (
-              <>
-                <Input
-                  placeholder="Say who you are and why you're writing"
-                  value={firstMessage}
-                  onChangeText={setFirstMessage}
-                  multiline
-                  maxLength={1000}
-                  containerStyle={{ marginTop: 12, marginBottom: 10 }}
-                />
-                <Button
-                  title="Send request"
-                  onPress={handleSendRequest}
-                  loading={sending}
-                  disabled={!firstMessage.trim()}
-                />
-              </>
-            )}
-          </View>
-        )}
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      </View>
-
-      <Text style={styles.sectionTitle}>Conversations</Text>
-      {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
-      ) : conversations.length === 0 ? (
-        <Text style={styles.emptyText}>Nothing here yet.</Text>
-      ) : (
-        conversations.map((conv) => {
-          const title = conversationTitle(conv, user.id);
-          const waitingOnMe = conv.request_status === "pending" && conv.requested_by !== user.id;
-          return (
-            <TouchableOpacity
-              key={conv.id}
-              style={styles.row}
-              activeOpacity={0.7}
-              onPress={() => openConversation(conv.id, title)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{title}</Text>
-                <Text style={[styles.rowNote, waitingOnMe && styles.rowNoteStrong]} numberOfLines={1}>
-                  {conversationNote(conv, user.id)}
-                </Text>
-              </View>
-              {conv.unread_count > 0 && <Text style={styles.unread}>{conv.unread_count}</Text>}
-              <Text style={styles.arrow}>›</Text>
-            </TouchableOpacity>
-          );
-        })
+              <EmptyState
+                icon={MessageCircle}
+                title="No conversations yet"
+                body="Know who an item belongs to? Message them with their registration number."
+                actionLabel="New message"
+                onAction={() => navigation.navigate("NewMessage")}
+                compact={!!adminShortcut}
+              />
+            )
+          }
+        />
       )}
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 30,
-    backgroundColor: colors.background,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 16,
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  cardHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    lineHeight: 17,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  foundBox: {
-    marginTop: 4,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  foundName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  foundReg: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
-  errorText: {
-    color: colors.lost,
-    fontSize: 12,
-    marginTop: 10,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
+  screen: { flex: 1, backgroundColor: colors.background },
+  list: { paddingBottom: 28, flexGrow: 1 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
+    gap: 14,
+    paddingHorizontal: SCREEN_PADDING,
     paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 8,
-    gap: 10,
+    backgroundColor: colors.background,
   },
-  rowTitle: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  rowNote: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  rowNoteStrong: {
-    color: colors.textPrimary,
-    fontWeight: "600",
-  },
+  rowBody: { flex: 1, minWidth: 0, gap: 3 },
+  rowTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  rowBottom: { flexDirection: "row", alignItems: "center", gap: 8 },
   unread: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: colors.primary,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  arrow: {
-    fontSize: 20,
-    color: colors.textMuted,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  emptyText: {
-    fontSize: 12,
-    color: colors.textSecondary,
+  unreadText: { color: colors.textWhite, fontSize: 11, lineHeight: 13, fontWeight: "700" },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: SCREEN_PADDING + 64 },
+  shortcut: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginHorizontal: SCREEN_PADDING,
+    marginBottom: 8,
+    padding: 14,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
 });

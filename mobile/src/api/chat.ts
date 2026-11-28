@@ -35,10 +35,12 @@ export interface Conversation {
   item?: { id: string; name: string; owner_id: string } | null;
   unread_count: number;
   last_message?: {
+    id?: string;
     content: string;
     created_at: string;
-    sender_name: string;
-  };
+    sender_id?: string | null;
+    is_read?: boolean;
+  } | null;
   created_at: string;
 }
 
