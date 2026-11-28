@@ -7,6 +7,8 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#FAF7F2",
+    "primaryColor": "#047857",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ac.in.iitrpr.lostandfound",
@@ -18,7 +20,8 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#047857"
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#1C1C1E"
       },
       "package": "ac.in.iitrpr.lostandfound",
       "permissions": [
@@ -65,12 +68,16 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash.png",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#FAF7F2"
         }
       ],
-      "./plugins/withReleaseSigning"
+      "./plugins/withReleaseSigning",
+      "./plugins/withAccentColor",
+      "expo-image",
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "apiUrl": "https://lost-and-found-portal-zx3h.onrender.com/api/v1",
