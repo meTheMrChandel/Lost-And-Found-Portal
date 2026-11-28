@@ -1,422 +1,314 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  RefreshControl,
-  Image,
-  ActivityIndicator,
-} from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { useNavigation, useScrollToTop } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RootStackParamList } from "../../navigation/types";
-import { postsApi, Post, Category } from "../../api/posts";
+import { Category, Post, postsApi } from "../../api/posts";
 import { errorMessage } from "../../api/client";
-import { CategoryChip } from "../../components/CategoryChip";
-import { Badge } from "../../components/Badge";
+import { useAuth } from "../../context/AuthContext";
+import { useActivity } from "../../context/ActivityContext";
+import {
+  CardSkeleton,
+  Chip,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  Logo,
+  SearchField,
+  SegmentedControl,
+  Text,
+  useToast,
+} from "../../ui";
+import { Bell, PackageSearch, ScanLine, SearchX } from "../../ui/icons";
 import { colors } from "../../theme/colors";
+import { SCREEN_PADDING } from "../../theme/tokens";
+import { categoryIcon } from "../../utils/categories";
+import { FeedCard } from "./FeedCard";
 
-const SEARCH_DELAY_MS = 300;
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+type TypeFilter = "all" | "lost" | "found";
+
+const SEARCH_DELAY_MS = 350;
 
 export const FeedScreen: React.FC = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const { user } = useAuth();
+  const { unreadNotifications } = useActivity();
+
+  const listRef = useRef<FlatList<Post>>(null);
+  useScrollToTop(listRef);
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [type, setType] = useState<TypeFilter>("all");
+  const [category, setCategory] = useState("all");
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
 
   const [posts, setPosts] = useState<Post[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedType, setSelectedType] = useState<"all" | "lost" | "found">("all");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  // The search actually sent, updated once typing pauses
-  const [appliedSearch, setAppliedSearch] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  // Only the newest request may update the list, so a slow older search can't overwrite it
-  const latestRequest = useRef(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+  // Only the newest request may change the list, so a slow older search can't overwrite it
+  const latest = useRef(0);
+  const postsRef = useRef(posts);
+  postsRef.current = posts;
 
   useEffect(() => {
-    const timer = setTimeout(() => setAppliedSearch(searchQuery.trim()), SEARCH_DELAY_MS);
+    const timer = setTimeout(() => setAppliedSearch(search.trim()), SEARCH_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [search]);
 
-  // Fetch categories
   useEffect(() => {
     postsApi
       .getCategories()
       .then(setCategories)
-      .catch((err) => {
-        // Fallback to empty categories gracefully if backend is rebooting
-        setCategories([]);
-      });
+      .catch(() => setCategories([]));
   }, []);
 
-  // Fetch feed items
-  const loadPosts = useCallback(async () => {
-    const requestId = ++latestRequest.current;
-    try {
-      // Public feed shows approved reports only; the backend adds the user's own pending ones
-      const params: any = {};
-      if (selectedType !== "all") {
-        params.post_type = selectedType.toUpperCase();
-        params.type = selectedType.toUpperCase();
-      }
-      if (selectedCategory !== "all") params.category = selectedCategory;
-      if (appliedSearch) params.search = appliedSearch;
+  const filters = useMemo(
+    () => ({
+      ...(type !== "all" ? { post_type: type.toUpperCase() as "LOST" | "FOUND" } : {}),
+      ...(category !== "all" ? { category } : {}),
+      ...(appliedSearch ? { search: appliedSearch } : {}),
+    }),
+    [type, category, appliedSearch],
+  );
 
-      const data = await postsApi.getFeed(params);
-      if (requestId !== latestRequest.current) return;
-      setPosts(data);
-      setError("");
-    } catch (e: any) {
-      if (requestId !== latestRequest.current) return;
-      setError(errorMessage(e, "Couldn't load the campus feed. Pull down to try again."));
-    } finally {
-      if (requestId === latestRequest.current) {
-        setLoading(false);
-        setRefreshing(false);
+  const loadFirstPage = useCallback(
+    async (mode: "initial" | "refresh") => {
+      const request = ++latest.current;
+      if (mode === "initial") setLoading(true);
+      try {
+        const result = await postsApi.getFeedPage({ ...filters, page: 1 });
+        if (request !== latest.current) return;
+        setPosts(result.posts);
+        setHasMore(result.hasNext);
+        setPage(1);
+        setError("");
+      } catch (err: any) {
+        if (request !== latest.current) return;
+        const message = errorMessage(err, "Couldn't load the feed.");
+        // Keep what's on screen after a failed refresh; only an empty list shows the error page
+        if (mode === "refresh" && postsRef.current.length) {
+          toast.show(message, "error");
+        } else {
+          setPosts([]);
+          setError(message);
+        }
+      } finally {
+        if (request === latest.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
-    }
-  }, [selectedType, selectedCategory, appliedSearch]);
+    },
+    [filters, toast],
+  );
 
   useEffect(() => {
-    setLoading(true);
-    loadPosts();
-  }, [loadPosts]);
+    loadFirstPage("initial");
+  }, [loadFirstPage]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadPosts();
+  const loadMore = async () => {
+    if (!hasMore || loadingMore || loading || refreshing) return;
+    const request = latest.current;
+    setLoadingMore(true);
+    try {
+      const result = await postsApi.getFeedPage({ ...filters, page: page + 1 });
+      if (request !== latest.current) return;
+      setPosts((current) => {
+        const known = new Set(current.map((p) => p.id));
+        return [...current, ...result.posts.filter((p) => !known.has(p.id))];
+      });
+      setHasMore(result.hasNext);
+      setPage((p) => p + 1);
+    } catch (err: any) {
+      toast.show(errorMessage(err, "Couldn't load more reports."), "error");
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
-  const renderPostItem = ({ item }: { item: Post }) => {
-    const isLost = item.post_type === "lost";
-    const primaryImg = item.images && item.images.length > 0 ? item.images[0].image_url : null;
+  const openPost = useCallback((post: Post) => navigation.navigate("ItemDetail", { postId: post.id }), [navigation]);
+  const filtered = type !== "all" || category !== "all" || !!appliedSearch;
 
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate("ItemDetail", { postId: item.id })}
+  const clearFilters = () => {
+    setType("all");
+    setCategory("all");
+    setSearch("");
+    setAppliedSearch("");
+  };
+
+  const header = (
+    <View style={styles.filters}>
+      <SegmentedControl<TypeFilter>
+        value={type}
+        onChange={setType}
+        options={[
+          { value: "all", label: "All" },
+          { value: "lost", label: "Lost", activeColor: colors.lost },
+          { value: "found", label: "Found", activeColor: colors.primary },
+        ]}
+      />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chips}
+        style={styles.chipScroller}
       >
-        {primaryImg ? (
-          <Image source={{ uri: primaryImg }} style={styles.cardImage} />
-        ) : (
-          <View style={[styles.cardImagePlaceholder, { backgroundColor: isLost ? colors.lostLight : colors.foundLight }]}>
-            <Text style={styles.placeholderEmoji}>{isLost ? "🔍" : "📦"}</Text>
-          </View>
-        )}
+        <Chip label="All items" selected={category === "all"} onPress={() => setCategory("all")} />
+        {categories.map((c) => (
+          <Chip
+            key={c.slug}
+            label={c.name}
+            icon={categoryIcon(c.slug)}
+            selected={category === c.slug}
+            onPress={() => setCategory(c.slug)}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
 
-        <View style={styles.cardContent}>
-          <View style={styles.topRow}>
-            <Badge
-              label={item.post_type.toUpperCase()}
-              variant={isLost ? "lost" : "found"}
-            />
-            {item.reward_amount ? (
-              <View style={styles.rewardChip}>
-                <Text style={styles.rewardText}>🏆 ₹{item.reward_amount}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {item.title}
-          </Text>
-
-          <Text style={styles.cardDesc} numberOfLines={2}>
-            {item.description}
-          </Text>
-
-          <View style={styles.bottomMeta}>
-            <Text style={styles.metaText}>📍 {item.campus_location || "IIT Ropar Campus"}</Text>
-            <Text style={styles.metaText}>
-              📅 {new Date(item.incident_date).toLocaleDateString([], { month: "short", day: "numeric" })}
-            </Text>
-          </View>
+  const renderBody = () => {
+    if (loading && posts.length === 0) {
+      return (
+        <View style={styles.list}>
+          {header}
+          {[0, 1, 2, 3, 4].map((i) => (
+            <CardSkeleton key={i} />
+          ))}
         </View>
-      </TouchableOpacity>
+      );
+    }
+    return (
+      <FlatList
+        ref={listRef}
+        data={posts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <FeedCard post={item} onPress={openPost} dimmed={loading} />}
+        extraData={loading}
+        ListHeaderComponent={header}
+        contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.6}
+        initialNumToRender={6}
+        maxToRenderPerBatch={8}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS === "android"}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadFirstPage("refresh");
+            }}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+            progressBackgroundColor={colors.surface}
+          />
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
+          ) : posts.length > 0 && !hasMore ? (
+            <Text variant="caption" color="textMuted" align="center" style={{ marginVertical: 18 }}>
+              You're all caught up
+            </Text>
+          ) : undefined
+        }
+        ListEmptyComponent={
+          error ? (
+            <ErrorState message={error} onRetry={() => loadFirstPage("initial")} />
+          ) : filtered ? (
+            <EmptyState
+              icon={SearchX}
+              tone="neutral"
+              title="No matching items"
+              body={
+                appliedSearch
+                  ? `Nothing matches "${appliedSearch}" with these filters.`
+                  : "Nothing matches these filters yet."
+              }
+              actionLabel="Clear filters"
+              onAction={clearFilters}
+            />
+          ) : (
+            <EmptyState
+              icon={PackageSearch}
+              title="No reports yet"
+              body="When someone on campus reports a lost or found item, it shows up here."
+              actionLabel="Report an item"
+              onAction={() => navigation.navigate("ReportLost")}
+            />
+          )
+        }
+      />
     );
   };
 
   return (
-    <View style={styles.container}>
-      {/* Top Search Bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search bicycles, IDs, keys, electronics..."
-          placeholderTextColor={colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          returnKeyType="search"
+    <View style={styles.screen}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <View style={styles.brandRow}>
+          <Logo size={40} />
+          <View style={{ flex: 1 }}>
+            <Text variant="title3" style={{ fontWeight: "700" }}>
+              Lost & Found
+            </Text>
+            <Text variant="caption" color="textSecondary">
+              IIT Ropar campus
+            </Text>
+          </View>
+          <IconButton
+            icon={ScanLine}
+            variant="surface"
+            accessibilityLabel="Scan a QR sticker"
+            onPress={() => navigation.navigate("QRScan")}
+          />
+          <IconButton
+            icon={Bell}
+            variant="surface"
+            accessibilityLabel={unreadNotifications ? `Notifications, ${unreadNotifications} unread` : "Notifications"}
+            badge={unreadNotifications}
+            onPress={() => (user ? navigation.navigate("Notifications") : navigation.navigate("Auth"))}
+          />
+        </View>
+        <SearchField
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search items, places, descriptions"
           onSubmitEditing={() => {
-            // Search straight away instead of waiting for the pause
-            const query = searchQuery.trim();
-            if (query === appliedSearch) loadPosts();
+            const query = search.trim();
+            if (query === appliedSearch) loadFirstPage("initial");
             else setAppliedSearch(query);
           }}
         />
       </View>
-
-      {/* Post Type Toggle (All, Lost, Found) */}
-      <View style={styles.typeToggleRow}>
-        {(["all", "lost", "found"] as const).map((type) => (
-          <TouchableOpacity
-            key={type}
-            onPress={() => setSelectedType(type)}
-            style={[
-              styles.typeTab,
-              selectedType === type && styles.typeTabActive,
-              type === "lost" && selectedType === "lost" && styles.typeTabLost,
-              type === "found" && selectedType === "found" && styles.typeTabFound,
-            ]}
-          >
-            <Text
-              style={[
-                styles.typeTabText,
-                selectedType === type && styles.typeTabTextActive,
-              ]}
-            >
-              {type === "all" ? "All Belongings" : type === "lost" ? "Lost Items" : "Found Items"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Category Horizontal Filter Scroller */}
-      <View style={styles.categoriesContainer}>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={[{ id: "all", slug: "all", name: "All Categories" }, ...categories]}
-          keyExtractor={(item) => item.slug}
-          contentContainerStyle={styles.categoryList}
-          renderItem={({ item }) => (
-            <CategoryChip
-              label={item.name}
-              selected={selectedCategory === item.slug}
-              onPress={() => setSelectedCategory(item.slug)}
-            />
-          )}
-        />
-      </View>
-
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-      {/* Feed List; current results stay visible while a new search loads */}
-      {loading && posts.length === 0 && !error ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Fetching campus feed...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderPostItem}
-          contentContainerStyle={styles.feedList}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[colors.primary]}
-              tintColor={colors.primary}
-            />
-          }
-          ListEmptyComponent={
-            error ? undefined : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>🍃</Text>
-              <Text style={styles.emptyTitle}>No Belongings Listed</Text>
-              <Text style={styles.emptySubtitle}>
-                No items match your active search or filters. Check back soon or submit a report.
-              </Text>
-            </View>
-            )
-          }
-        />
-      )}
+      {renderBody()}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  screen: { flex: 1, backgroundColor: colors.background },
+  header: {
+    paddingHorizontal: SCREEN_PADDING,
+    paddingBottom: 12,
+    gap: 14,
     backgroundColor: colors.background,
   },
-  errorText: {
-    color: colors.lost,
-    fontSize: 12,
-    fontWeight: "600",
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  searchInput: {
-    height: 44,
-    backgroundColor: colors.card,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    paddingHorizontal: 18,
-    fontSize: 13,
-    color: colors.textPrimary,
-  },
-  typeToggleRow: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    gap: 8,
-  },
-  typeTab: {
-    flex: 1,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  typeTabActive: {
-    backgroundColor: colors.textPrimary,
-    borderColor: colors.textPrimary,
-  },
-  typeTabLost: {
-    backgroundColor: colors.lost,
-    borderColor: colors.lost,
-  },
-  typeTabFound: {
-    backgroundColor: colors.found,
-    borderColor: colors.found,
-  },
-  typeTabText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.textSecondary,
-  },
-  typeTabTextActive: {
-    color: colors.textWhite,
-  },
-  categoriesContainer: {
-    paddingVertical: 6,
-  },
-  categoryList: {
-    paddingHorizontal: 16,
-  },
-  feedList: {
-    padding: 16,
-    paddingTop: 8,
-    gap: 14,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    overflow: "hidden",
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    flexDirection: "row",
-  },
-  cardImage: {
-    width: 110,
-    height: 110,
-    backgroundColor: colors.cardSubtle,
-  },
-  cardImagePlaceholder: {
-    width: 110,
-    height: 110,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  placeholderEmoji: {
-    fontSize: 32,
-  },
-  cardContent: {
-    flex: 1,
-    padding: 12,
-    justifyContent: "space-between",
-  },
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  rewardChip: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  rewardText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#B45309",
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-    marginTop: 4,
-  },
-  cardDesc: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  bottomMeta: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6,
-  },
-  metaText: {
-    fontSize: 10,
-    color: colors.textMuted,
-    fontWeight: "500",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 40,
-    marginTop: 30,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginTop: 6,
-    lineHeight: 18,
-  },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  filters: { paddingTop: 4, paddingBottom: 14 },
+  chipScroller: { marginHorizontal: -SCREEN_PADDING, marginTop: 12 },
+  chips: { gap: 8, paddingHorizontal: SCREEN_PADDING },
+  list: { paddingHorizontal: SCREEN_PADDING, paddingBottom: 28, flexGrow: 1 },
 });

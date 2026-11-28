@@ -1,358 +1,563 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   ScrollView,
-  Image,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
+  Share,
+  StyleSheet,
+  useWindowDimensions,
+  View,
 } from "react-native";
+import { Image } from "expo-image";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RootStackParamList } from "../../navigation/types";
-import { apiClient, errorMessage } from "../../api/client";
+import { goBackOrHome } from "../../navigation/goBackOrHome";
+import { errorMessage, WEB_URL } from "../../api/client";
 import { chatApi } from "../../api/chat";
-import { postsApi, Post } from "../../api/posts";
+import { Post, postsApi } from "../../api/posts";
 import { useAuth } from "../../context/AuthContext";
-import { Badge } from "../../components/Badge";
-import { Button } from "../../components/Button";
+import {
+  Avatar,
+  Badge,
+  BottomSheet,
+  Button,
+  ErrorState,
+  IconButton,
+  Notice,
+  PressableScale,
+  Skeleton,
+  Text,
+  TextField,
+  useKeyboardVisible,
+  useToast,
+} from "../../ui";
+import {
+  ArrowLeft,
+  Building2,
+  CalendarClock,
+  Check,
+  Flag,
+  Gift,
+  IconType,
+  MapPin,
+  MessageCircle,
+  Pencil,
+  Share2,
+  ShieldCheck,
+  Tag,
+} from "../../ui/icons";
 import { colors } from "../../theme/colors";
+import { radii, SCREEN_PADDING } from "../../theme/tokens";
+import { categoryIcon } from "../../utils/categories";
+import { formatDateTime, formatRupees, timeAgo } from "../../utils/format";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ItemDetail">;
 
-export const ItemDetailScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { user } = useAuth();
-  const { postId } = route.params;
-  const [post, setPost] = useState<Post | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [reportingAbuse, setReportingAbuse] = useState<boolean>(false);
-  const [openingChat, setOpeningChat] = useState<boolean>(false);
+const CUSTODY: Record<string, string> = {
+  finder: "With the finder",
+  admin_office: "Admin office",
+  security_office: "Security office",
+};
 
-  useEffect(() => {
-    const loadPost = async () => {
-      try {
-        const postData = await postsApi.getPostDetail(postId);
-        setPost(postData);
-      } catch (e: any) {
-        Alert.alert("Error", e.message || "Failed to load item details");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadPost();
-  }, [postId]);
+const ABUSE_REASONS = [
+  { value: "spam", label: "Spam", description: "Advertising or repeated posts" },
+  { value: "fake", label: "Fake or misleading", description: "The item or details look made up" },
+  { value: "inappropriate", label: "Inappropriate", description: "Offensive photos or text" },
+  { value: "other", label: "Something else", description: "Tell us what's wrong" },
+];
 
-  const handleReportAbuse = () => {
-    Alert.prompt(
-      "Report Inappropriate Content",
-      "Please enter the reason for reporting this post:",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Submit",
-          onPress: async (reason) => {
-            if (!reason) return;
-            setReportingAbuse(true);
-            try {
-              await postsApi.reportAbuse(postId, reason);
-              Alert.alert("Report Received", "Thank you. Our campus moderation team will review this listing.");
-            } catch (err: any) {
-              Alert.alert("Error", err.formattedMessage || "Failed to submit abuse report.");
-            } finally {
-              setReportingAbuse(false);
-            }
-          },
-        },
-      ]
+const DetailRow: React.FC<{ icon: IconType; label: string; value: string }> = ({ icon: Icon, label, value }) => (
+  <View style={styles.detailRow}>
+    <View style={styles.detailIcon}>
+      <Icon size={18} color={colors.primary} strokeWidth={2} />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text variant="caption" color="textSecondary">
+        {label}
+      </Text>
+      <Text variant="bodyMedium">{value}</Text>
+    </View>
+  </View>
+);
+
+/** Swipeable photos with a page indicator. */
+const Gallery: React.FC<{ post: Post; width: number; height: number }> = ({ post, width, height }) => {
+  const [index, setIndex] = useState(0);
+  const isLost = post.post_type === "lost";
+
+  if (!post.images.length) {
+    const Icon = categoryIcon(typeof post.category === "string" ? post.category : post.category?.slug);
+    return (
+      <View
+        style={[styles.heroPlaceholder, { height, backgroundColor: isLost ? colors.lostTint : colors.primaryTint }]}
+      >
+        <View style={[styles.heroIcon, { backgroundColor: isLost ? colors.lostSoft : colors.primarySoft }]}>
+          <Icon size={56} color={isLost ? colors.lost : colors.primary} strokeWidth={1.5} />
+        </View>
+        <Text variant="footnote" color="textSecondary" style={{ marginTop: 14 }}>
+          No photos were added
+        </Text>
+      </View>
     );
+  }
+
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const next = Math.round(e.nativeEvent.contentOffset.x / width);
+    if (next !== index) setIndex(next);
   };
 
-  if (loading) {
+  return (
+    <View style={{ height }}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
+      >
+        {post.images.map((img) => (
+          <Image
+            key={img.id}
+            source={{ uri: img.image_url }}
+            style={{ width, height, backgroundColor: colors.surfaceAlt }}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
+            accessibilityLabel={`Photo of ${post.title}`}
+          />
+        ))}
+      </ScrollView>
+      {post.images.length > 1 ? (
+        <View style={styles.dots} pointerEvents="none">
+          {post.images.map((img, i) => (
+            <View key={img.id} style={[styles.dot, i === index && styles.dotActive]} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+export const ItemDetailScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { postId } = route.params;
+  const { user } = useAuth();
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const keyboardUp = useKeyboardVisible();
+
+  const [post, setPost] = useState<Post | null>(null);
+  const [error, setError] = useState("");
+  const [openingChat, setOpeningChat] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(false);
+
+  const load = useCallback(async () => {
+    setError("");
+    try {
+      setPost(await postsApi.getPostDetail(postId));
+    } catch (err: any) {
+      setError(errorMessage(err, "Couldn't load this item."));
+    }
+  }, [postId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const heroHeight = Math.round(width * 0.78);
+  const isLost = post?.post_type === "lost";
+  const isMine =
+    !!user && !!post?.author_registration_number && post.author_registration_number === user.registration_number;
+
+  const requireSignIn = (): boolean => {
+    if (user) return true;
+    navigation.navigate("Auth");
+    return false;
+  };
+
+  const contactAdmin = async () => {
+    if (!post || !requireSignIn()) return;
+    setOpeningChat(true);
+    try {
+      const conversation = await chatApi.openAdminConversation();
+      const draft = isLost
+        ? `Hi, I think I've found the item in the lost report "${post.title}".`
+        : `Hi, I think the item in the found report "${post.title}" is mine.`;
+      navigation.navigate("Chat", { conversationId: conversation.id, title: "Admin office", draft });
+    } catch (err: any) {
+      toast.show(errorMessage(err, "Couldn't open the chat."), "error");
+    } finally {
+      setOpeningChat(false);
+    }
+  };
+
+  const share = () => {
+    if (!post) return;
+    const place = post.campus_location ? ` near ${post.campus_location}` : "";
+    const link = WEB_URL ? `\n${WEB_URL}/feed` : "";
+    Share.share({
+      message: `${isLost ? "Lost" : "Found"} on campus${place}: ${post.title}. Seen it? Check IIT Ropar Lost & Found.${link}`,
+    }).catch(() => {});
+  };
+
+  const openReport = () => {
+    if (!requireSignIn()) return;
+    if (reported) {
+      toast.show("You've already reported this listing.", "info");
+      return;
+    }
+    setReason("");
+    setDetails("");
+    setReportOpen(true);
+  };
+
+  const submitReport = async () => {
+    if (!post || !reason) return;
+    setReporting(true);
+    try {
+      await postsApi.reportAbuse(post.id, reason, details.trim());
+      setReported(true);
+      setReportOpen(false);
+      toast.show("Thanks. The admin team will review this listing.");
+    } catch (err: any) {
+      toast.show(errorMessage(err, "Couldn't send your report."), "error");
+    } finally {
+      setReporting(false);
+    }
+  };
+
+  const topBar = (
+    <View style={[styles.topBar, { top: insets.top + 8 }]} pointerEvents="box-none">
+      <IconButton icon={ArrowLeft} variant="overlay" accessibilityLabel="Back" onPress={() => goBackOrHome(navigation)} />
+      {post ? (
+        <View style={styles.topActions}>
+          <IconButton icon={Share2} variant="overlay" accessibilityLabel="Share" onPress={share} />
+          {!isMine ? (
+            <IconButton icon={Flag} variant="overlay" accessibilityLabel="Report this listing" onPress={openReport} />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+
+  if (error && !post) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading item details...</Text>
+      <View style={[styles.screen, { paddingTop: insets.top + 64 }]}>
+        {topBar}
+        <ErrorState message={error} onRetry={load} />
       </View>
     );
   }
 
   if (!post) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>Item not found or has been removed.</Text>
+      <View style={styles.screen}>
+        <Skeleton height={heroHeight} radius={0} />
+        <View style={[styles.sheet, { gap: 14 }]}>
+          <Skeleton width={120} height={22} radius={11} />
+          <Skeleton width="80%" height={26} />
+          <Skeleton width="45%" height={14} />
+          <Skeleton height={150} radius={radii.lg} style={{ marginTop: 8 }} />
+          <Skeleton height={80} radius={radii.lg} />
+        </View>
+        {topBar}
       </View>
     );
   }
 
-  const isLost = post.post_type === "lost";
+  const status = post.status && post.status !== "APPROVED" ? post.status : null;
+  const CategoryIcon = categoryIcon(typeof post.category === "string" ? post.category : post.category?.slug);
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Photos Carousel */}
-        {post.images && post.images.length > 0 ? (
-          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
-            {post.images.map((img) => (
-              <Image key={img.id} source={{ uri: img.image_url }} style={styles.bannerImage} />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={[styles.placeholderBanner, { backgroundColor: isLost ? colors.lostLight : colors.foundLight }]}>
-            <Text style={styles.placeholderEmoji}>{isLost ? "🔍" : "📦"}</Text>
-          </View>
-        )}
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+        <Gallery post={post} width={width} height={heroHeight} />
 
-        <View style={styles.contentCard}>
-          {/* Top Badges */}
-          <View style={styles.badgeRow}>
-            <Badge label={post.post_type.toUpperCase()} variant={isLost ? "lost" : "found"} />
-            <Badge label={post.status.replace("_", " ")} variant="info" />
-            {post.reward_amount ? (
-              <View style={styles.rewardChip}>
-                <Text style={styles.rewardText}>🏆 ₹{post.reward_amount} Reward</Text>
-              </View>
+        <View style={styles.sheet}>
+          <View style={styles.badges}>
+            <Badge label={isLost ? "Lost" : "Found"} tone={isLost ? "danger" : "success"} dot size="md" />
+            {post.category_name ? <Badge label={post.category_name} icon={CategoryIcon} size="md" /> : null}
+            {status ? (
+              <Badge
+                label={status === "PENDING" ? "In review" : status.replace(/_/g, " ").toLowerCase()}
+                tone="warning"
+                size="md"
+              />
             ) : null}
           </View>
 
-          {/* Title & Category */}
-          <Text style={styles.title}>{post.title}</Text>
-          <Text style={styles.category}>
-            {post.category_name || (typeof post.category === "object" ? post.category?.name : post.category) || "General Item"}
+          <Text variant="title1" style={styles.title}>
+            {post.title}
+          </Text>
+          <Text variant="footnote" color="textSecondary">
+            Reported {timeAgo(post.created_at).toLowerCase()}
           </Text>
 
-          {/* Location & Date Card */}
-          <View style={styles.metaBox}>
-            <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>CAMPUS LOCATION</Text>
-              <Text style={styles.metaValue}>📍 {post.campus_location || "IIT Ropar"}</Text>
+          {isLost && post.reward_amount ? (
+            <View style={styles.reward}>
+              <View style={styles.rewardIcon}>
+                <Gift size={22} color={colors.reward} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="title3" style={{ color: colors.reward }}>
+                  {formatRupees(post.reward_amount)} reward
+                </Text>
+                <Text variant="footnote" color="textSecondary">
+                  Offered by the owner to whoever returns it
+                </Text>
+              </View>
             </View>
-            <View style={styles.metaItem}>
-              <Text style={styles.metaLabel}>INCIDENT DATE</Text>
-              <Text style={styles.metaValue}>
-                📅 {new Date(post.incident_date).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+          ) : null}
+
+          <View style={styles.detailsCard}>
+            <DetailRow icon={MapPin} label={isLost ? "Last seen at" : "Found at"} value={post.campus_location} />
+            <View style={styles.divider} />
+            <DetailRow
+              icon={CalendarClock}
+              label={isLost ? "Lost on" : "Found on"}
+              value={formatDateTime(post.incident_date)}
+            />
+            {!isLost && post.custody_location ? (
+              <>
+                <View style={styles.divider} />
+                <DetailRow
+                  icon={Building2}
+                  label="Where it is now"
+                  value={CUSTODY[post.custody_location] || post.custody_location}
+                />
+              </>
+            ) : null}
+            {post.category_name ? (
+              <>
+                <View style={styles.divider} />
+                <DetailRow icon={Tag} label="Category" value={post.category_name} />
+              </>
+            ) : null}
+          </View>
+
+          {post.description ? (
+            <View style={styles.section}>
+              <Text variant="overline" color="textSecondary" style={styles.sectionTitle}>
+                Description
+              </Text>
+              <Text variant="body" style={{ lineHeight: 23 }}>
+                {post.description}
               </Text>
             </View>
-          </View>
+          ) : null}
 
-          {/* Description */}
-          <Text style={styles.sectionHeader}>Description & Identifiers</Text>
-          <Text style={styles.description}>{post.description}</Text>
-
-          {/* Reporter Information */}
-          <Text style={styles.sectionHeader}>Reported By</Text>
-          <View style={styles.reporterBox}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{post.author?.full_name?.charAt(0) || "U"}</Text>
+          <View style={styles.section}>
+            <Text variant="overline" color="textSecondary" style={styles.sectionTitle}>
+              Reported by
+            </Text>
+            <View style={styles.person}>
+              <Avatar name={post.author?.full_name} size={44} />
+              <View style={{ flex: 1 }}>
+                <Text variant="headline">{isMine ? "You" : post.author?.full_name || "Campus member"}</Text>
+                {post.author?.registration_number ? (
+                  <Text variant="footnote" color="textSecondary">
+                    {post.author.registration_number}
+                  </Text>
+                ) : null}
+              </View>
             </View>
-            <View>
-              <Text style={styles.reporterName}>{post.author?.full_name || "Campus Resident"}</Text>
-              <Text style={styles.reporterReg}>{post.author?.registration_number}</Text>
-            </View>
           </View>
 
-          {/* Safety & Action Controls */}
-          <View style={styles.actionSection}>
-            <Button
-              title="💬 Open Campus Chat"
-              variant="ocean"
-              onPress={() => {
-                if (!user) {
-                  Alert.alert(
-                    "Sign In Required",
-                    "Please sign in with your IIT Ropar institute account to chat with the finder or claim this item.",
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      { text: "Sign In", onPress: () => navigation.navigate("Auth") },
-                    ]
-                  );
-                  return;
-                }
-                setOpeningChat(true);
-                chatApi
-                  .openAdminConversation()
-                  .then((conv) =>
-                    navigation.navigate("Chat", { conversationId: conv.id, title: `Admin office · ${post.title}` })
-                  )
-                  .catch((err) => Alert.alert("Chat unavailable", errorMessage(err, "Could not open the chat.")))
-                  .finally(() => setOpeningChat(false));
-              }}
-              loading={openingChat}
-              style={styles.actionBtn}
-            />
-
-            <TouchableOpacity onPress={handleReportAbuse} style={styles.abuseBtn}>
-              <Text style={styles.abuseText}>🚩 Report Inappropriate Listing</Text>
-            </TouchableOpacity>
-          </View>
+          <Notice
+            tone="neutral"
+            icon={ShieldCheck}
+            title="Safe hand-overs"
+            message="The admin office checks proof of ownership before anything is returned. Never share personal details in public."
+            style={{ marginTop: 22 }}
+          />
         </View>
       </ScrollView>
+
+      <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
+        {isMine ? (
+          <Button
+            title="Manage my report"
+            icon={Pencil}
+            size="lg"
+            fullWidth
+            onPress={() => navigation.navigate("MyReportDetail", { reportId: post.id })}
+          />
+        ) : (
+          <Button
+            title={!user ? "Sign in to respond" : isLost ? "I found this item" : "This is mine"}
+            icon={MessageCircle}
+            size="lg"
+            fullWidth
+            loading={openingChat}
+            onPress={contactAdmin}
+          />
+        )}
+      </View>
+
+      {topBar}
+
+      <BottomSheet
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        title="Report this listing"
+        subtitle="Tell the admins what's wrong. The person who posted it won't know it was you."
+      >
+        <View style={{ gap: 8 }}>
+          {ABUSE_REASONS.map((r) => {
+            const selected = reason === r.value;
+            return (
+              <PressableScale
+                key={r.value}
+                onPress={() => setReason(r.value)}
+                scaleTo={0.985}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                style={[styles.reason, selected && styles.reasonSelected]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text variant="bodyMedium">{r.label}</Text>
+                  <Text variant="footnote" color="textSecondary">
+                    {r.description}
+                  </Text>
+                </View>
+                <View style={[styles.radio, selected && styles.radioOn]}>
+                  {selected ? <Check size={14} color={colors.textWhite} strokeWidth={3} /> : null}
+                </View>
+              </PressableScale>
+            );
+          })}
+        </View>
+        {reason ? (
+          <TextField
+            placeholder={reason === "other" ? "What's wrong with it?" : "Anything else the admins should know?"}
+            value={details}
+            onChangeText={setDetails}
+            multiline
+            maxLength={500}
+            containerStyle={{ marginTop: 14, marginBottom: 0 }}
+            style={{ minHeight: 80 }}
+          />
+        ) : null}
+        <Button
+          title="Send report"
+          variant="danger"
+          size="lg"
+          fullWidth
+          loading={reporting}
+          disabled={!reason || (reason === "other" && !details.trim())}
+          onPress={submitReport}
+          style={{ marginTop: keyboardUp ? 12 : 18 }}
+        />
+      </BottomSheet>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  centerContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  errorText: {
-    color: colors.lost,
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  imageScroll: {
-    height: 280,
-  },
-  bannerImage: {
-    width: 380,
-    height: 280,
-    resizeMode: "cover",
-  },
-  placeholderBanner: {
-    height: 200,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  placeholderEmoji: {
-    fontSize: 54,
-  },
-  contentCard: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    marginTop: -20,
-    padding: 24,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  rewardChip: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  rewardText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#B45309",
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  category: {
-    fontSize: 13,
-    color: colors.ocean,
-    fontWeight: "600",
-    marginTop: 2,
-    marginBottom: 16,
-  },
-  metaBox: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
+  screen: { flex: 1, backgroundColor: colors.background },
+  topBar: {
+    position: "absolute",
+    left: 16,
+    right: 16,
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
   },
-  metaItem: {
-    flex: 1,
+  topActions: { flexDirection: "row", gap: 10 },
+  heroPlaceholder: { alignItems: "center", justifyContent: "center" },
+  heroIcon: { width: 112, height: 112, borderRadius: 56, alignItems: "center", justifyContent: "center" },
+  dots: {
+    position: "absolute",
+    bottom: 34,
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: radii.pill,
+    backgroundColor: "rgba(28,28,30,0.4)",
   },
-  metaLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-    marginBottom: 4,
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.55)" },
+  dotActive: { width: 16, backgroundColor: colors.textWhite },
+  sheet: {
+    marginTop: -22,
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    backgroundColor: colors.background,
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 22,
   },
-  metaValue: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  description: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  reporterBox: {
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  title: { marginTop: 14, marginBottom: 6 },
+  reward: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.cardSubtle,
-    padding: 12,
-    borderRadius: 14,
-    gap: 12,
-    marginBottom: 24,
+    gap: 14,
+    marginTop: 18,
+    padding: 14,
+    borderRadius: radii.lg,
+    backgroundColor: colors.rewardTint,
+    borderWidth: 1,
+    borderColor: "#F6E2B0",
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
+  rewardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: {
-    color: colors.textWhite,
-    fontSize: 16,
-    fontWeight: "bold",
+  detailsCard: {
+    marginTop: 18,
+    paddingHorizontal: 16,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  reporterName: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: colors.textPrimary,
+  detailRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14 },
+  detailIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radii.sm,
+    backgroundColor: colors.primaryTint,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  reporterReg: {
-    fontSize: 11,
-    color: colors.textMuted,
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 52 },
+  section: { marginTop: 24 },
+  sectionTitle: { marginBottom: 10 },
+  person: { flexDirection: "row", alignItems: "center", gap: 12 },
+  actionBar: {
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 12,
+    backgroundColor: colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
-  actionSection: {
-    marginTop: 10,
+  reason: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
-  actionBtn: {
-    marginBottom: 14,
+  reasonSelected: { borderColor: colors.lost, backgroundColor: colors.lostTint },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  abuseBtn: {
-    alignSelf: "center",
-  },
-  abuseText: {
-    fontSize: 12,
-    color: colors.lost,
-    fontWeight: "600",
-  },
+  radioOn: { borderColor: colors.lost, backgroundColor: colors.lost },
 });

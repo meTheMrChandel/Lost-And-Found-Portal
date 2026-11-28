@@ -134,6 +134,19 @@ export const postsApi = {
     return rawList.map(normalizePost);
   },
 
+  /** One page of the public feed, newest first. */
+  async getFeedPage(params: {
+    post_type?: "LOST" | "FOUND";
+    category?: string;
+    search?: string;
+    page: number;
+    page_size?: number;
+  }): Promise<{ posts: Post[]; hasNext: boolean }> {
+    const res = await apiClient.get("/posts/feed/", { params: { page_size: 20, ...params } });
+    const rows: any[] = res.data?.data || [];
+    return { posts: rows.map(normalizePost), hasNext: !!res.data?.pagination?.has_next };
+  },
+
   async getPostDetail(id: string): Promise<Post> {
     const res = await apiClient.get(`/posts/${id}/`);
     const raw = res.data?.data || res.data;
@@ -182,8 +195,9 @@ export const postsApi = {
     return res.data;
   },
 
-  async reportAbuse(postId: string, reason: string): Promise<any> {
-    const res = await apiClient.post(`/posts/${postId}/report-abuse/`, { reason });
+  /** reason is one of spam, fake, inappropriate or other (posts.AbuseReport.Reason). */
+  async reportAbuse(postId: string, reason: string, description = ""): Promise<{ message?: string }> {
+    const res = await apiClient.post(`/posts/${postId}/report-abuse/`, { reason, description });
     return res.data;
   },
 
