@@ -2,35 +2,43 @@ import { NavigatorScreenParams } from "@react-navigation/native";
 import { MyReport } from "../api/posts";
 
 export type AuthStackParamList = {
-  Login: undefined;
+  Login: { email?: string } | undefined;
   Register: undefined;
-  ForgotPassword: undefined;
+  ForgotPassword: { email?: string } | undefined;
 };
 
+/** The bottom tabs. Staff see Admin where students see Activity (their reports). */
 export type MainTabParamList = {
-  Feed: undefined;
-  ReportLost: undefined;
-  // Prefilled when a finder comes from a QR sticker scan
-  // qrUuid: set when the report starts from a scanned sticker, so its owner can be notified
-  ReportFound: { title?: string; category?: string; qrUuid?: string } | undefined;
-  // Set when the app is opened from a sticker link (lostandfound://scan/<uuid>)
-  QRScan: { uuid?: string } | undefined;
-  Valuables: undefined;
-  Profile: undefined;
-  // Only shown to campus admins (is_staff)
+  Home: undefined;
+  Activity: undefined;
+  // The centre button: opens the "lost, found or scan" sheet instead of a screen
+  Report: undefined;
+  Inbox: undefined;
+  Account: undefined;
   Admin: undefined;
 };
 
 export type RootStackParamList = {
-  Auth: NavigatorScreenParams<AuthStackParamList> | undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
+  Auth: NavigatorScreenParams<AuthStackParamList> | undefined;
+
   ItemDetail: { postId: string };
-  Chat: { conversationId: string; title?: string };
-  Messages: undefined;
+  ReportLost: undefined;
+  // Prefilled when a finder comes from a QR sticker scan; qrUuid lets its owner be notified
+  ReportFound: { title?: string; category?: string; qrUuid?: string } | undefined;
+  // Set when the app is opened from a sticker link (lostandfound://scan/<uuid>)
+  QRScan: { uuid?: string } | undefined;
+
+  Chat: { conversationId: string; title?: string; draft?: string };
+  NewMessage: undefined;
   Notifications: undefined;
-  Valuables: undefined;
+
   MyReports: undefined;
-  MyReportDetail: { report: MyReport };
+  // `report` shows the list's copy straight away while the full report loads
+  MyReportDetail: { reportId: string; report?: MyReport };
+  Valuables: undefined;
+  RegisterValuable: undefined;
+  EditProfile: undefined;
   // `from` names the screen the feedback was opened from
   Feedback: { from?: string } | undefined;
 
@@ -46,3 +54,10 @@ export type RootStackParamList = {
   AdminFeedback: undefined;
   AdminSettings: undefined;
 };
+
+declare global {
+  namespace ReactNavigation {
+    // Typed useNavigation() everywhere
+    interface RootParamList extends RootStackParamList {}
+  }
+}

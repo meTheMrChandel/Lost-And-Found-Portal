@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
 import Constants from "expo-constants";
+import * as SplashScreen from "expo-splash-screen";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppConfig, compareVersions, getAppConfig } from "../api/appConfig";
-import { Button } from "./Button";
+import { Button, Logo, Text } from "../ui";
+import { Sparkles, X } from "../ui/icons";
 import { colors } from "../theme/colors";
+import { radii, SCREEN_PADDING } from "../theme/tokens";
 
 const APP_VERSION = Constants.expoConfig?.version;
 
@@ -26,25 +29,37 @@ export const UpdateGate: React.FC<{ children: React.ReactNode }> = ({ children }
       .catch(() => {});
   }, []);
 
+  const blocked = !!config && !!APP_VERSION && compareVersions(APP_VERSION, config.min_supported_version) < 0;
+
+  useEffect(() => {
+    // The navigator normally hides the splash screen, but it isn't shown while blocked
+    if (blocked) SplashScreen.hideAsync().catch(() => {});
+  }, [blocked]);
+
   if (!config || !APP_VERSION) return <>{children}</>;
 
-  const openStore = () => {
+  const openUpdate = () => {
     if (config.update_url) Linking.openURL(config.update_url).catch(() => {});
   };
 
-  if (compareVersions(APP_VERSION, config.min_supported_version) < 0) {
+  if (blocked) {
     return (
-      <View style={[styles.blocked, { paddingTop: insets.top + 40 }]}>
-        <Text style={styles.emoji}>⬆️</Text>
-        <Text style={styles.title}>Update Required</Text>
-        <Text style={styles.body}>
-          This version ({APP_VERSION}) is no longer supported. Please install version{" "}
-          {config.latest_version} to keep using Lost & Found.
+      <View style={[styles.blocked, { paddingTop: insets.top + 64, paddingBottom: insets.bottom + 24 }]}>
+        <Logo size={72} />
+        <Text variant="title1" align="center" style={{ marginTop: 28 }}>
+          Time to update
         </Text>
+        <Text variant="body" color="textSecondary" align="center" style={styles.body}>
+          This version ({APP_VERSION}) is no longer supported. Install version {config.latest_version} to keep using
+          Lost & Found.
+        </Text>
+        <View style={{ flex: 1 }} />
         {config.update_url ? (
-          <Button title="Update Now" onPress={openStore} style={styles.button} />
+          <Button title="Download the update" onPress={openUpdate} size="lg" fullWidth />
         ) : (
-          <Text style={styles.body}>Ask the campus admin office for the latest version.</Text>
+          <Text variant="footnote" color="textSecondary" align="center">
+            Ask the campus admin office for the latest version.
+          </Text>
         )}
       </View>
     );
@@ -53,42 +68,69 @@ export const UpdateGate: React.FC<{ children: React.ReactNode }> = ({ children }
   const outdated = compareVersions(APP_VERSION, config.latest_version) < 0;
   return (
     <View style={styles.fill}>
+      <View style={styles.fill}>{children}</View>
       {outdated && !dismissed ? (
-        <View style={[styles.banner, { paddingTop: insets.top + 8 }]}>
-          <Text style={styles.bannerText}>Version {config.latest_version} is available.</Text>
-          {config.update_url ? (
-            <TouchableOpacity onPress={openStore}>
-              <Text style={styles.bannerAction}>Update</Text>
-            </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity onPress={() => setDismissed(true)}>
-            <Text style={styles.bannerDismiss}>Dismiss</Text>
-          </TouchableOpacity>
+        <View style={[styles.banner, { bottom: insets.bottom + 84 }]} pointerEvents="box-none">
+          <View style={styles.bannerCard}>
+            <View style={styles.bannerIcon}>
+              <Sparkles size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="subhead">Version {config.latest_version} is available</Text>
+              <Text variant="caption" color="textSecondary">
+                New fixes and improvements
+              </Text>
+            </View>
+            {config.update_url ? <Button title="Update" size="sm" onPress={openUpdate} /> : null}
+            <Pressable
+              onPress={() => setDismissed(true)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss"
+              style={styles.dismiss}
+            >
+              <X size={18} color={colors.textMuted} />
+            </Pressable>
+          </View>
         </View>
       ) : null}
-      <View style={styles.fill}>{children}</View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  blocked: { flex: 1, alignItems: "center", padding: 30, backgroundColor: colors.background },
-  emoji: { fontSize: 44, marginBottom: 12 },
-  title: { fontSize: 20, fontWeight: "bold", color: colors.textPrimary, marginBottom: 8 },
-  body: { fontSize: 13, color: colors.textSecondary, textAlign: "center", lineHeight: 19, marginBottom: 8 },
-  button: { marginTop: 16, alignSelf: "stretch" },
-  banner: {
+  blocked: {
+    flex: 1,
+    alignItems: "center",
+    paddingHorizontal: SCREEN_PADDING + 8,
+    backgroundColor: colors.background,
+  },
+  body: { marginTop: 10, maxWidth: 320 },
+  banner: { position: "absolute", left: 12, right: 12 },
+  bannerCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    backgroundColor: colors.primaryLight,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    gap: 12,
+    padding: 12,
+    paddingLeft: 14,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  bannerText: { flex: 1, fontSize: 12, color: colors.textPrimary },
-  bannerAction: { fontSize: 12, fontWeight: "700", color: colors.primary },
-  bannerDismiss: { fontSize: 12, color: colors.textSecondary },
+  bannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryTint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dismiss: { padding: 2 },
 });
