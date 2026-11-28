@@ -1,413 +1,331 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Switch,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-  Platform,
-} from "react-native";
+import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, RefreshControl, Share, StyleSheet, View } from "react-native";
+import { SvgXml } from "react-native-svg";
+import { useFocusEffect } from "@react-navigation/native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../navigation/types";
 import { itemsApi, RegisteredValuable } from "../../api/items";
-import { postsApi, Category } from "../../api/posts";
-import { Input } from "../../components/Input";
-import { Button } from "../../components/Button";
-import { Badge } from "../../components/Badge";
+import { errorMessage } from "../../api/client";
+import {
+  Badge,
+  BottomSheet,
+  Button,
+  Card,
+  CardSkeleton,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  Notice,
+  OptionSheet,
+  Text,
+  useToast,
+} from "../../ui";
+import { EllipsisVertical, Pause, Play, Plus, QrCode, Share2, ShieldCheck, Trash2 } from "../../ui/icons";
 import { colors } from "../../theme/colors";
+import { radii, SCREEN_PADDING } from "../../theme/tokens";
+import { categoryIcon } from "../../utils/categories";
+import { formatDate } from "../../utils/format";
 
-export const ValuablesScreen: React.FC = () => {
+type Props = NativeStackScreenProps<RootStackParamList, "Valuables">;
+
+/** The server's sticker is a standalone SVG sized in millimetres; keep just the drawing. */
+function cleanSvg(svg: string): string {
+  return svg
+    .replace(/<\?xml[^>]*\?>/, "")
+    .replace(/\s(width|height)="[^"]*"/g, "")
+    .trim();
+}
+
+export const ValuablesScreen: React.FC<Props> = ({ navigation }) => {
+  const toast = useToast();
   const [items, setItems] = useState<RegisteredValuable[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const loaded = useRef(false);
 
-  // Register Modal state
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [name, setName] = useState<string>("");
-  const [category, setCategory] = useState<string>("bicycle");
-  const [description, setDescription] = useState<string>("");
-  const [serialNumber, setSerialNumber] = useState<string>("");
-  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [menuFor, setMenuFor] = useState<RegisteredValuable | null>(null);
+  const [stickerFor, setStickerFor] = useState<RegisteredValuable | null>(null);
+  const [sticker, setSticker] = useState<{ svg: string; scan_url: string } | null>(null);
+  const [stickerError, setStickerError] = useState("");
 
-  // QR Sticker Modal
-  const [stickerModal, setStickerModal] = useState<RegisteredValuable | null>(null);
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <IconButton
+          icon={Plus}
+          variant="tonal"
+          size={38}
+          accessibilityLabel="Register an item"
+          onPress={() => navigation.navigate("RegisterValuable")}
+        />
+      ),
+    });
+  }, [navigation]);
 
-  const loadItems = async () => {
+  const load = useCallback(async () => {
     try {
-      const data = await itemsApi.getRegisteredItems();
-      setItems(data);
-    } catch (e) {
-      console.error(e);
+      setItems(await itemsApi.getRegisteredItems());
+      setError("");
+      loaded.current = true;
+    } catch (err: any) {
+      const message = errorMessage(err, "Couldn't load your items.");
+      if (loaded.current) toast.show(message, "error");
+      else setError(message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  }, [toast]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const openSticker = async (item: RegisteredValuable) => {
+    setStickerFor(item);
+    setSticker(null);
+    setStickerError("");
+    try {
+      const data = await itemsApi.getSticker(item.id);
+      setSticker({ svg: cleanSvg(data.svg), scan_url: data.scan_url });
+    } catch (err: any) {
+      setStickerError(errorMessage(err, "Couldn't load the sticker."));
     }
   };
 
-  useEffect(() => {
-    loadItems();
-    postsApi.getCategories().then((cats) => {
-      setCategories(cats);
-      if (cats.length > 0) setCategory(cats[0].slug);
-    }).catch(console.error);
-  }, []);
-
-  const handleToggle = async (item: RegisteredValuable) => {
+  const toggle = async (item: RegisteredValuable) => {
+    // Show the change straight away; undo it if the server says no
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_active: !i.is_active } : i)));
     try {
       await itemsApi.toggleActive(item.id);
-      setItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, is_active: !i.is_active } : i))
-      );
-    } catch {
-      Alert.alert("Error", "Failed to update sticker status");
+      toast.show(item.is_active ? `${item.name}'s sticker is paused` : `${item.name}'s sticker is on again`);
+    } catch (err: any) {
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, is_active: item.is_active } : i)));
+      toast.show(errorMessage(err, "Couldn't update the sticker."), "error");
     }
   };
 
-  const handleRegister = async () => {
-    if (!name.trim()) {
-      Alert.alert("Validation", "Please enter item name.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await itemsApi.registerItem({
-        name: name.trim(),
-        category,
-        description: description.trim(),
-        serial_number: serialNumber.trim(),
-      });
-      setModalVisible(false);
-      setName("");
-      setDescription("");
-      setSerialNumber("");
-      loadItems();
-      Alert.alert("Registered", "Your valuable item has been registered with a unique QR link.");
-    } catch (err: any) {
-      Alert.alert("Error", err.formattedMessage || "Failed to register item");
-    } finally {
-      setSubmitting(false);
-    }
+  const remove = (item: RegisteredValuable) => {
+    Alert.alert(`Remove ${item.name}?`, "Its QR sticker will stop working. This can't be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await itemsApi.deleteItem(item.id);
+            setItems((prev) => prev.filter((i) => i.id !== item.id));
+            toast.show(`${item.name} removed`);
+          } catch (err: any) {
+            toast.show(errorMessage(err, "Couldn't remove it."), "error");
+          }
+        },
+      },
+    ]);
   };
+
+  const renderItem = ({ item }: { item: RegisteredValuable }) => {
+    const Icon = categoryIcon(item.category?.slug || item.category?.name);
+    return (
+      <Card style={styles.card}>
+        <View style={styles.cardTop}>
+          <View style={[styles.icon, !item.is_active && { backgroundColor: colors.surfaceAlt }]}>
+            <Icon size={24} color={item.is_active ? colors.primary : colors.textMuted} strokeWidth={1.9} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="headline" numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text variant="footnote" color="textSecondary" numberOfLines={1}>
+              {item.category?.name || "Item"}
+              {item.serial_number ? ` · Serial ${item.serial_number}` : ""}
+            </Text>
+          </View>
+          <IconButton
+            icon={EllipsisVertical}
+            size={38}
+            accessibilityLabel={`Options for ${item.name}`}
+            onPress={() => setMenuFor(item)}
+          />
+        </View>
+        {item.description ? (
+          <Text variant="footnote" color="textSecondary" numberOfLines={2} style={{ marginTop: 10 }}>
+            {item.description}
+          </Text>
+        ) : null}
+        <View style={styles.cardBottom}>
+          <Badge label={item.is_active ? "Sticker on" : "Paused"} tone={item.is_active ? "success" : "neutral"} dot />
+          <Text variant="caption" color="textMuted" style={{ flex: 1 }}>
+            Added {formatDate(item.created_at)}
+          </Text>
+          <Button title="Show QR" icon={QrCode} size="sm" variant="tonal" onPress={() => openSticker(item)} />
+        </View>
+      </Card>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.screen, styles.list]}>
+        {[0, 1, 2].map((i) => (
+          <CardSkeleton key={i} thumb={false} />
+        ))}
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {/* Header bar with + Add Button */}
-      <View style={styles.topHeader}>
-        <View>
-          <Text style={styles.title}>Registered Valuables</Text>
-          <Text style={styles.subtitle}>Protected with Zero-Knowledge QR stickers</Text>
-        </View>
-        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addBtn}>
-          <Text style={styles.addBtnText}>+ Add Gear</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={styles.screen}>
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          items.length ? (
+            <Notice
+              tone="neutral"
+              icon={ShieldCheck}
+              message="Stick a QR code on each item. Whoever finds it can scan it and message you, without seeing your phone number."
+              style={{ marginBottom: 16 }}
+            />
+          ) : undefined
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+        ListEmptyComponent={
+          error ? (
+            <ErrorState
+              message={error}
+              onRetry={() => {
+                setLoading(true);
+                load();
+              }}
+            />
+          ) : (
+            <EmptyState
+              icon={QrCode}
+              title="Protect your things with QR stickers"
+              body="Register your bike, laptop or anything you carry around. If it's lost, whoever finds it can scan the sticker and message you."
+              actionLabel="Register an item"
+              onAction={() => navigation.navigate("RegisterValuable")}
+            />
+          )
+        }
+      />
 
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={styles.infoCol}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.categoryName}>{item.category?.name || "Equipment"}</Text>
-                </View>
-                <Switch
-                  value={item.is_active}
-                  onValueChange={() => handleToggle(item)}
-                  trackColor={{ false: "#D1D5DB", true: colors.primaryLight }}
-                  thumbColor={item.is_active ? colors.primary : "#9CA3AF"}
-                />
-              </View>
+      <OptionSheet
+        visible={!!menuFor}
+        onClose={() => setMenuFor(null)}
+        title={menuFor?.name}
+        options={
+          menuFor
+            ? [
+                menuFor.is_active
+                  ? { value: "toggle", label: "Pause sticker", description: "Scans will say it's paused", icon: Pause }
+                  : { value: "toggle", label: "Turn sticker back on", icon: Play },
+                { value: "share", label: "Share sticker link", icon: Share2 },
+                {
+                  value: "delete",
+                  label: "Remove item",
+                  description: "Its sticker stops working",
+                  icon: Trash2,
+                  destructive: true,
+                },
+              ]
+            : []
+        }
+        onSelect={(choice) => {
+          const item = menuFor;
+          if (!item) return;
+          if (choice === "toggle") toggle(item);
+          else if (choice === "share") Share.share({ message: `${item.name}: ${item.scan_url}` }).catch(() => {});
+          else setTimeout(() => remove(item), 250);
+        }}
+      />
 
-              <Text style={styles.itemDesc} numberOfLines={2}>
-                {item.description || "No description provided."}
-              </Text>
-
-              <View style={styles.footerRow}>
-                <Badge
-                  label={item.is_active ? "ACTIVE QR" : "DEACTIVATED"}
-                  variant={item.is_active ? "found" : "default"}
-                />
-                <TouchableOpacity onPress={() => setStickerModal(item)} style={styles.viewStickerBtn}>
-                  <Text style={styles.viewStickerText}>🏷️ View QR Info</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+      <BottomSheet
+        visible={!!stickerFor}
+        onClose={() => setStickerFor(null)}
+        title={stickerFor?.name}
+        subtitle="Print this and stick it somewhere visible."
+      >
+        <View style={styles.stickerCard}>
+          {sticker ? (
+            <SvgXml xml={sticker.svg} width={210} height={210} />
+          ) : stickerError ? (
+            <Text variant="footnote" color="danger" align="center">
+              {stickerError}
+            </Text>
+          ) : (
+            <ActivityIndicator color={colors.primary} />
           )}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>🏷️</Text>
-              <Text style={styles.emptyTitle}>No Valuables Registered Yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Register your bicycles, laptops, and headphones to print sticker QR tags.
-              </Text>
-              <Button
-                title="+ Register First Item"
-                onPress={() => setModalVisible(true)}
-                style={styles.emptyBtn}
-              />
-            </View>
+          <Text variant="overline" color="textSecondary" style={{ marginTop: 12 }}>
+            Found this? Scan me
+          </Text>
+          <Text variant="caption" color="textMuted">
+            IIT Ropar Lost & Found
+          </Text>
+        </View>
+        {stickerFor && !stickerFor.is_active ? (
+          <Notice
+            tone="warning"
+            message="This sticker is paused. Scans will say so until you turn it back on."
+            style={{ marginTop: 14 }}
+          />
+        ) : null}
+        <Button
+          title="Share sticker link"
+          icon={Share2}
+          size="lg"
+          fullWidth
+          disabled={!sticker}
+          onPress={() =>
+            sticker && stickerFor && Share.share({ message: `${stickerFor.name}: ${sticker.scan_url}` }).catch(() => {})
           }
+          style={{ marginTop: 18 }}
         />
-      )}
-
-      {/* Registration Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Register Campus Valuable</Text>
-            <ScrollView>
-              <Input label="Item Name *" placeholder="e.g. Hero Sprint Pro Bicycle" value={name} onChangeText={setName} />
-              <Input
-                label="Private Serial / Frame No."
-                placeholder="e.g. SN-88219-X99"
-                value={serialNumber}
-                onChangeText={setSerialNumber}
-                helperText="🔒 Strictly confidential. Used only by admins for verification."
-              />
-              <Input
-                label="Distinguishing Features"
-                placeholder="e.g. Matte blue frame, bell on left handlebar"
-                value={description}
-                onChangeText={setDescription}
-                multiline
-              />
-              <View style={styles.modalBtns}>
-                <Button title="Cancel" variant="outline" onPress={() => setModalVisible(false)} style={{ flex: 1 }} />
-                <Button title="Register" onPress={handleRegister} loading={submitting} style={{ flex: 1 }} />
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Sticker Info Modal */}
-      <Modal visible={!!stickerModal} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Valuable QR Sticker</Text>
-            {stickerModal && (
-              <View style={styles.stickerBox}>
-                <Text style={styles.stickerItemTitle}>{stickerModal.name}</Text>
-                <Text style={styles.stickerUUID}>UUID: {stickerModal.qr_uuid.slice(0, 13)}...</Text>
-                <View style={styles.qrMock}>
-                  <Text style={styles.qrIcon}>📱</Text>
-                  <Text style={styles.qrScanText}>SCAN ME IF FOUND</Text>
-                  <Text style={styles.qrPortal}>IIT ROPAR LOST & FOUND</Text>
-                </View>
-                <Text style={styles.stickerInfo}>
-                  Finders can scan this sticker with any camera to verify you are the registered owner without seeing your personal phone number.
-                </Text>
-              </View>
-            )}
-            <Button title="Close" variant="outline" onPress={() => setStickerModal(null)} />
-          </View>
-        </View>
-      </Modal>
+      </BottomSheet>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  topHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  addBtn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  addBtnText: {
-    color: colors.textWhite,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  list: {
-    padding: 16,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 16,
-    elevation: 1,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  infoCol: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  categoryName: {
-    fontSize: 11,
-    color: colors.ocean,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  itemDesc: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  footerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  viewStickerBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  viewStickerText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-  center: {
-    flex: 1,
+  screen: { flex: 1, backgroundColor: colors.background },
+  list: { paddingHorizontal: SCREEN_PADDING, paddingTop: 12, paddingBottom: 32, flexGrow: 1 },
+  card: { marginBottom: 12, padding: 14 },
+  cardTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+  icon: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.md,
+    backgroundColor: colors.primaryTint,
     alignItems: "center",
     justifyContent: "center",
   },
-  empty: {
+  cardBottom: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 14 },
+  stickerCard: {
     alignItems: "center",
-    justifyContent: "center",
-    padding: 30,
-    marginTop: 40,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  emptyBtn: {
-    marginTop: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    maxHeight: "85%",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-    marginBottom: 16,
-  },
-  modalBtns: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 10,
-  },
-  stickerBox: {
-    alignItems: "center",
-    padding: 16,
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: colors.primary,
-    borderRadius: 20,
-    marginVertical: 16,
-  },
-  stickerItemTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  stickerUUID: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-    marginTop: 2,
-  },
-  qrMock: {
-    width: 140,
-    height: 140,
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 14,
+    alignSelf: "center",
+    padding: 18,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  qrIcon: {
-    fontSize: 42,
-  },
-  qrScanText: {
-    fontSize: 9,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-    marginTop: 4,
-  },
-  qrPortal: {
-    fontSize: 7,
-    color: colors.ocean,
-    fontWeight: "700",
-  },
-  stickerInfo: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 16,
+    backgroundColor: colors.surface,
+    minWidth: 250,
+    minHeight: 250,
+    justifyContent: "center",
   },
 });

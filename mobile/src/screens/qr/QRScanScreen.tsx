@@ -1,423 +1,453 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
-import { Camera, CameraView } from "expo-camera";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { MainTabParamList } from "../../navigation/types";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Easing, Linking, ScrollView, StyleSheet, View } from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { useIsFocused } from "@react-navigation/native";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { RootStackParamList } from "../../navigation/types";
+import { goBackOrHome } from "../../navigation/goBackOrHome";
 import { errorMessage } from "../../api/client";
-import { itemsApi, QRScanResult } from "../../api/items";
-import { Button } from "../../components/Button";
-import { Badge } from "../../components/Badge";
 import { chatApi } from "../../api/chat";
+import { itemsApi, QRScanResult } from "../../api/items";
 import { useAuth } from "../../context/AuthContext";
+import { Avatar, Badge, Button, EmptyState, haptics, IconButton, Text, useToast } from "../../ui";
+import {
+  Camera,
+  EyeOff,
+  Flashlight,
+  FlashlightOff,
+  MessageCircle,
+  PackageCheck,
+  Pause,
+  QrCode,
+  ScanLine,
+  ShieldCheck,
+  X,
+} from "../../ui/icons";
 import { colors } from "../../theme/colors";
+import { radii, SCREEN_PADDING } from "../../theme/tokens";
+import { categoryIcon } from "../../utils/categories";
+
+type Props = NativeStackScreenProps<RootStackParamList, "QRScan">;
 
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const FRAME = 248;
 
-export const QRScanScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
-  const { params } = useRoute<RouteProp<MainTabParamList, "QRScan">>();
-
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [scanned, setScanned] = useState<boolean>(false);
-  const [scanning, setScanning] = useState<boolean>(false);
-  const [scanResult, setScanResult] = useState<QRScanResult | null>(null);
-  const [openingChat, setOpeningChat] = useState(false);
-  const { user } = useAuth();
-
+/** The line sweeping up and down the viewfinder. */
+const ScanLineAnimation: React.FC = () => {
+  const progress = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const getCameraPermissions = async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === "granted");
-    };
-    getCameraPermissions();
-  }, []);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(progress, {
+          toValue: 1,
+          duration: 1800,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(progress, {
+          toValue: 0,
+          duration: 1800,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [progress]);
+  return (
+    <Animated.View
+      style={[
+        styles.sweep,
+        { transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [12, FRAME - 14] }) }] },
+      ]}
+    />
+  );
+};
 
-  const lookup = async (uuid: string) => {
-    setScanning(true);
-    try {
-      setScanResult(await itemsApi.scanQR(uuid));
-    } catch (err: any) {
-      const notFound = err?.response?.status === 404;
-      Alert.alert(
-        notFound ? "Invalid Sticker" : "Couldn't Check Sticker",
-        notFound
-          ? "Could not verify this QR code as an active IIT Ropar valuable sticker."
-          : errorMessage(err, "Please check your connection and try again."),
-        [{ text: "Scan Again", onPress: () => setScanned(false) }]
-      );
-    } finally {
-      setScanning(false);
-    }
-  };
+export const QRScanScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { user } = useAuth();
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
+  const [permission, requestPermission] = useCameraPermissions();
+
+  const [torch, setTorch] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<QRScanResult | null>(null);
+  const [openingChat, setOpeningChat] = useState(false);
+  // Ignore further codes while one is being handled
+  const busy = useRef(false);
+
+  const lookup = useCallback(
+    async (uuid: string) => {
+      setChecking(true);
+      try {
+        const found = await itemsApi.scanQR(uuid);
+        haptics.success();
+        setResult(found);
+      } catch (err: any) {
+        haptics.error();
+        toast.show(
+          err?.response?.status === 404
+            ? "This sticker isn't registered on Lost & Found."
+            : errorMessage(err, "Couldn't check the sticker. Try again."),
+          "error",
+        );
+        // Let the camera try again after the message has been seen
+        setTimeout(() => (busy.current = false), 1500);
+      } finally {
+        setChecking(false);
+      }
+    },
+    [toast],
+  );
 
   // Opened from a sticker link: look the tag up directly, no camera needed
   useEffect(() => {
-    if (params?.uuid) {
-      setScanned(true);
-      lookup(params.uuid);
+    const uuid = route.params?.uuid;
+    if (uuid) {
+      busy.current = true;
+      lookup(uuid);
     }
-  }, [params?.uuid]);
+  }, [route.params?.uuid, lookup]);
 
-  const handleBarcodeScanned = async ({ data }: { data: string }) => {
-    if (scanned || scanning) return;
-    setScanned(true);
+  // Ask for the camera once when the scanner opens; after a "no", the screen explains and
+  // offers a button instead of asking again straight away
+  const askedForCamera = useRef(false);
+  useEffect(() => {
+    if (!permission || permission.granted || !permission.canAskAgain || route.params?.uuid) return;
+    if (askedForCamera.current) return;
+    askedForCamera.current = true;
+    requestPermission();
+  }, [permission, requestPermission, route.params?.uuid]);
+
+  const onScanned = ({ data }: { data: string }) => {
+    if (busy.current || result) return;
+    busy.current = true;
     // The sticker encodes a URL ending in /scan/<uuid> (a trailing slash or query is fine)
     const uuid = data.match(UUID_PATTERN)?.[0];
     if (!uuid) {
-      Alert.alert("Not a Campus Sticker", "This QR code isn't an IIT Ropar Lost & Found sticker.", [
-        { text: "Scan Again", onPress: () => setScanned(false) },
-      ]);
+      haptics.error();
+      toast.show("That QR code isn't a Lost & Found sticker.", "error");
+      setTimeout(() => (busy.current = false), 1800);
       return;
     }
-    await lookup(uuid);
+    lookup(uuid);
   };
 
-  const handleReportFoundFromScan = () => {
-    if (!scanResult) return;
-    navigation.navigate("ReportFound", {
-      title: `Found: ${scanResult.item_name}`,
-      category: scanResult.category,
-      qrUuid: scanResult.qr_uuid,
-    });
+  const scanAgain = () => {
+    setResult(null);
+    busy.current = false;
+    navigation.setParams({ uuid: undefined });
   };
 
-  // The scanner has the item in hand, so the chat opens straight away (no request step)
-  const handleChatWithOwner = async () => {
-    if (!scanResult) return;
+  const chatWithOwner = async () => {
+    if (!result) return;
     setOpeningChat(true);
     try {
-      const conv = await chatApi.openQRConversation(scanResult.qr_uuid);
-      navigation.navigate("Chat", { conversationId: conv.id, title: scanResult.owner_name });
+      const conv = await chatApi.openQRConversation(result.qr_uuid);
+      navigation.navigate("Chat", { conversationId: conv.id, title: result.owner_name });
     } catch (err: any) {
-      Alert.alert("Couldn't Open Chat", errorMessage(err, "Please try again."));
+      toast.show(errorMessage(err, "Couldn't open the chat."), "error");
     } finally {
       setOpeningChat(false);
     }
   };
 
-  const scanAgain = () => {
-    setScanResult(null);
-    setScanned(false);
-    navigation.setParams({ uuid: undefined });
+  const reportFound = () => {
+    if (!result) return;
+    navigation.navigate("ReportFound", {
+      title: `Found: ${result.item_name}`,
+      category: result.category,
+      qrUuid: result.qr_uuid,
+    });
   };
 
-  if (scanning && !scanResult) {
+  // ── The scan result ───────────────────────────────────────────────────────────
+  if (result) {
+    const CategoryIcon = categoryIcon(result.category);
+    const active = result.is_active;
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.text}>Checking sticker...</Text>
-      </View>
-    );
-  }
-
-  if (scanResult && !scanResult.is_active) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.emoji}>🏷️</Text>
-        <Text style={styles.title}>Sticker Not Active</Text>
-        <Text style={styles.subtitle}>
-          This sticker has been deactivated by its owner. If you found the item, please hand it in at the
-          Security Office or Admin Office.
-        </Text>
-        <Button title="Scan Another Code" variant="outline" onPress={scanAgain} style={{ marginTop: 16 }} />
-      </View>
-    );
-  }
-
-  if (hasPermission === null && !scanResult) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.text}>Requesting camera permission...</Text>
-      </View>
-    );
-  }
-
-  if (hasPermission === false && !scanResult) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.emoji}>📷</Text>
-        <Text style={styles.title}>Camera Access Required</Text>
-        <Text style={styles.subtitle}>
-          Camera permission is required to scan QR stickers attached to campus valuables.
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      {/* Scanner Viewport */}
-      {!scanResult ? (
-        <View style={styles.cameraContainer}>
-          <CameraView
-            onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr"],
-            }}
-            style={StyleSheet.absoluteFill}
-          />
-
-          {/* Scanner Overlay Frame */}
-          <View style={styles.overlay}>
-            <View style={styles.targetFrame}>
-              <View style={[styles.corner, styles.topLeft]} />
-              <View style={[styles.corner, styles.topRight]} />
-              <View style={[styles.corner, styles.bottomLeft]} />
-              <View style={[styles.corner, styles.bottomRight]} />
+      <View style={[styles.result, { paddingTop: insets.top + 8 }]}>
+        <StatusBar style="dark" />
+        <View style={styles.resultTop}>
+          <IconButton icon={X} variant="surface" accessibilityLabel="Close" onPress={() => goBackOrHome(navigation)} />
+          <Text variant="headline">Sticker details</Text>
+          <View style={{ width: 42 }} />
+        </View>
+        <ScrollView contentContainerStyle={[styles.resultBody, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={[styles.hero, { backgroundColor: active ? colors.primaryTint : colors.surfaceAlt }]}>
+            <View style={[styles.heroIcon, { backgroundColor: active ? colors.primary : colors.textSecondary }]}>
+              {active ? (
+                <ShieldCheck size={30} color={colors.textWhite} />
+              ) : (
+                <Pause size={28} color={colors.textWhite} />
+              )}
             </View>
-            <Text style={styles.instructionText}>
-              Align campus valuable QR sticker inside frame
+            <Text variant="title3" align="center" style={{ marginTop: 14 }}>
+              {result.is_owner ? "This is your item" : active ? "Registered on Lost & Found" : "This sticker is paused"}
+            </Text>
+            <Text variant="footnote" color="textSecondary" align="center" style={{ marginTop: 4, maxWidth: 290 }}>
+              {result.is_owner
+                ? active
+                  ? "This is what anyone who scans the sticker sees. They can message you without seeing your contact details."
+                  : "Your sticker is paused, so people who scan it are told to hand the item in at an office."
+                : active
+                  ? "This item belongs to someone on campus. Help it get back to them."
+                  : "The owner has paused this sticker. If you found the item, hand it in at the admin or security office."}
             </Text>
           </View>
-        </View>
-      ) : (
-        /* Zero-Knowledge Scan Result Card */
-        <View style={styles.resultContainer}>
-          <View style={styles.resultCard}>
-            <View style={styles.shieldHeader}>
-              <Text style={styles.shieldIcon}>🛡️</Text>
-              <Text style={styles.shieldTitle}>Verified IIT Ropar Valuable</Text>
-            </View>
 
+          <View style={styles.card}>
+            <View style={styles.cardRow}>
+              <View style={styles.itemIcon}>
+                <CategoryIcon size={22} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text variant="caption" color="textSecondary">
+                  Item
+                </Text>
+                <Text variant="headline">{result.item_name}</Text>
+              </View>
+              <Badge label={result.category} />
+            </View>
             <View style={styles.divider} />
-
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>ITEM NAME</Text>
-              <Text style={styles.resultValue}>{scanResult.item_name}</Text>
+            <View style={styles.cardRow}>
+              <Avatar name={result.owner_name} size={42} />
+              <View style={{ flex: 1 }}>
+                <Text variant="caption" color="textSecondary">
+                  Registered owner
+                </Text>
+                <Text variant="headline">{result.owner_name}</Text>
+                {result.owner_registration_number ? (
+                  <Text variant="footnote" color="textSecondary">
+                    {result.owner_registration_number}
+                  </Text>
+                ) : null}
+              </View>
             </View>
+          </View>
 
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>CATEGORY</Text>
-              <Text style={styles.resultValue}>{scanResult.category}</Text>
-            </View>
-
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>REGISTERED OWNER</Text>
-              <Text style={styles.resultValue}>{scanResult.owner_name}</Text>
-              {scanResult.owner_registration_number ? (
-                <Text style={styles.resultSub}>{scanResult.owner_registration_number}</Text>
-              ) : null}
-            </View>
-
-            <View style={styles.resultRow}>
-              <Text style={styles.resultLabel}>STICKER STATUS</Text>
-              <Badge
-                label={scanResult.is_active ? "ACTIVE & PROTECTED" : "DEACTIVATED"}
-                variant={scanResult.is_active ? "found" : "lost"}
-              />
-            </View>
-
-            <View style={styles.privacyNotice}>
-              <Text style={styles.privacyText}>
+          {result.is_owner ? null : (
+            <View style={styles.privacy}>
+              <EyeOff size={15} color={colors.textMuted} />
+              <Text variant="caption" color="textSecondary" style={{ flex: 1 }}>
                 {user
-                  ? "🔒 The owner's phone number and email stay private. You can message them here instead."
-                  : "🔒 The owner's phone number, email and registration number stay private. Sign in to message them."}
+                  ? "The owner's phone number and email stay private. Message them here instead."
+                  : "The owner's contact details stay private. Sign in to message them."}
               </Text>
             </View>
+          )}
 
-            {scanResult.can_chat ? (
+          <View style={{ gap: 10, marginTop: 22 }}>
+            {result.can_chat ? (
               <Button
-                title="Chat with owner"
-                onPress={handleChatWithOwner}
+                title="Message the owner"
+                icon={MessageCircle}
+                size="lg"
+                fullWidth
                 loading={openingChat}
-                style={styles.actionBtn}
+                onPress={chatWithOwner}
               />
             ) : !user ? (
               <Button
-                title="Sign in to chat"
-                variant="outline"
+                title="Sign in to message the owner"
+                icon={MessageCircle}
+                size="lg"
+                fullWidth
                 onPress={() => navigation.navigate("Auth")}
-                style={styles.actionBtn}
               />
             ) : null}
-
-            {!scanResult.is_owner && (
+            {!result.is_owner && active ? (
               <Button
-                title="🤝 I Found This Belonging"
-                onPress={handleReportFoundFromScan}
-                style={styles.actionBtn}
+                title="Report it as found"
+                icon={PackageCheck}
+                variant={result.can_chat || !user ? "secondary" : "primary"}
+                size="lg"
+                fullWidth
+                onPress={reportFound}
               />
-            )}
-
-            <Button
-              title="Scan Another Code"
-              variant="outline"
-              onPress={scanAgain}
-            />
+            ) : null}
+            {result.is_owner ? (
+              <Button
+                title="Manage my items"
+                icon={QrCode}
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onPress={() => navigation.navigate("Valuables")}
+              />
+            ) : null}
+            <Button title="Scan another sticker" icon={ScanLine} variant="ghost" onPress={scanAgain} />
           </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Looking up a sticker from a link ─────────────────────────────────────────
+  if (route.params?.uuid && checking) {
+    return (
+      <View style={[styles.result, styles.center]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text variant="callout" color="textSecondary" style={{ marginTop: 14 }}>
+          Checking the sticker…
+        </Text>
+      </View>
+    );
+  }
+
+  // ── Camera permission ────────────────────────────────────────────────────────
+  if (!permission || !permission.granted) {
+    const blocked = permission && !permission.canAskAgain;
+    return (
+      <View style={[styles.result, { paddingTop: insets.top + 8 }]}>
+        <StatusBar style="dark" />
+        <View style={styles.resultTop}>
+          <IconButton icon={X} variant="surface" accessibilityLabel="Close" onPress={() => goBackOrHome(navigation)} />
         </View>
-      )}
+        {permission ? (
+          <EmptyState
+            icon={Camera}
+            title="Allow camera access"
+            body="The camera is only used to read QR stickers on campus items. Nothing is recorded."
+            actionLabel={blocked ? "Open Settings" : "Allow camera"}
+            onAction={() => (blocked ? Linking.openSettings() : requestPermission())}
+            style={{ flex: 1 }}
+          />
+        ) : (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  // ── The viewfinder ───────────────────────────────────────────────────────────
+  return (
+    <View style={styles.camera}>
+      <StatusBar style="light" />
+      {focused ? (
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          enableTorch={torch}
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onBarcodeScanned={onScanned}
+        />
+      ) : null}
+
+      <View style={styles.mask} pointerEvents="none">
+        <View style={styles.maskFill} />
+        <View style={styles.maskRow}>
+          <View style={styles.maskFill} />
+          <View style={styles.frame}>
+            <View style={[styles.corner, styles.topLeft]} />
+            <View style={[styles.corner, styles.topRight]} />
+            <View style={[styles.corner, styles.bottomLeft]} />
+            <View style={[styles.corner, styles.bottomRight]} />
+            {checking ? (
+              <View style={styles.checking}>
+                <ActivityIndicator color={colors.textWhite} />
+              </View>
+            ) : (
+              <ScanLineAnimation />
+            )}
+          </View>
+          <View style={styles.maskFill} />
+        </View>
+        <View style={[styles.maskFill, styles.hintArea]}>
+          <Text variant="headline" color="textWhite" align="center">
+            {checking ? "Checking the sticker…" : "Scan a Lost & Found sticker"}
+          </Text>
+          <Text variant="footnote" align="center" style={styles.hint}>
+            Hold the QR code inside the frame. It scans automatically.
+          </Text>
+        </View>
+      </View>
+
+      <View style={[styles.cameraTop, { top: insets.top + 8 }]}>
+        <IconButton icon={X} variant="overlay" accessibilityLabel="Close" onPress={() => goBackOrHome(navigation)} />
+        <IconButton
+          icon={torch ? FlashlightOff : Flashlight}
+          variant="overlay"
+          accessibilityLabel={torch ? "Turn off the torch" : "Turn on the torch"}
+          onPress={() => setTorch((t) => !t)}
+        />
+      </View>
     </View>
   );
 };
 
+const CORNER = 30;
+const MASK = "rgba(0,0,0,0.58)";
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  cameraContainer: {
-    flex: 1,
-    position: "relative",
-  },
-  centerContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 30,
-    backgroundColor: colors.background,
-  },
-  emoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  text: {
-    marginTop: 10,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  targetFrame: {
-    width: 240,
-    height: 240,
-    position: "relative",
-  },
-  corner: {
+  camera: { flex: 1, backgroundColor: "#000" },
+  mask: { ...StyleSheet.absoluteFill },
+  maskFill: { flex: 1, backgroundColor: MASK },
+  maskRow: { flexDirection: "row", height: FRAME },
+  frame: { width: FRAME, height: FRAME },
+  hintArea: { alignItems: "center", paddingTop: 28, paddingHorizontal: 32 },
+  hint: { color: "rgba(255,255,255,0.75)", marginTop: 6 },
+  corner: { position: "absolute", width: CORNER, height: CORNER, borderColor: colors.textWhite },
+  topLeft: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 18 },
+  topRight: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 18 },
+  bottomLeft: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 18 },
+  bottomRight: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 18 },
+  sweep: {
     position: "absolute",
-    width: 32,
-    height: 32,
-    borderColor: colors.ocean,
+    left: 16,
+    right: 16,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: colors.accent,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  topLeft: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
+  checking: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
+  cameraTop: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  topRight: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-  },
-  bottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-  },
-  bottomRight: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-  },
-  instructionText: {
-    marginTop: 24,
-    color: colors.textWhite,
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  resultContainer: {
-    flex: 1,
-    padding: 20,
-    justifyContent: "center",
-  },
-  resultCard: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  shieldHeader: {
+  result: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  resultTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
-  shieldIcon: {
-    fontSize: 20,
-  },
-  shieldTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: colors.primary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.borderLight,
-    marginBottom: 16,
-  },
-  resultRow: {
-    marginBottom: 12,
-  },
-  resultLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  resultValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  resultSub: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
-  privacyNotice: {
-    backgroundColor: colors.oceanLight,
-    padding: 10,
-    borderRadius: 12,
+  resultBody: { paddingHorizontal: SCREEN_PADDING, paddingTop: 8 },
+  hero: { alignItems: "center", paddingVertical: 26, paddingHorizontal: 20, borderRadius: radii.xl },
+  heroIcon: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
+  card: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: "#BAE6FD",
-    marginVertical: 14,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  privacyText: {
-    fontSize: 11,
-    color: "#0369A1",
-    lineHeight: 16,
+  cardRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14 },
+  itemIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.sm,
+    backgroundColor: colors.primaryTint,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  actionBtn: {
-    marginBottom: 10,
-  },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  privacy: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14, paddingHorizontal: 4 },
 });
