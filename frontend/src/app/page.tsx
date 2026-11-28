@@ -8,6 +8,10 @@ import Link from "next/link";
 import { useState } from "react";
 import Logo from "@/components/Logo";
 
+// Direct APK download; bump the version here with each Android release
+const ANDROID_APP_URL =
+  "https://github.com/meTheMrChandel/Lost-And-Found-Portal/releases/download/android-v1.1.0/LostAndFound-1.1.0.apk";
+
 export default function Home() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -154,6 +158,17 @@ export default function Home() {
             <p className="text-xs text-[#6B7280]">
               Submit a report with confidential proof of ownership to initiate admin review and automated matching.
             </p>
+            <p className="text-xs text-[#6B7280] mt-1">
+              On Android?{" "}
+              <a
+                href={ANDROID_APP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[#047857] hover:underline"
+              >
+                Download the app
+              </a>
+            </p>
           </div>
           <div className="flex flex-wrap gap-2.5">
             <Link
@@ -208,6 +223,14 @@ export default function Home() {
             <Link href="/feedback?from=/" className="font-semibold text-[#047857] hover:underline">
               Send feedback
             </Link>
+            <a
+              href={ANDROID_APP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[#047857] hover:underline"
+            >
+              Android app
+            </a>
             <span>Admin Supervision</span>
             <span>Zero-Knowledge Scans</span>
             <span>Secured Verification</span>
