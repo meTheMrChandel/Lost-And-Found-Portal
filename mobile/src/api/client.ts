@@ -43,9 +43,12 @@ export function websocketUrl(path: string): string {
   return API_ORIGIN.replace(/^http/, "ws") + path;
 }
 
-// Platform-aware secure storage helper
+// Platform-aware secure storage, with an in-memory copy so each request doesn't wait on the keystore
+const memory = new Map<string, string | null>();
+
 export const storage = {
   async setItem(key: string, value: string): Promise<void> {
+    memory.set(key, value);
     try {
       if (Platform.OS === "web") {
         await AsyncStorage.setItem(key, value);
@@ -58,11 +61,11 @@ export const storage = {
   },
 
   async getItem(key: string): Promise<string | null> {
+    if (memory.has(key)) return memory.get(key) ?? null;
     try {
-      if (Platform.OS === "web") {
-        return await AsyncStorage.getItem(key);
-      }
-      return await SecureStore.getItemAsync(key);
+      const value = Platform.OS === "web" ? await AsyncStorage.getItem(key) : await SecureStore.getItemAsync(key);
+      memory.set(key, value);
+      return value;
     } catch (e) {
       console.warn("Storage getItem error:", e);
       return null;
@@ -70,6 +73,7 @@ export const storage = {
   },
 
   async removeItem(key: string): Promise<void> {
+    memory.set(key, null);
     try {
       if (Platform.OS === "web") {
         await AsyncStorage.removeItem(key);
@@ -81,6 +85,16 @@ export const storage = {
     }
   },
 };
+
+// The app signs the user out when the server refuses to renew their session
+const sessionExpiredListeners = new Set<() => void>();
+
+export function onSessionExpired(listener: () => void): () => void {
+  sessionExpiredListeners.add(listener);
+  return () => {
+    sessionExpiredListeners.delete(listener);
+  };
+}
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -134,7 +148,11 @@ apiClient.interceptors.response.use(
       // Signing out with an expired token should not first rotate it
       requestUrl.includes("/auth/logout/");
 
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+    // Only signed-in requests can be renewed; a guest's 401 just means "sign in first"
+    const headers = originalRequest?.headers as any;
+    const wasSignedIn = !!(headers?.get?.("Authorization") ?? headers?.Authorization);
+
+    if (error.response?.status === 401 && wasSignedIn && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       if (isRefreshing) {
@@ -172,9 +190,11 @@ apiClient.interceptors.response.use(
           throw new Error("No refresh token available");
         }
 
-        const refreshRes = await axios.post(`${API_URL}/auth/token/refresh/`, {
-          refresh: refreshToken,
-        });
+        const refreshRes = await axios.post(
+          `${API_URL}/auth/token/refresh/`,
+          { refresh: refreshToken },
+          { timeout: 60000 }
+        );
 
         const newAccess = refreshRes.data.access;
         if (newAccess) {
@@ -190,12 +210,18 @@ apiClient.interceptors.response.use(
         } else {
           throw new Error("No access token in refresh response");
         }
-      } catch (refreshErr) {
-        // Refresh token failed -> clear credentials
+      } catch (refreshErr: any) {
         onTokenRefreshed(null);
+        // Only a refusal ends the session. Offline or a sleeping server is not a reason to
+        // sign the user out: the request fails and the next one tries again.
+        if (!refreshErr?.response && refreshErr?.message !== "No refresh token available") {
+          error.formattedMessage = describeError(refreshErr);
+          return Promise.reject(error);
+        }
         await storage.removeItem("access_token");
         await storage.removeItem("refresh_token");
         await storage.removeItem("user_data");
+        sessionExpiredListeners.forEach((listener) => listener());
 
         // If the original request was a GET request (e.g. public feed/categories), retry anonymously
         if (originalRequest.method?.toLowerCase() === "get" && originalRequest.headers) {
