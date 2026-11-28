@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, FlatList, TextInput, RefreshControl } from "react-native";
+import { View, FlatList, RefreshControl } from "react-native";
+import { Badge, Text, TextInput } from "../../ui";
 import { useFocusEffect } from "@react-navigation/native";
 import { adminApi, AdminInvite } from "../../api/admin";
 import { errorMessage } from "../../api/client";
-import { Badge } from "../../components/Badge";
 import { colors } from "../../theme/colors";
 import { ActionButton, EmptyState, ErrorText, ScreenLoader, Section, SuccessText, formatDateTime, ui } from "./adminUi";
 

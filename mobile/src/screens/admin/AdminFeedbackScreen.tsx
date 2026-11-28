@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, FlatList, RefreshControl } from "react-native";
+import { View, FlatList, RefreshControl } from "react-native";
+import { Text } from "../../ui";
 import { useFocusEffect } from "@react-navigation/native";
 import { adminApi, FeedbackEntry } from "../../api/admin";
 import { errorMessage } from "../../api/client";

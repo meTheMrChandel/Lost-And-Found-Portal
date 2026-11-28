@@ -1,13 +1,24 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image, ActivityIndicator } from "react-native";
+import { View, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Image, ActivityIndicator } from "react-native";
+import { Badge, Text } from "../../ui";
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import { adminApi, MATCH_STATUSES, MatchListItem, MatchPost, MatchStatus } from "../../api/admin";
 import { errorMessage } from "../../api/client";
-import { Badge } from "../../components/Badge";
 import { colors } from "../../theme/colors";
-import { ActionButton, ChipFilter, EmptyState, ErrorText, ScreenLoader, SuccessText, formatDateTime, humanize, ui } from "./adminUi";
+import { categoryIcon } from "../../utils/categories";
+import {
+  ActionButton,
+  ChipFilter,
+  EmptyState,
+  ErrorText,
+  ScreenLoader,
+  SuccessText,
+  formatDateTime,
+  humanize,
+  ui,
+} from "./adminUi";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, "AdminMatches">;
@@ -30,18 +41,35 @@ export function matchBadgeVariant(status: MatchStatus): "pending" | "approved" |
   }
 }
 
-const Side: React.FC<{ post: MatchPost; label: string }> = ({ post, label }) => (
-  <View style={styles.side}>
-    {post.images[0] ? <Image source={{ uri: post.images[0] }} style={styles.sidePhoto} /> : <View style={styles.sidePhoto} />}
-    <Text style={styles.sideLabel}>{label}</Text>
-    <Text style={styles.sideTitle} numberOfLines={2}>
-      {post.title}
-    </Text>
-    <Text style={ui.muted} numberOfLines={1}>
-      {post.last_seen_place}
-    </Text>
-  </View>
-);
+const Side: React.FC<{ post: MatchPost; label: string }> = ({ post, label }) => {
+  const lost = post.post_type === "LOST";
+  const Icon = categoryIcon(post.category?.slug || post.category?.name);
+  return (
+    <View style={styles.side}>
+      {post.images[0] ? (
+        <Image source={{ uri: post.images[0] }} style={styles.sidePhoto} />
+      ) : (
+        // No photo: the category's icon on the lost or found tint, as in the rest of the app
+        <View
+          style={[
+            styles.sidePhoto,
+            styles.sidePlaceholder,
+            { backgroundColor: lost ? colors.lostTint : colors.primaryTint },
+          ]}
+        >
+          <Icon size={28} color={lost ? colors.lost : colors.primary} strokeWidth={1.7} />
+        </View>
+      )}
+      <Text style={styles.sideLabel}>{label}</Text>
+      <Text style={styles.sideTitle} numberOfLines={2}>
+        {post.title}
+      </Text>
+      <Text style={ui.muted} numberOfLines={1}>
+        {post.last_seen_place}
+      </Text>
+    </View>
+  );
+};
 
 export const AdminMatchesScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -77,7 +105,7 @@ export const AdminMatchesScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+    }, [load]),
   );
 
   const loadMore = async () => {
@@ -102,7 +130,7 @@ export const AdminMatchesScreen: React.FC = () => {
     try {
       const res = await adminApi.runMatching();
       setSuccess(
-        `Matching ran over ${res.scanned_pairs} pair(s): ${res.matches_created} new, ${res.matches_updated} updated.`
+        `Matching ran over ${res.scanned_pairs} pair(s): ${res.matches_created} new, ${res.matches_updated} updated.`,
       );
       load();
     } catch (err: any) {
@@ -149,7 +177,12 @@ export const AdminMatchesScreen: React.FC = () => {
       />
       <View style={styles.toolbar}>
         <Text style={ui.muted}>{count} match(es)</Text>
-        <ActionButton label={running ? "Running…" : "Run matching now"} tone="neutral" onPress={runEngine} disabled={running} />
+        <ActionButton
+          label={running ? "Running…" : "Run matching now"}
+          tone="neutral"
+          onPress={runEngine}
+          disabled={running}
+        />
       </View>
       <View style={{ paddingHorizontal: 16 }}>
         <ErrorText message={error} />
@@ -166,7 +199,9 @@ export const AdminMatchesScreen: React.FC = () => {
           contentContainerStyle={styles.list}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
-          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ margin: 16 }} /> : undefined}
+          ListFooterComponent={
+            loadingMore ? <ActivityIndicator color={colors.primary} style={{ margin: 16 }} /> : undefined
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -182,7 +217,11 @@ export const AdminMatchesScreen: React.FC = () => {
             error ? undefined : (
               <EmptyState
                 title="No matches here"
-                body={status === "suggested" ? "New lost and found pairs appear here after the matching engine runs." : "Try another status."}
+                body={
+                  status === "suggested"
+                    ? "New lost and found pairs appear here after the matching engine runs."
+                    : "Try another status."
+                }
               />
             )
           }
@@ -206,6 +245,7 @@ const styles = StyleSheet.create({
   sides: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   side: { flex: 1 },
   sidePhoto: { width: "100%", height: 80, borderRadius: 12, backgroundColor: colors.cardSubtle, marginBottom: 6 },
+  sidePlaceholder: { alignItems: "center", justifyContent: "center" },
   sideLabel: { fontSize: 10, fontWeight: "800", color: colors.textSecondary, letterSpacing: 0.5 },
   sideTitle: { fontSize: 13, fontWeight: "700", color: colors.textPrimary },
   arrow: { fontSize: 18, color: colors.textMuted },

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, FlatList, TextInput, RefreshControl, TouchableOpacity } from "react-native";
+import { View, FlatList, RefreshControl, TouchableOpacity } from "react-native";
+import { Text, TextInput } from "../../ui";
 import { RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";

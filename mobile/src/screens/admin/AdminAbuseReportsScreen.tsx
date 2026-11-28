@@ -1,11 +1,11 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, FlatList, RefreshControl } from "react-native";
+import { View, FlatList, RefreshControl } from "react-native";
+import { Badge, Text } from "../../ui";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
 import { adminApi, AbuseReport } from "../../api/admin";
 import { errorMessage } from "../../api/client";
-import { Badge } from "../../components/Badge";
 import { colors } from "../../theme/colors";
 import { statusBadge } from "../reports/reportStatus";
 import { ActionButton, ChipFilter, EmptyState, ErrorText, ScreenLoader, SuccessText, formatDateTime, humanize, ui } from "./adminUi";

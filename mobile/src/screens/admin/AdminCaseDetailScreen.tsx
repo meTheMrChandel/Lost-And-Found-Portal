@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Image, TextInput, Alert, RefreshControl } from "react-native";
+import { View, StyleSheet, ScrollView, Image, Alert, RefreshControl } from "react-native";
+import { Badge, CategoryChip, Text, TextInput } from "../../ui";
+import { LockKeyhole, QrCode } from "../../ui/icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../navigation/types";
+import { programYearLabel } from "../../api/auth";
 import { adminApi, CaseDetail, ReviewAction, StaffMember } from "../../api/admin";
 import { Category, postsApi } from "../../api/posts";
 import { errorMessage } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
-import { Badge } from "../../components/Badge";
-import { CategoryChip } from "../../components/CategoryChip";
 import { colors } from "../../theme/colors";
 import { statusBadge } from "../reports/reportStatus";
 import {
@@ -182,7 +183,7 @@ export const AdminCaseDetailScreen: React.FC = () => {
       </Section>
 
       {post.post_type === "LOST" ? (
-        <Section title="🔒 Hidden proof (admins only)" style={styles.proof}>
+        <Section title="Hidden proof (admins only)" icon={LockKeyhole} style={styles.proof}>
           <Text style={ui.body}>{post.hidden_proof || "The owner gave no hidden proof."}</Text>
           <Text style={[ui.muted, { marginTop: 6 }]}>Ask the claimant about these details before any handover.</Text>
         </Section>
@@ -194,7 +195,7 @@ export const AdminCaseDetailScreen: React.FC = () => {
             <InfoRow label="Name" value={post.author.full_name} />
             <InfoRow label="Email" value={post.author.email} />
             <InfoRow label="Reg. no." value={post.author.registration_number} />
-            <InfoRow label="Department" value={[post.author.department, humanize(post.author.program_year)].filter(Boolean).join(" · ")} />
+            <InfoRow label="Department" value={[post.author.department, programYearLabel(post.author.program_year)].filter(Boolean).join(" · ")} />
             <InfoRow label="Hostel" value={post.author.hostel} />
             <InfoRow label="Phone" value={post.author.phone} />
             {post.author.is_banned ? <Badge label="Account banned" variant="lost" style={{ marginTop: 8 }} /> : null}
@@ -205,7 +206,7 @@ export const AdminCaseDetailScreen: React.FC = () => {
       </Section>
 
       {post.registered_item ? (
-        <Section title="🏷️ From a QR sticker scan">
+        <Section title="From a QR sticker scan" icon={QrCode}>
           <InfoRow label="Registered item" value={post.registered_item.name} />
           <InfoRow label="Owner" value={`${post.registered_item.owner_name} (${post.registered_item.owner_registration_number})`} />
           <InfoRow label="Owner email" value={post.registered_item.owner_email} />

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Image, TextInput, Switch, Linking, TouchableOpacity, RefreshControl } from "react-native";
+import { View, StyleSheet, ScrollView, Image, Switch, Linking, TouchableOpacity, RefreshControl } from "react-native";
+import { Badge, CategoryChip, Text, TextInput } from "../../ui";
+import { LockKeyhole, Mail, PackageCheck, Phone, SearchX } from "../../ui/icons";
 import { RouteProp, useRoute } from "@react-navigation/native";
 import { RootStackParamList } from "../../navigation/types";
 import { adminApi, MatchDetail, MatchPost, ProofQuestion, scoreBreakdown } from "../../api/admin";
 import { errorMessage } from "../../api/client";
-import { Badge } from "../../components/Badge";
-import { CategoryChip } from "../../components/CategoryChip";
 import { colors } from "../../theme/colors";
 import { matchBadgeVariant } from "./AdminMatchesScreen";
 import { ActionButton, ErrorText, InfoRow, ScreenLoader, Section, SuccessText, formatDateTime, humanize, ui } from "./adminUi";
@@ -26,12 +26,14 @@ const Contact: React.FC<{ author: MatchPost["author"] }> = ({ author }) => {
         {author.full_name} · {author.registration_number}
       </Text>
       <View style={styles.contactLinks}>
-        <TouchableOpacity onPress={() => Linking.openURL(`mailto:${author.email}`)}>
-          <Text style={styles.link}>✉️ {author.email}</Text>
+        <TouchableOpacity onPress={() => Linking.openURL(`mailto:${author.email}`)} style={styles.linkRow}>
+          <Mail size={15} color={colors.primary} />
+          <Text style={styles.link}>{author.email}</Text>
         </TouchableOpacity>
         {author.phone ? (
-          <TouchableOpacity onPress={() => Linking.openURL(`tel:${author.phone}`)}>
-            <Text style={styles.link}>📞 {author.phone}</Text>
+          <TouchableOpacity onPress={() => Linking.openURL(`tel:${author.phone}`)} style={styles.linkRow}>
+            <Phone size={15} color={colors.primary} />
+            <Text style={styles.link}>{author.phone}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -40,7 +42,7 @@ const Contact: React.FC<{ author: MatchPost["author"] }> = ({ author }) => {
 };
 
 const PostCard: React.FC<{ post: MatchPost; kind: "LOST" | "FOUND" }> = ({ post, kind }) => (
-  <Section title={kind === "LOST" ? "🔍 Lost report (owner)" : "📦 Found report (finder)"}>
+  <Section title={kind === "LOST" ? "Lost report (owner)" : "Found report (finder)"} icon={kind === "LOST" ? SearchX : PackageCheck}>
     {post.images.length ? (
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
         {post.images.map((uri) => (
@@ -61,7 +63,10 @@ const PostCard: React.FC<{ post: MatchPost; kind: "LOST" | "FOUND" }> = ({ post,
     <InfoRow label="Report status" value={humanize(post.status)} />
     {kind === "LOST" ? (
       <View style={styles.proofBox}>
-        <Text style={styles.proofLabel}>🔒 Owner's hidden proof</Text>
+        <View style={styles.linkRow}>
+          <LockKeyhole size={14} color={colors.warning} />
+          <Text style={styles.proofLabel}>Owner's hidden proof</Text>
+        </View>
         <Text style={ui.body}>{post.hidden_proof || "None given."}</Text>
       </View>
     ) : null}
@@ -440,10 +445,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.warning,
   },
-  proofLabel: { fontSize: 11, fontWeight: "800", color: colors.warning, marginBottom: 4 },
+  proofLabel: { fontSize: 12, fontWeight: "600", color: colors.warning },
   contactName: { fontSize: 13, fontWeight: "700", color: colors.textPrimary },
   contactLinks: { flexDirection: "row", flexWrap: "wrap", gap: 14, marginTop: 4 },
-  link: { fontSize: 12, fontWeight: "700", color: colors.ocean, marginTop: 6 },
+  link: { fontSize: 13, fontWeight: "600", color: colors.primary },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
   chipRow: { flexDirection: "row", gap: 6, marginTop: 8 },
   qa: {
     marginTop: 10,

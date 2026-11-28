@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, FlatList, TextInput, RefreshControl, StyleSheet } from "react-native";
+import { View, FlatList, RefreshControl, StyleSheet } from "react-native";
+import { Badge, Text, TextInput } from "../../ui";
 import { useFocusEffect } from "@react-navigation/native";
+import { programYearLabel } from "../../api/auth";
 import { adminApi, AdminUser } from "../../api/admin";
 import { errorMessage } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
-import { Badge } from "../../components/Badge";
 import { colors } from "../../theme/colors";
-import { ActionButton, EmptyState, ErrorText, ScreenLoader, SuccessText, formatDateTime, humanize, ui } from "./adminUi";
+import { ActionButton, EmptyState, ErrorText, ScreenLoader, SuccessText, formatDateTime, ui } from "./adminUi";
 
 const SEARCH_DELAY_MS = 400;
 
@@ -79,7 +80,7 @@ export const AdminUsersScreen: React.FC = () => {
           {item.email} · {item.registration_number}
         </Text>
         <Text style={ui.meta}>
-          {[item.department, humanize(item.program_year), item.hostel].filter((v) => v && v !== "—").join(" · ") || "No profile details"}
+          {[item.department, programYearLabel(item.program_year), item.hostel].filter(Boolean).join(" · ") || "No profile details"}
         </Text>
         {item.is_banned && item.ban_reason ? <Text style={styles.reason}>Ban reason: {item.ban_reason}</Text> : null}
         <Text style={ui.muted}>Joined {formatDateTime(item.date_joined)}</Text>
@@ -121,7 +122,7 @@ export const AdminUsersScreen: React.FC = () => {
             </View>
           ) : (
             <View style={ui.actions}>
-              <ActionButton label="Ban…" tone="warning" onPress={() => setBanTarget(item.id)} />
+              <ActionButton label="Ban user" tone="warning" onPress={() => setBanTarget(item.id)} />
             </View>
           )
         ) : null}

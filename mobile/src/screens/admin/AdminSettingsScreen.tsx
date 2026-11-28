@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, TextInput } from "react-native";
+import { View, ScrollView } from "react-native";
+import { Text, TextInput } from "../../ui";
 import { adminApi, SiteSettings } from "../../api/admin";
 import { errorMessage } from "../../api/client";
 import { colors } from "../../theme/colors";
