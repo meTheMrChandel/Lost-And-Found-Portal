@@ -1,326 +1,163 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-} from "react-native";
+import React, { useRef, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AuthStackParamList } from "../../navigation/types";
 import { useAuth } from "../../context/AuthContext";
-import { Input } from "../../components/Input";
-import { Button } from "../../components/Button";
+import { errorMessage } from "../../api/client";
+import { Button, haptics, Notice, Text, TextField, useToast, TextInputRef } from "../../ui";
+import { Lock, Mail } from "../../ui/icons";
 import { colors } from "../../theme/colors";
+import { AuthLayout } from "./AuthLayout";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
-export const LoginScreen: React.FC<Props> = ({ navigation }) => {
+export const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const toast = useToast();
+  const passwordRef = useRef<TextInputRef>(null);
+
+  const [email, setEmail] = useState(route.params?.email || "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const closeAuth = () => {
+    const root = navigation.getParent();
+    if (root?.canGoBack()) root.goBack();
+    else root?.navigate("Main");
+  };
+
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter your email and password.");
+    const address = email.trim().toLowerCase();
+    if (!address || !password) {
+      setError("Enter your email and password.");
       return;
     }
-
-    if (!email.includes("@")) {
-      setError("Please enter a valid email address.");
+    if (!/^\S+@\S+\.\S+$/.test(address)) {
+      setError("That doesn't look like an email address.");
       return;
     }
-
     setError("");
     setLoading(true);
     try {
-      await login(email.trim().toLowerCase(), password);
-      navigation.navigate("Main" as any);
+      const profile = await login(address, password);
+      haptics.success();
+      toast.show(`Welcome back${profile.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}`);
+      closeAuth();
     } catch (err: any) {
-      setError(err.formattedMessage || err.message || "Failed to sign in. Please verify your credentials.");
-    } finally {
+      setError(errorMessage(err, "Couldn't sign you in. Check your email and password."));
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.container}
+    <AuthLayout
+      showLogo
+      title="Welcome back"
+      subtitle="Sign in with your IIT Ropar email to report items, message the admin office and track your reports."
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+      {error ? <Notice tone="danger" message={error} style={styles.notice} /> : null}
+
+      <TextField
+        label="Institute email"
+        icon={Mail}
+        placeholder="you@iitrpr.ac.in"
+        value={email}
+        onChangeText={(text) => {
+          setEmail(text);
+          setError("");
+        }}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+        submitBehavior="submit"
+      />
+      <TextField
+        ref={passwordRef}
+        label="Password"
+        icon={Lock}
+        placeholder="Your password"
+        value={password}
+        onChangeText={(text) => {
+          setPassword(text);
+          setError("");
+        }}
+        secureTextEntry
+        autoComplete="current-password"
+        textContentType="password"
+        returnKeyType="go"
+        onSubmitEditing={handleLogin}
+        containerStyle={{ marginBottom: 10 }}
+      />
+      <Pressable
+        onPress={() => navigation.navigate("ForgotPassword", { email: email.trim() || undefined })}
+        hitSlop={10}
+        style={styles.forgot}
+        accessibilityRole="link"
       >
-        {/* Brand Logo & Header */}
-        <View style={styles.header}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>LF</Text>
-          </View>
-          <Text style={styles.title}>IIT Ropar</Text>
-          <Text style={styles.subtitle}>LOST & FOUND PORTAL</Text>
-        </View>
+        <Text variant="subhead" color="primary">
+          Forgot password?
+        </Text>
+      </Pressable>
 
-        {/* Card Form */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Student & Staff Login</Text>
-          <Text style={styles.cardSubtitle}>
-            Sign in with your institute email to track belongings and claims.
-          </Text>
+      <Button title="Sign in" onPress={handleLogin} loading={loading} size="lg" fullWidth />
 
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>⚠️ {error}</Text>
-            </View>
-          ) : null}
-
-          <Input
-            label="Institute Email"
-            placeholder="e.g. 2026aim1023@iitrpr.ac.in"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              setError("");
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <Input
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              setError("");
-            }}
-            secureTextEntry
-          />
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate("ForgotPassword")}
-            style={styles.forgotBtn}
-          >
-            <Text style={styles.forgotText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
+      {/* Quick demo sign-in for development builds only, so no credentials ship in the APK */}
+      {__DEV__ ? (
+        <View style={styles.devRow}>
           <Button
-            title="Sign In"
-            onPress={handleLogin}
-            loading={loading}
-            style={styles.submitBtn}
+            title="Demo student"
+            size="sm"
+            variant="tonal"
+            onPress={() => {
+              setEmail("2026aim1023@iitrpr.ac.in");
+              setPassword("Student@123456");
+            }}
           />
-
-          {/* Quick demo fill helpers: development builds only, so no credentials ship in the APK */}
-          {__DEV__ ? (
-            <>
-              <TouchableOpacity
-                style={styles.demoHelper}
-                onPress={() => {
-                  setEmail("2026aim1023@iitrpr.ac.in");
-                  setPassword("Student@123456");
-                  setError("");
-                }}
-              >
-                <Text style={styles.demoHelperText}>
-                  💡 Fill Student Demo (2026aim1023@iitrpr.ac.in)
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.demoHelper, { marginTop: 6, backgroundColor: colors.ocean + "10" }]}
-                onPress={() => {
-                  setEmail("admin@iitrpr.ac.in");
-                  setPassword("Admin@123456");
-                  setError("");
-                }}
-              >
-                <Text style={[styles.demoHelperText, { color: colors.ocean }]}>
-                  🛡️ Fill Admin Demo (admin@iitrpr.ac.in)
-                </Text>
-              </TouchableOpacity>
-            </>
-          ) : null}
-
-          <View style={styles.footerRow}>
-            <Text style={styles.footerText}>New to IIT Ropar Lost & Found? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-              <Text style={styles.registerLink}>Register</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.guestDivider}>
-            <View style={styles.line} />
-            <Text style={styles.orText}>OR</Text>
-            <View style={styles.line} />
-          </View>
-
-          <TouchableOpacity
-            style={styles.guestBtn}
-            onPress={() => navigation.navigate("Main" as any)}
-          >
-            <Text style={styles.guestBtnText}>← Continue as Guest (Browse Feed)</Text>
-          </TouchableOpacity>
+          <Button
+            title="Demo admin"
+            size="sm"
+            variant="tonal"
+            onPress={() => {
+              setEmail("admin@iitrpr.ac.in");
+              setPassword("Admin@123456");
+            }}
+          />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      ) : null}
+
+      <View style={styles.divider}>
+        <View style={styles.line} />
+        <Text variant="caption" color="textMuted">
+          New to Lost & Found?
+        </Text>
+        <View style={styles.line} />
+      </View>
+      <Button
+        title="Create an account"
+        variant="secondary"
+        size="lg"
+        fullWidth
+        onPress={() => navigation.navigate("Register")}
+      />
+      <Pressable onPress={closeAuth} hitSlop={10} style={styles.guest} accessibilityRole="button">
+        <Text variant="subhead" color="textSecondary">
+          Browse without signing in
+        </Text>
+      </Pressable>
+    </AuthLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  logoBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-    marginBottom: 12,
-  },
-  logoText: {
-    color: colors.textWhite,
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.ocean,
-    letterSpacing: 1.5,
-    marginTop: 2,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 24,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4,
-    marginBottom: 18,
-    lineHeight: 18,
-  },
-  errorBox: {
-    backgroundColor: colors.lostLight,
-    borderColor: "#FECACA",
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 12,
-    marginBottom: 14,
-  },
-  errorText: {
-    color: colors.lost,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  forgotBtn: {
-    alignSelf: "flex-end",
-    marginBottom: 16,
-    marginTop: -4,
-  },
-  forgotText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.ocean,
-  },
-  submitBtn: {
-    marginTop: 4,
-  },
-  footerRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 18,
-  },
-  footerText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  registerLink: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-  demoHelper: {
-    backgroundColor: colors.primaryLight,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginTop: 10,
-    alignItems: "center",
-  },
-  demoHelperText: {
-    fontSize: 11,
-    color: colors.primaryHover,
-    fontWeight: "600",
-  },
-  guestDivider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 14,
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.borderLight,
-  },
-  orText: {
-    marginHorizontal: 10,
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.textMuted,
-  },
-  guestBtn: {
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 10,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  guestBtnText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
+  notice: { marginBottom: 18 },
+  forgot: { alignSelf: "flex-end", marginBottom: 24 },
+  devRow: { flexDirection: "row", gap: 8, marginTop: 12, justifyContent: "center" },
+  divider: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 24 },
+  line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong },
+  guest: { alignSelf: "center", marginTop: 20, padding: 6 },
 });
