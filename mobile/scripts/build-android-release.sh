@@ -39,9 +39,11 @@ fi
 
 [[ -d node_modules ]] || npm ci
 export NODE_ENV=production
+# prebuild rewrites the run scripts in package.json; put back the Expo Go ones the team uses
+# (a copy rather than git checkout, so uncommitted dependency changes survive)
+cp package.json "${TMPDIR:-/tmp}/lostandfound-package.json"
 CI=1 npx expo prebuild --platform android --clean --no-install
-# prebuild rewrites the run scripts in package.json; keep the Expo Go ones the team uses
-git checkout -- package.json 2>/dev/null || true
+cp "${TMPDIR:-/tmp}/lostandfound-package.json" package.json
 
 # Phones (and emulators on Apple-silicon Macs) are ARM; leaving out x86 halves the APK size.
 # Set ANDROID_ARCHS=arm64-v8a,armeabi-v7a,x86,x86_64 for an x86 emulator.

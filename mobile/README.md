@@ -6,25 +6,26 @@ Cross-platform mobile client for the **IIT Ropar Lost & Found Portal** built wit
 
 ## 🚀 Key Features
 
-- **Dual-Mode SimpleJWT Authentication:**
-  - Secure token persistence via `expo-secure-store` with automatic token refresh interceptor.
-  - `@iitrpr.ac.in` domain verification with live email OTP delivery.
-- **Public Feed & Discovery:**
-  - Fast searchable campus feed with category filter chips and post-type toggles (All, Lost, Found).
-  - High-resolution photo gallery and promised honor reward tags.
-- **Native Lost & Found Reporting:**
-  - Camera and photo library integration via `expo-image-picker`.
-  - Confidential `hidden_proof` field for private ownership verification.
-  - Custody assignment (Finder, Admin Office, Security Office).
-- **Native QR Valuables Scanner:**
-  - Real-time barcode & QR scanning via `expo-camera`.
-  - Zero-knowledge identity protection: reveals only item name, category, and owner name without exposing phone or registration numbers.
-- **Real-Time Handover Chat:**
-  - Case-mediated chat threads with offline synchronization cursor (`?since=`).
-  - Read receipts and unread badge counters.
-- **Campus Notifications Hub:**
-  - Match alerts, handover updates, and administration notifications.
-- **Campus Admin Console (staff accounts only, Admin tab):**
+- **Home feed:** search, an All / Lost / Found switch and category chips; photo cards with the place,
+  date and any reward; infinite scroll, pull to refresh and loading placeholders.
+- **Report in one tap:** the centre button of the tab bar asks "lost, found or scan?". The report
+  forms take up to 5 photos (camera or gallery, shrunk before upload so they stay under the
+  server's 5 MB limit), the date and time it happened, the place, private ownership proof and an
+  optional reward (lost), or where the item is now and an admin-only option (found). Leaving a
+  half-filled form asks before discarding it.
+- **Item details:** swipeable photos, everything known about the item, "I found this" / "This is
+  mine" (opens the admin office chat with a ready-made message), share, and report a listing.
+- **My reports:** status filters with counts, what each status means, the admin's notes, replying
+  to an information request, renewing and withdrawing.
+- **Messages:** conversations with the admin office and other students, message requests by
+  registration number, live chat over WebSocket with read ticks, and blocking.
+- **Notifications:** grouped new and earlier, each opening the right screen (the matched item,
+  the report, the conversation or the admin queue).
+- **QR stickers:** register belongings, show and share the real sticker, pause or remove it, and a
+  full-screen scanner with a torch. Sticker links open the scan result in the app.
+- **Account:** sign in, three-step registration with an emailed code, password reset, and profile
+  editing with a photo, department and programme.
+- **Campus admin console (staff accounts, Admin tab):**
   - Overview of pending and overdue reviews, live and returned reports, recovery rate and abuse reports.
   - Case queue with filters and full case review: approve, request info, reject, hide or restore, change category, assign, delete, with the hidden proof, the author and the audit history.
   - Match queue and handover: confirm or dismiss matches, record hidden-proof Q&A, set the meeting mode, issue and verify the one-time handover code, settle the reward and close the case.
@@ -34,15 +35,29 @@ Cross-platform mobile client for the **IIT Ropar Lost & Found Portal** built wit
 
 ## 🛠️ Tech Stack
 
-- **Framework:** React Native + Expo (SDK 58)
-- **Language:** TypeScript
-- **Navigation:** React Navigation v7 (Native Stack & Bottom Tabs)
-- **Network & State:** Axios with interceptors, Context API
-- **Device Hardware APIs:**
-  - `expo-camera` (`CameraView` modern QR & barcode scanning)
-  - `expo-image-picker` (Camera & Photo Library)
-  - `expo-secure-store` (Encrypted keychain / keystore storage)
-- **Styling:** Custom light theme with IIT Ropar emerald (`#047857`) and ocean teal accents (`#0284c7`, `#0d9488`).
+- **Framework:** React Native + Expo (SDK 58), TypeScript
+- **Navigation:** React Navigation v7 (native stack and bottom tabs with a custom tab bar)
+- **Network & state:** Axios with token refresh, React context for the session and unread counts
+- **Device APIs:** `expo-camera` (QR scanning), `expo-image-picker` and `expo-image-manipulator`
+  (photos), `expo-image` (cached images), `@react-native-community/datetimepicker`, `expo-haptics`,
+  `expo-secure-store` (tokens)
+- **Look:** the website's palette and its Inter typeface (`@expo-google-fonts/inter`), Lucide icons
+  (`lucide-react-native` on `react-native-svg`)
+
+## 🎨 Design System
+
+Screens are built from the components in `src/ui/` rather than styling React Native primitives
+directly, so the app stays consistent:
+
+- `src/theme/colors.ts` and `src/theme/tokens.ts`: colours, Inter type scale, spacing, radii, shadows.
+- `Text` / `TextInput`: Inter everywhere; a `fontWeight` in a style picks the matching Inter face.
+- `Button`, `IconButton`, `TextField`, `SearchField`, `SelectField`, `DateTimeField`, `OtpInput`,
+  `PhotoPicker`, `Chip`, `SegmentedControl`, `Badge`, `Card`, `ListItem` / `ListGroup`, `Avatar`.
+- `Screen` (safe areas, keyboard handling and a pinned footer), `ScreenHeader`, `BottomSheet` /
+  `OptionSheet`, `EmptyState` / `ErrorState`, `Notice`, `Skeleton`, and `useToast()` for short
+  confirmations.
+- `src/ui/icons.ts` imports each Lucide icon by its own file: Metro doesn't tree-shake, so importing
+  from the package root would bundle all of them. Add new icons there.
 
 ---
 

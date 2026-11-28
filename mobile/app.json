@@ -3,7 +3,7 @@
     "name": "Lost & Found IIT Ropar",
     "slug": "lost-and-found-iitrpr",
     "scheme": "lostandfound",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -50,7 +50,8 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "versionCode": 2
     },
     "plugins": [
       [
