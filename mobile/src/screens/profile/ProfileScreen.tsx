@@ -1,417 +1,313 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
+import React, { useState } from "react";
+import { Alert, Linking, ScrollView, StyleSheet, View } from "react-native";
+import Constants from "expo-constants";
 import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../navigation/types";
+import { departmentLabel, profilePhotoUrl, programYearLabel } from "../../api/auth";
+import { WEB_URL } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
-import { Card } from "../../components/Card";
-import { Button } from "../../components/Button";
+import { useActivity } from "../../context/ActivityContext";
+import {
+  Avatar,
+  Badge,
+  BottomSheet,
+  Button,
+  ListGroup,
+  ListItem,
+  Logo,
+  ScreenHeader,
+  SectionHeader,
+  Text,
+  useToast,
+} from "../../ui";
+import {
+  Bell,
+  ClipboardList,
+  ExternalLink,
+  EyeOff,
+  Handshake,
+  LockKeyhole,
+  LogOut,
+  MessageSquareText,
+  Pencil,
+  QrCode,
+  ScanLine,
+  ShieldCheck,
+} from "../../ui/icons";
 import { colors } from "../../theme/colors";
+import { radii, SCREEN_PADDING } from "../../theme/tokens";
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+const PRIVACY_POINTS = [
+  {
+    icon: EyeOff,
+    title: "Your contact details stay private",
+    body: "Your phone number and email are never shown on the feed or to people who scan your stickers.",
+  },
+  {
+    icon: LockKeyhole,
+    title: "Proof only the admins see",
+    body: "The private details you add to a lost report are only used by the admin office to check claims.",
+  },
+  {
+    icon: Handshake,
+    title: "Verified hand-overs",
+    body: "Items are returned through the admin office using a one-time code, so they reach the right person.",
+  },
+];
 
 export const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
+  const toast = useToast();
   const { user, logout } = useAuth();
-  const navigation = useNavigation<any>();
+  const { unreadNotifications } = useActivity();
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
-  const handleLogout = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+  const version = Constants.expoConfig?.version;
+
+  const signOut = () => {
+    Alert.alert("Sign out?", "You'll need your password to sign back in.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: logout },
+      {
+        text: "Sign out",
+        style: "destructive",
+        onPress: async () => {
+          setSigningOut(true);
+          await logout();
+          setSigningOut(false);
+          toast.show("You're signed out");
+          navigation.navigate("Main", { screen: "Home" });
+        },
+      },
     ]);
   };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {!user ? (
-        <View style={styles.guestCard}>
-          <View style={styles.guestLogoBadge}>
-            <Text style={styles.logoText}>LF</Text>
-          </View>
-          <Text style={styles.guestTitle}>IIT Ropar Campus Member</Text>
-          <Text style={styles.guestSubtitle}>
-            Sign in with your institute email to register campus valuables with QR stickers, report belongings, and receive automated matching alerts.
-          </Text>
-          <Button
-            title="Sign In / Register"
-            onPress={() => navigation.navigate("Auth")}
-            style={{ marginTop: 16 }}
+  const support = (
+    <>
+      <SectionHeader title="Help & info" style={styles.section} />
+      <ListGroup>
+        {user ? (
+          <ListItem
+            title="Send feedback"
+            subtitle="Tell the team what works and what doesn't"
+            icon={MessageSquareText}
+            onPress={() => navigation.navigate("Feedback", { from: "Profile" })}
           />
-        </View>
-      ) : (
-        /* Student ID Card */
-        <View style={styles.idCard}>
-          <View style={styles.idHeader}>
-            <View style={styles.logoBadge}>
-              <Text style={styles.logoText}>LF</Text>
+        ) : null}
+        <ListItem
+          title="Privacy & safety"
+          subtitle="How your details are protected"
+          icon={ShieldCheck}
+          onPress={() => setPrivacyOpen(true)}
+        />
+        {WEB_URL ? (
+          <ListItem
+            title="Open the website"
+            subtitle="Lost & Found on the web"
+            icon={ExternalLink}
+            onPress={() => Linking.openURL(`${WEB_URL}/feed`).catch(() => {})}
+          />
+        ) : null}
+      </ListGroup>
+    </>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScreenHeader title="Profile" />
+      {/* Keyed by account so signing in or out starts again from the top */}
+      <ScrollView key={user?.id || "guest"} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {!user ? (
+          <View style={styles.guest}>
+            <Logo size={64} />
+            <Text variant="title2" align="center" style={{ marginTop: 18 }}>
+              Your campus account
+            </Text>
+            <Text variant="callout" color="textSecondary" align="center" style={styles.guestBody}>
+              Sign in with your IIT Ropar email to report items, register QR stickers for your belongings and chat with
+              the admin office.
+            </Text>
+            <Button
+              title="Sign in"
+              size="lg"
+              fullWidth
+              onPress={() => navigation.navigate("Auth")}
+              style={{ marginTop: 22 }}
+            />
+            <Button
+              title="Create an account"
+              variant="secondary"
+              size="lg"
+              fullWidth
+              onPress={() => navigation.navigate("Auth", { screen: "Register" })}
+              style={{ marginTop: 10 }}
+            />
+          </View>
+        ) : (
+          <View style={styles.idCard}>
+            <View style={styles.idTop}>
+              <Avatar name={user.full_name} uri={profilePhotoUrl(user)} size={68} />
+              <View style={{ flex: 1 }}>
+                <Text variant="title2" numberOfLines={2}>
+                  {user.full_name || "Campus member"}
+                </Text>
+                <Text variant="footnote" color="textSecondary" numberOfLines={1}>
+                  {user.registration_number}
+                </Text>
+                <Text variant="footnote" color="textSecondary" numberOfLines={1}>
+                  {user.email}
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.instName}>INDIAN INSTITUTE OF TECHNOLOGY ROPAR</Text>
-              <Text style={styles.portalTag}>Verified Campus Member</Text>
+            <View style={styles.tags}>
+              {user.is_staff ? <Badge label="Campus admin" tone="dark" icon={ShieldCheck} size="md" /> : null}
+              {user.department ? <Badge label={departmentLabel(user.department)} size="md" /> : null}
+              {user.program_year ? <Badge label={programYearLabel(user.program_year)} size="md" /> : null}
             </View>
+            <Button
+              title="Edit profile"
+              icon={Pencil}
+              variant="secondary"
+              size="sm"
+              onPress={() => navigation.navigate("EditProfile")}
+              style={styles.edit}
+            />
           </View>
+        )}
 
-          <View style={styles.avatarRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarChar}>{user?.full_name?.charAt(0) || "U"}</Text>
-            </View>
-            <View style={styles.nameCol}>
-              <Text style={styles.fullName}>{user?.full_name || "Campus Member"}</Text>
-              <Text style={styles.regNo}>{user?.registration_number || "REGISTRATION NUMBER"}</Text>
-            </View>
-          </View>
+        {user ? (
+          <>
+            <SectionHeader title="Your activity" style={styles.section} />
+            <ListGroup>
+              {user.is_staff ? (
+                <ListItem
+                  title="My reports"
+                  subtitle="Reports you've made yourself"
+                  icon={ClipboardList}
+                  onPress={() => navigation.navigate("MyReports")}
+                />
+              ) : null}
+              <ListItem
+                title="Registered items"
+                subtitle="QR stickers for your bike, laptop and more"
+                icon={QrCode}
+                onPress={() => navigation.navigate("Valuables")}
+              />
+              <ListItem
+                title="Notifications"
+                subtitle="Matches, report updates and alerts"
+                icon={Bell}
+                badge={unreadNotifications}
+                onPress={() => navigation.navigate("Notifications")}
+              />
+              <ListItem
+                title="Scan a QR sticker"
+                subtitle="See whose tagged item you're holding"
+                icon={ScanLine}
+                onPress={() => navigation.navigate("QRScan")}
+              />
+            </ListGroup>
+          </>
+        ) : (
+          <>
+            <SectionHeader title="Tools" style={styles.section} />
+            <ListGroup>
+              <ListItem
+                title="Scan a QR sticker"
+                subtitle="See whose tagged item you're holding"
+                icon={ScanLine}
+                onPress={() => navigation.navigate("QRScan")}
+              />
+            </ListGroup>
+          </>
+        )}
 
-          <View style={styles.divider} />
+        {support}
 
-          <View style={styles.infoGrid}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>INSTITUTE EMAIL</Text>
-              <Text style={styles.infoValue}>{user?.email}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>DEPARTMENT</Text>
-              <Text style={styles.infoValue}>{user?.department || "CSE"}</Text>
-            </View>
-          </View>
-        </View>
-      )}
+        {user ? (
+          <ListGroup style={styles.section}>
+            <ListItem
+              title={signingOut ? "Signing out…" : "Sign out"}
+              icon={LogOut}
+              destructive
+              onPress={signOut}
+              disabled={signingOut}
+              right={null}
+            />
+          </ListGroup>
+        ) : null}
 
-      {/* Quick Menu Options */}
-      <View style={styles.menuSection}>
-        <Text style={styles.sectionTitle}>Campus Belongings & Activity</Text>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate("MyReports")}
-        >
-          <View style={styles.menuIconBox}>
-            <Text style={styles.menuEmoji}>📋</Text>
-          </View>
-          <View style={styles.menuTextCol}>
-            <Text style={styles.menuLabel}>My Reports</Text>
-            <Text style={styles.menuDesc}>Status, admin notes, renew or update your reports</Text>
-          </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate("Valuables")}
-        >
-          <View style={styles.menuIconBox}>
-            <Text style={styles.menuEmoji}>🏷️</Text>
-          </View>
-          <View style={styles.menuTextCol}>
-            <Text style={styles.menuLabel}>My Registered Valuables</Text>
-            <Text style={styles.menuDesc}>Manage bicycles, laptops & print QR tags</Text>
-          </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate("Messages")}
-        >
-          <View style={styles.menuIconBox}>
-            <Text style={styles.menuEmoji}>✉️</Text>
-          </View>
-          <View style={styles.menuTextCol}>
-            <Text style={styles.menuLabel}>Messages</Text>
-            <Text style={styles.menuDesc}>Your chats, and message a student by registration number</Text>
-          </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate("Notifications")}
-        >
-          <View style={styles.menuIconBox}>
-            <Text style={styles.menuEmoji}>🔔</Text>
-          </View>
-          <View style={styles.menuTextCol}>
-            <Text style={styles.menuLabel}>Campus Alerts & Updates</Text>
-            <Text style={styles.menuDesc}>Match notifications and case alerts</Text>
-          </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate("QRScan")}
-        >
-          <View style={styles.menuIconBox}>
-            <Text style={styles.menuEmoji}>📷</Text>
-          </View>
-          <View style={styles.menuTextCol}>
-            <Text style={styles.menuLabel}>Scan Item Sticker</Text>
-            <Text style={styles.menuDesc}>Scan belongings found across campus</Text>
-          </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.menuSection}>
-        <Text style={styles.sectionTitle}>Beta</Text>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => navigation.navigate("Feedback", { from: "Profile" })}
-        >
-          <View style={styles.menuIconBox}>
-            <Text style={styles.menuEmoji}>💬</Text>
-          </View>
-          <View style={styles.menuTextCol}>
-            <Text style={styles.menuLabel}>Send Feedback</Text>
-            <Text style={styles.menuDesc}>Tell the team what works and what doesn't</Text>
-          </View>
-          <Text style={styles.arrow}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Safety & App Info */}
-      <View style={styles.safetyBox}>
-        <Text style={styles.safetyTitle}>🛡️ Privacy & Security Guarantee</Text>
-        <Text style={styles.safetyText}>
-          Your phone number and student credentials are never shown on public feeds or QR sticker scans. All claim handovers are verified securely with one-time verification tokens.
+        <Text variant="caption" color="textMuted" align="center" style={styles.version}>
+          Lost & Found · IIT Ropar{version ? ` · v${version}` : ""}
         </Text>
-      </View>
+      </ScrollView>
 
-      {user ? (
+      <BottomSheet visible={privacyOpen} onClose={() => setPrivacyOpen(false)} title="Privacy & safety">
+        <View style={{ gap: 16 }}>
+          {PRIVACY_POINTS.map((point) => {
+            const Icon = point.icon;
+            return (
+              <View key={point.title} style={styles.point}>
+                <View style={styles.pointIcon}>
+                  <Icon size={20} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="headline">{point.title}</Text>
+                  <Text variant="footnote" color="textSecondary" style={{ marginTop: 2 }}>
+                    {point.body}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
         <Button
-          title="Sign Out"
-          variant="lost"
-          onPress={handleLogout}
-          style={styles.logoutBtn}
+          title="Got it"
+          variant="secondary"
+          size="lg"
+          fullWidth
+          onPress={() => setPrivacyOpen(false)}
+          style={{ marginTop: 22 }}
         />
-      ) : (
-        <Button
-          title="Sign In with IIT Ropar Email"
-          onPress={() => navigation.navigate("Auth")}
-          style={styles.logoutBtn}
-        />
-      )}
-    </ScrollView>
+      </BottomSheet>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  guestCard: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: SCREEN_PADDING, paddingBottom: 32 },
+  guest: {
+    alignItems: "center",
     padding: 24,
-    alignItems: "center",
-    marginBottom: 20,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
+    borderColor: colors.border,
   },
-  guestLogoBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  guestTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-    marginBottom: 6,
-    textAlign: "center",
-  },
-  guestSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 18,
-  },
+  guestBody: { marginTop: 8, maxWidth: 320 },
   idCard: {
-    backgroundColor: "#064E3B",
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 4,
-    marginBottom: 20,
+    padding: 18,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  idHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 16,
-  },
-  logoBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: {
-    color: colors.textWhite,
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  instName: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: "#6EE7B7",
-    letterSpacing: 0.8,
-  },
-  portalTag: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.7)",
-  },
-  avatarRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    marginVertical: 6,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#059669",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#A7F3D0",
-  },
-  avatarChar: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.textWhite,
-  },
-  nameCol: {
-    flex: 1,
-  },
-  fullName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: colors.textWhite,
-  },
-  regNo: {
-    fontSize: 12,
-    color: "#A7F3D0",
-    fontWeight: "600",
-    letterSpacing: 1,
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    marginVertical: 14,
-  },
-  infoGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  infoItem: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 8,
-    fontWeight: "700",
-    color: "#6EE7B7",
-    letterSpacing: 0.5,
-  },
-  infoValue: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.textWhite,
-    marginTop: 2,
-  },
-  menuSection: {
-    backgroundColor: colors.card,
+  idTop: { flexDirection: "row", alignItems: "center", gap: 16 },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
+  edit: { alignSelf: "flex-start", marginTop: 16 },
+  section: { marginTop: 22 },
+  version: { marginTop: 28 },
+  point: { flexDirection: "row", gap: 14 },
+  pointIcon: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 16,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-    marginBottom: 12,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  menuIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: colors.background,
+    backgroundColor: colors.primaryTint,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
-  },
-  menuEmoji: {
-    fontSize: 18,
-  },
-  menuTextCol: {
-    flex: 1,
-  },
-  menuLabel: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: colors.textPrimary,
-  },
-  menuDesc: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
-  arrow: {
-    fontSize: 20,
-    color: colors.textMuted,
-  },
-  safetyBox: {
-    backgroundColor: colors.oceanLight,
-    borderWidth: 1,
-    borderColor: "#BAE6FD",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 20,
-  },
-  safetyTitle: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#0369A1",
-    marginBottom: 4,
-  },
-  safetyText: {
-    fontSize: 11,
-    color: "#0284C7",
-    lineHeight: 16,
-  },
-  logoutBtn: {
-    marginTop: 4,
   },
 });
